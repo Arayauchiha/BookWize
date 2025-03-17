@@ -1,0 +1,18 @@
+excluded:
+  - Pods
+  - Carthage
+  - .build
+
+disabled_rules:
+  - line_length
+  - todo
+  - file_length
+  - identifier_name
+  - type_name
+
+type_body_length:
+  warning: 300
+  error: 400
+
+reporter: "github-actions-logging"
+strict: true

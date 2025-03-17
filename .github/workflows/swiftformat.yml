@@ -1,0 +1,34 @@
+name: Swiftformat
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.swift"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**/*.swift"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  Swiftformat:
+    name: Lint with swiftformat, fail if any errors
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Install Swiftformat
+        run: |
+          brew install swiftformat
+
+      - name: Run Swiftformat
+        run: |
+          swiftformat --quiet --strict --reporter github-actions-log --lint .
