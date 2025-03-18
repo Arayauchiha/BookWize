@@ -20,26 +20,26 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                         .padding(.top, 50)
-                    
+
                     // Role selection cards with colorful icons
                     VStack(spacing: 16) {
-                        RoleCard(title: "Member", 
-                               icon: "person.fill", 
-                               iconColor: Color(hex: "007AFF"),  // iOS blue
+                        RoleCard(title: "Member",
+                               icon: "person.fill",
+                               iconColor: Color(hex: "007AFF"), // iOS blue
                                cardColor: Color(hex: "F8F1E9"))
-                        
-                        RoleCard(title: "Librarian", 
-                               icon: "books.vertical.fill", 
-                               iconColor: Color(hex: "34C759"),  // iOS green
+
+                        RoleCard(title: "Librarian",
+                               icon: "books.vertical.fill",
+                               iconColor: Color(hex: "34C759"), // iOS green
                                cardColor: Color(hex: "F8F1E9"))
-                        
-                        RoleCard(title: "Admin", 
-                               icon: "gear", 
-                               iconColor: Color(hex: "AF52DE"),  // iOS purple
+
+                        RoleCard(title: "Admin",
+                               icon: "gear",
+                               iconColor: Color(hex: "AF52DE"), // iOS purple
                                cardColor: Color(hex: "F8F1E9"))
                     }
                     .padding(.horizontal, 20)
-                    
+
                     Spacer(minLength: 50)
                 }
             }
@@ -50,13 +50,14 @@ struct ContentView: View {
 }
 
 struct RoleCard: View {
+
+    // MARK: Internal
+
     let title: String
     let icon: String
     let iconColor: Color
     let cardColor: Color
-    
-    @State private var isPressed = false
-    
+
     var body: some View {
         NavigationLink(destination: destination) {
             HStack(spacing: 16) {
@@ -66,13 +67,13 @@ struct RoleCard: View {
                     .frame(width: 48, height: 48)
                     .background(iconColor.opacity(0.15))
                     .clipShape(Circle())
-                
+
                 Text(title)
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(hex: "463F3A"))  // Dark brown text
-                
+                    .foregroundStyle(Color(hex: "463F3A")) // Dark brown text
+
                 Spacer()
-                
+
                 Image(systemName: "chevron.right")
                     .foregroundStyle(Color(hex: "463F3A").opacity(0.6))
                     .font(.system(size: 14, weight: .semibold))
@@ -94,7 +95,11 @@ struct RoleCard: View {
                 isPressed = pressing
             }, perform: {})
     }
-    
+
+    // MARK: Private
+
+    @State private var isPressed = false
+
     @ViewBuilder
     private var destination: some View {
         switch title {
@@ -115,10 +120,13 @@ extension Color {
         switch hex.count {
         case 3: // RGB (12-bit)
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+
         case 6: // RGB (24-bit)
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+
         case 8: // ARGB (32-bit)
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+
         default:
             (a, r, g, b) = (1, 1, 1, 0)
         }
@@ -126,7 +134,7 @@ extension Color {
             .sRGB,
             red: Double(r) / 255,
             green: Double(g) / 255,
-            blue:  Double(b) / 255,
+            blue: Double(b) / 255,
             opacity: Double(a) / 255
         )
     }
