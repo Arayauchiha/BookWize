@@ -63,6 +63,10 @@ struct LoginView: View {
     // Mock user state (in real app, this would be in UserDefaults/Backend)
     @State private var hasCustomPassword = false
     @State private var alertType: AlertType?
+    @State private var showPassword = false
+    @State private var emailError: String?
+    @State private var passwordError: String?
+    @State private var showSignup = false
 
     // MARK: - Body
     var body: some View {
@@ -136,7 +140,7 @@ struct LoginView: View {
                             .padding(.horizontal, 20)
                             
                             NavigationLink {
-                                Text("Create Account View")  // Replace with actual view
+                                SignupView()  // Replace with actual view
                             } label: {
                                 Text("Create Account")
                                     .font(.system(size: 16, weight: .medium))
@@ -146,6 +150,14 @@ struct LoginView: View {
                         .padding(.top, 10)
                     }
                 }
+                
+        }
+            .padding()
+            .sheet(isPresented: $showSignup) {
+                SignupView()
+            }
+            .sheet(isPresented: $showForgotPassword) {
+                ForgotPasswordView()
             }
             .background(Color.customBackground)
             .navigationDestination(isPresented: $navigateToApp) {
@@ -346,6 +358,44 @@ private enum AlertType: Identifiable {
     var message: String {
         switch self {
         case .error(let message), .success(let message): return message
+        }
+    }
+}
+
+//MARK: - Forget Password View
+struct ForgotPasswordView: View {
+    @Environment(\.dismiss) var dismiss
+    @State private var email = ""
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Text("Reset Password")
+                    .font(.title)
+                
+                TextField("Email", text: $email)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .autocapitalization(.none)
+                    .keyboardType(.emailAddress)
+                    .padding(.horizontal)
+                
+                Button("Send Reset Link") {
+                    // TODO: Implement password reset
+                    dismiss()
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .cornerRadius(10)
+                .padding(.horizontal)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationBarItems(trailing: Button("Cancel") {
+                dismiss()
+            })
         }
     }
 }
