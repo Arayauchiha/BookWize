@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3A8E59EA2D8AE4A800CF1570 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8E59E92D8AE4A800CF1570 /* LoginView.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		3A0AD2F82D8879E20053270C /* BookWize.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BookWize.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3A8E59E92D8AE4A800CF1570 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +39,7 @@
 			children = (
 				3A0AD2FA2D8879E20053270C /* BookWize */,
 				3A0AD2F92D8879E20053270C /* Products */,
+				3A8E59E92D8AE4A800CF1570 /* LoginView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -119,6 +125,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A8E59EA2D8AE4A800CF1570 /* LoginView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
