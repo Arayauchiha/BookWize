@@ -11,11 +11,11 @@ struct AdminLoginView: View {
                 VStack(spacing: 12) {
                     Text("Welcome, Admin")
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.customText)
 
                     Text("Please sign in to continue")
                         .font(.system(size: 17))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.customText.opacity(0.6))
                 }
                 .padding(.top, 50)
 
@@ -25,7 +25,7 @@ struct AdminLoginView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Email")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.customText.opacity(0.6))
 
                         TextField("Enter your email", text: $email)
                             .textFieldStyle(CustomTextFieldStyle())
@@ -39,7 +39,7 @@ struct AdminLoginView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Password")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color.customText.opacity(0.6))
 
                         HStack {
                             if isPasswordVisible {
@@ -55,11 +55,11 @@ struct AdminLoginView: View {
                                 isPasswordVisible.toggle()
                             }) {
                                 Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                    .foregroundStyle(buttonColor.opacity(0.6))
+                                    .foregroundStyle(Color.customText.opacity(0.6))
                             }
                         }
                         .padding(12)
-                        .background(Color.white)
+                        .background(Color.customInputBackground)
                         .cornerRadius(8)
                     }
                 }
@@ -69,14 +69,13 @@ struct AdminLoginView: View {
                 if hasCustomPassword {
                     Button("Forgot Password?") {
                         if email.isEmpty {
-                            errorMessage = "Please enter your email first"
-                            showError = true
+                            alertType = .error("Please enter your email first")
                             return
                         }
                         showOTPVerification = true
                     }
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(buttonColor)
+                    .foregroundStyle(Color.customButton)
                     .padding(.top, 10)
                 }
 
@@ -84,21 +83,19 @@ struct AdminLoginView: View {
                 Button(action: handleLogin) {
                     Text("Login")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.customInputBackground)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(buttonColor)
+                                .fill(Color.customButton)
                         )
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
             }
         }
-        .background(Color(hex: "F5EBE0"))
-
-        // Sheet for first-time password change or regular password reset
+        .background(Color.customBackground)
         .sheet(isPresented: $showPasswordChangeSheet) {
             PasswordResetView(
                 newPassword: $newPassword,
@@ -107,52 +104,36 @@ struct AdminLoginView: View {
                 title: hasCustomPassword ? "Reset Password" : "Set New Password",
                 message: hasCustomPassword ? "Enter your new password" : "Please change the default password for security",
                 buttonTitle: hasCustomPassword ? "Reset Password" : "Set Password",
-                buttonColor: buttonColor,
                 onSave: handlePasswordChange,
                 onCancel: { showPasswordChangeSheet = false }
             )
-            .background(Color(hex: "F5EBE0"))
-            .interactiveDismissDisabled()
+            .presentationDetents([.height(420)])
+            .presentationDragIndicator(.visible)
         }
-
-        // Sheet for OTP verification
         .sheet(isPresented: $showOTPVerification) {
             OTPVerificationView(
                 email: email,
                 otp: $otp,
-                buttonColor: buttonColor,
                 onVerify: handleOTPVerification,
                 onCancel: { showOTPVerification = false }
             )
-            .background(Color(hex: "F5EBE0"))
-            .interactiveDismissDisabled()
+            .presentationDetents([.height(300)])
+            .presentationDragIndicator(.visible)
         }
-
-        // Error alert
-        .alert("Error", isPresented: $showError) {
-            Button("OK", role: .cancel) {}
+        .alert(alertType?.title ?? "", isPresented: .constant(alertType != nil)) {
+            Button("OK") { alertType = nil }
         } message: {
-            Text(errorMessage)
-        }
-
-        // Success alert
-        .alert("Success", isPresented: $showSuccess) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(successMessage)
+            Text(alertType?.message ?? "")
         }
     }
 
     // MARK: Private
 
+    @Environment(\.dismiss) private var dismiss
     @State private var email = ""
     @State private var password = ""
     @State private var showForgotPassword = false
     @State private var showPasswordChangeSheet = false
-    @State private var showError = false
-    @State private var showSuccess = false
-    @State private var errorMessage = ""
-    @State private var successMessage = ""
     @State private var isPasswordVisible = false
 
     // Password change states
@@ -166,22 +147,50 @@ struct AdminLoginView: View {
 
     // Mock user state (in real app, this would be in UserDefaults/Backend)
     @State private var hasCustomPassword = false
+    @State private var alertType: AlertType?
 
     // Constants
     private let defaultEmail = "ss0854850@gmail.com"
     private let defaultPassword = "admin@12345"
-    private let buttonColor: Color = .init(hex: "2C1810")
+
+    private enum Field {
+        case email
+        case password
+    }
+
+    private enum AlertType: Identifiable {
+        case error(String)
+        case success(String)
+
+        var id: String {
+            switch self {
+            case .error: return "error"
+            case .success: return "success"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .error: return "Error"
+            case .success: return "Success"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .error(let message), .success(let message): return message
+            }
+        }
+    }
 
     private func handleLogin() {
         if email.isEmpty || password.isEmpty {
-            errorMessage = "Please fill in all fields"
-            showError = true
+            alertType = .error("Please fill in all fields")
             return
         }
 
         if email != defaultEmail {
-            errorMessage = "Email not recognized"
-            showError = true
+            alertType = .error("Email not recognized")
             return
         }
 
@@ -195,25 +204,21 @@ struct AdminLoginView: View {
         if hasCustomPassword {
             // Here you would validate against stored password
             // For demo, assume login successful
-            successMessage = "Login successful"
-            showSuccess = true
+            alertType = .success("Login successful")
             return
         }
 
-        errorMessage = "Invalid credentials"
-        showError = true
+        alertType = .error("Invalid credentials")
     }
 
     private func handlePasswordChange() {
         if newPassword.count < 8 {
-            errorMessage = "Password must be at least 8 characters"
-            showError = true
+            alertType = .error("Password must be at least 8 characters")
             return
         }
 
         if newPassword != confirmPassword {
-            errorMessage = "Passwords do not match"
-            showError = true
+            alertType = .error("Passwords do not match")
             return
         }
 
@@ -221,16 +226,14 @@ struct AdminLoginView: View {
         hasCustomPassword = true
         password = newPassword
         showPasswordChangeSheet = false
-        successMessage = "Password updated successfully"
-        showSuccess = true
+        alertType = .success("Password updated successfully")
         newPassword = ""
         confirmPassword = ""
     }
 
     private func handleOTPVerification() {
         if otp.count != 6 {
-            errorMessage = "Please enter a valid 6-digit OTP"
-            showError = true
+            alertType = .error("Please enter a valid 6-digit OTP")
             return
         }
 
@@ -240,177 +243,7 @@ struct AdminLoginView: View {
     }
 }
 
-// Custom text field style for consistent look
-struct CustomTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .padding(12)
-            .background(Color.white)
-            .cornerRadius(8)
-    }
-}
-
-// Update PasswordResetView
-struct PasswordResetView: View {
-    @Binding var newPassword: String
-    @Binding var confirmPassword: String
-    @Binding var isNewPasswordVisible: Bool
-
-    let title: String
-    let message: String
-    let buttonTitle: String
-    let buttonColor: Color
-    let onSave: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                Text(message)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 20)
-
-                VStack(alignment: .leading, spacing: 16) {
-                    // New password field
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("New Password")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        HStack {
-                            if isNewPasswordVisible {
-                                TextField("Enter new password", text: $newPassword)
-                                    .textContentType(.newPassword)
-                                    .autocapitalization(.none)
-                            } else {
-                                SecureField("Enter new password", text: $newPassword)
-                                    .textContentType(.newPassword)
-                            }
-
-                            Button(action: { isNewPasswordVisible.toggle() }) {
-                                Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                    .foregroundStyle(.gray)
-                            }
-                        }
-                        .padding(12)
-                        .background(Color.white)
-                        .cornerRadius(8)
-                    }
-
-                    // Confirm password field
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Confirm Password")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        HStack {
-                            if isNewPasswordVisible {
-                                TextField("Confirm new password", text: $confirmPassword)
-                                    .textContentType(.newPassword)
-                                    .autocapitalization(.none)
-                            } else {
-                                SecureField("Confirm new password", text: $confirmPassword)
-                                    .textContentType(.newPassword)
-                            }
-                        }
-                        .padding(12)
-                        .background(Color.white)
-                        .cornerRadius(8)
-                    }
-                }
-                .padding(.horizontal, 20)
-
-                Button(action: onSave) {
-                    Text(buttonTitle)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(buttonColor)
-                        )
-                }
-                .padding(.horizontal, 20)
-
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(hex: "F5EBE0"))
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                        .foregroundStyle(buttonColor)
-                }
-            }
-        }
-    }
-}
-
-// Add OTP verification view
-struct OTPVerificationView: View {
-    let email: String
-    @Binding var otp: String
-    let buttonColor: Color
-    let onVerify: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                Text("Enter the verification code sent to\n\(email)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 20)
-
-                // OTP field
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Verification Code")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    TextField("Enter 6-digit code", text: $otp)
-                        .keyboardType(.numberPad)
-                        .textContentType(.oneTimeCode)
-                        .padding(12)
-                        .background(Color.white)
-                        .cornerRadius(8)
-                }
-                .padding(.horizontal, 20)
-
-                Button(action: onVerify) {
-                    Text("Verify")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(buttonColor)
-                        )
-                }
-                .padding(.horizontal, 20)
-
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(hex: "F5EBE0"))
-            .navigationTitle("Verify OTP")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                        .foregroundStyle(buttonColor)
-                }
-            }
-        }
-    }
-}
-
 #Preview {
     AdminLoginView()
+        .environment(\.colorScheme, .light)
 }
