@@ -1,12 +1,12 @@
 import SwiftUI
 
 enum AppTheme {
-    static let primaryColor = Color("2C3E50")
-    static let secondaryColor = Color("3498DB")
-    static let accentColor = Color("E74C3C")
-    static let backgroundColor = Color("FCFCFC")
-    static let textColor = Color("2C3E50")
-    static let secondaryTextColor = Color("7F8C8D")
+    static let primaryColor = Color(hex: "2C3E50")
+    static let secondaryColor = Color(hex: "3498DB")
+    static let accentColor = Color(hex: "E74C3C")
+    static let backgroundColor = Color(hex: "FCFCFC")
+    static let textColor = Color(hex: "2C3E50")
+    static let secondaryTextColor = Color(hex: "7F8C8D")
     
     static let cornerRadius: CGFloat = 12
     static let padding: CGFloat = 16
@@ -52,4 +52,4 @@ struct CardView: View {
                    radius: AppTheme.shadowRadius,
                    y: AppTheme.shadowY)
     }
-} 
+}
