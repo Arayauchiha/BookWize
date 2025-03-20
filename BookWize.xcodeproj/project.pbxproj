@@ -21,6 +21,21 @@
 			path = BookWize;
 			sourceTree = "<group>";
 		};
+		6A17FB152D8BC7DF0012DE53 /* librarian role */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "librarian role";
+			sourceTree = "<group>";
+		};
+		6A17FB172D8BC7DF0012DE53 /* librarian roleTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "librarian roleTests";
+			sourceTree = "<group>";
+		};
+		6A17FB1A2D8BC7DF0012DE53 /* librarian roleUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "librarian roleUITests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +55,9 @@
 				3A0AD2FA2D8879E20053270C /* BookWize */,
 				3A0AD2F92D8879E20053270C /* Products */,
 				3A8E59E92D8AE4A800CF1570 /* LoginView.swift */,
+				6A17FB152D8BC7DF0012DE53 /* librarian role */,
+				6A17FB172D8BC7DF0012DE53 /* librarian roleTests */,
+				6A17FB1A2D8BC7DF0012DE53 /* librarian roleUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -68,6 +86,9 @@
 			);
 			fileSystemSynchronizedGroups = (
 				3A0AD2FA2D8879E20053270C /* BookWize */,
+				6A17FB152D8BC7DF0012DE53 /* librarian role */,
+				6A17FB172D8BC7DF0012DE53 /* librarian roleTests */,
+				6A17FB1A2D8BC7DF0012DE53 /* librarian roleUITests */,
 			);
 			name = BookWize;
 			packageProductDependencies = (
