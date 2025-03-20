@@ -172,3 +172,18 @@ struct SignupView: View {
         }
     }
 }
+
+//
+//  SignUp.swift
+//  BookWize
+//
+//  Created by Aditya Singh on 18/03/25.
+//
+
+import SwiftUI
+
+struct SignUp: View {
+    var body: some View {
+        SignupView() // This redirects to your actual implementation
+    }
+}

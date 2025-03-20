@@ -10,13 +10,30 @@ import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var showAdminDashboard = false
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
+    @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
+    @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
 
     var body: some View {
         Group {
             if isAdminLoggedIn {
                 AdminDashboardView()
+            } else if isLibrarianLoggedIn {
+                // Replace with your LibrarianDashboardView
+                Text("Librarian Dashboard")
+                    .font(.largeTitle)
+                    .onTapGesture {
+                        // For testing: allow logout
+                        isLibrarianLoggedIn = false
+                    }
+            } else if isMemberLoggedIn {
+                // Replace with your MemberDashboardView
+                Text("Member Dashboard")
+                    .font(.largeTitle)
+                    .onTapGesture {
+                        // For testing: allow logout
+                        isMemberLoggedIn = false
+                    }
             } else {
                 NavigationStack {
                     ScrollView {

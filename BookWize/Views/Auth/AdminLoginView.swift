@@ -1,256 +1,193 @@
+//
+//  AdminLoginView.swift
+//  BookWize
+//
+//  Created by Aditya Singh on 18/03/25.
+//
+
 import SwiftUI
 
 struct AdminLoginView: View {
-
-    // MARK: Internal
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 30) {
-                    // Welcome section
-                    VStack(spacing: 12) {
-                        Text("Welcome, Admin")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(Color.customText)
-
-                        Text("Please sign in to continue")
-                            .font(.system(size: 17))
-                            .foregroundStyle(Color.customText.opacity(0.6))
-                    }
-                    .padding(.top, 50)
-
-                    // Login fields
-                    VStack(spacing: 20) {
-                        // Email field
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.customText.opacity(0.6))
-
-                            TextField("Enter your email", text: $email)
-                                .textFieldStyle(CustomTextFieldStyle())
-                                .textContentType(.emailAddress)
-                                .keyboardType(.emailAddress)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                        }
-
-                        // Password field with visibility toggle
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Password")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.customText.opacity(0.6))
-
-                            HStack {
-                                if isPasswordVisible {
-                                    TextField("Enter your password", text: $password)
-                                        .textContentType(.password)
-                                        .autocapitalization(.none)
-                                        .disableAutocorrection(true)
-                                } else {
-                                    SecureField("Enter your password", text: $password)
-                                        .textContentType(.password)
-                                }
-                                Button(action: {
-                                    isPasswordVisible.toggle()
-                                }) {
-                                    Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                        .foregroundStyle(Color.customText.opacity(0.6))
-                                }
-                            }
-                            .padding(12)
-                            .background(Color.customInputBackground)
-                            .cornerRadius(8)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-
-                    // Show forgot password only if user has set custom password
-                    if hasCustomPassword {
-                        Button("Forgot Password?") {
-                            if email.isEmpty {
-                                alertType = .error("Please enter your email first")
-                                return
-                            }
-                            showOTPVerification = true
-                        }
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.customButton)
-                        .padding(.top, 10)
-                    }
-
-                    // Login button with darker color
-                    Button(action: handleLogin) {
-                        Text("Login")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color.customInputBackground)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.customButton)
-                            )
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                }
-            }
-            .background(Color.customBackground)
-            .navigationDestination(isPresented: $navigateToAdminDashboard) {
-                AdminDashboardView()
-            }
-            .sheet(isPresented: $showPasswordChangeSheet) {
-                PasswordResetView(
-                    newPassword: $newPassword,
-                    confirmPassword: $confirmPassword,
-                    isNewPasswordVisible: $isNewPasswordVisible,
-                    title: hasCustomPassword ? "Reset Password" : "Set New Password",
-                    message: hasCustomPassword ? "Enter your new password" : "Please change the default password for security",
-                    buttonTitle: hasCustomPassword ? "Reset Password" : "Set Password",
-                    onSave: handlePasswordChange,
-                    onCancel: { showPasswordChangeSheet = false }
-                )
-                .presentationDetents([.height(420)])
-                .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $showOTPVerification) {
-                OTPVerificationView(
-                    email: email,
-                    otp: $otp,
-                    onVerify: handleOTPVerification,
-                    onCancel: { showOTPVerification = false }
-                )
-                .presentationDetents([.height(300)])
-                .presentationDragIndicator(.visible)
-            }
-            .alert(alertType?.title ?? "", isPresented: .constant(alertType != nil)) {
-                Button("OK") { alertType = nil }
-            } message: {
-                Text(alertType?.message ?? "")
-            }
-        }
-    }
-
-    // MARK: Private
-
-    @Environment(\.dismiss) private var dismiss
-    @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
-    @State private var email = ""
-    @State private var password = ""
-    @State private var showForgotPassword = false
-    @State private var showPasswordChangeSheet = false
-    @State private var isPasswordVisible = false
-    @State private var navigateToAdminDashboard = false
-
-    // Password change states
+    @State private var email = "admin@example.com"
+    @State private var password = "admin123"
     @State private var newPassword = ""
     @State private var confirmPassword = ""
-    @State private var isNewPasswordVisible = false
-
-    // OTP states
-    @State private var showOTPVerification = false
-    @State private var otp = ""
-
-    // Mock user state (in real app, this would be in UserDefaults/Backend)
-    @State private var hasCustomPassword = false
-    @State private var alertType: AlertType?
-
-    // Constants
-    private let defaultEmail = "ss0854850@gmail.com"
-    private let defaultPassword = "admin@12345"
-
-    private enum Field {
-        case email
-        case password
+    @State private var showingOTPView = false
+    @State private var otpCode = ""
+    @State private var errorMessage = ""
+    @State private var isLoading = false
+    
+    @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
+    @AppStorage("isFirstLogin") private var isFirstLogin = true
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Admin Login")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+            
+            TextField("Email", text: $email)
+                .padding()
+                .background(Color.gray.opacity(0.2))
+                .cornerRadius(10)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.emailAddress)
+            
+            SecureField("Password", text: $password)
+                .padding()
+                .background(Color.gray.opacity(0.2))
+                .cornerRadius(10)
+            
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+            
+            Button(action: {
+                login()
+            }) {
+                if isLoading {
+                    ProgressView()
+                } else {
+                    Text("Login")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding()
+            .background(Color.adminColor)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .disabled(isLoading)
+        }
+        .padding()
+        .sheet(isPresented: $isFirstLogin) {
+            // First login password change sheet
+            VStack(spacing: 20) {
+                Text("Create New Password")
+                    .font(.headline)
+                
+                SecureField("New Password", text: $newPassword)
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                
+                SecureField("Confirm Password", text: $confirmPassword)
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                
+                if !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+                
+                Button("Set Password") {
+                    if newPassword == confirmPassword && !newPassword.isEmpty {
+                        password = newPassword
+                        isFirstLogin = false
+                        // Send verification email
+                        sendVerificationOTP()
+                    } else {
+                        errorMessage = "Passwords don't match or are empty"
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.adminColor)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .padding()
+        }
+        .sheet(isPresented: $showingOTPView) {
+            // OTP verification sheet
+            VStack(spacing: 20) {
+                Text("Verify Your Email")
+                    .font(.headline)
+                
+                Text("Enter the code sent to your email")
+                    .font(.subheadline)
+                
+                TextField("Verification Code", text: $otpCode)
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                    .keyboardType(.numberPad)
+                
+                if !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+                
+                Button("Verify") {
+                    verifyOTP()
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.adminColor)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+                
+                Button("Resend Code") {
+                    sendVerificationOTP()
+                }
+                .foregroundColor(.adminColor)
+            }
+            .padding()
+        }
     }
-
-    private enum AlertType: Identifiable {
-        case error(String)
-        case success(String)
-
-        var id: String {
-            switch self {
-            case .error: return "error"
-            case .success: return "success"
+    
+    func login() {
+        isLoading = true
+        
+        // Hardcoded admin credentials check
+        if email == "admin@example.com" && password == "admin123" {
+            if isFirstLogin {
+                isLoading = false
+                // Show password change view
+                errorMessage = ""
+            } else {
+                // Send verification OTP
+                sendVerificationOTP()
             }
+        } else {
+            isLoading = false
+            errorMessage = "Invalid credentials"
         }
-
-        var title: String {
-            switch self {
-            case .error: return "Error"
-            case .success: return "Success"
-            }
-        }
-
-        var message: String {
-            switch self {
-            case .error(let message), .success(let message): return message
+    }
+    
+    func sendVerificationOTP() {
+        Task {
+            isLoading = true
+            let sent = await OTPManager.shared.sendOTPEmail(to: email)
+            
+            DispatchQueue.main.async {
+                isLoading = false
+                if sent {
+                    showingOTPView = true
+                    errorMessage = ""
+                } else {
+                    errorMessage = "Failed to send verification code"
+                }
             }
         }
     }
-
-    private func handleLogin() {
-        if email.isEmpty || password.isEmpty {
-            alertType = .error("Please fill in all fields")
-            return
-        }
-
-        if email != defaultEmail {
-            alertType = .error("Email not recognized")
-            return
-        }
-
-        // First time login with default password
-        if !hasCustomPassword && password == defaultPassword {
-            showPasswordChangeSheet = true
-            return
-        }
-
-        // Login with custom password
-        if hasCustomPassword {
+    
+    func verifyOTP() {
+        if OTPManager.shared.verifyOTP(email: email, code: otpCode) {
+            // OTP verified
+            OTPManager.shared.clearOTP(for: email)
+            showingOTPView = false
             isAdminLoggedIn = true
-            dismiss()
-            navigateToAdminDashboard = true
-            return
+        } else {
+            errorMessage = "Invalid verification code"
         }
-
-        alertType = .error("Invalid credentials")
-    }
-
-    private func handlePasswordChange() {
-        if newPassword.count < 8 {
-            alertType = .error("Password must be at least 8 characters")
-            return
-        }
-
-        if newPassword != confirmPassword {
-            alertType = .error("Passwords do not match")
-            return
-        }
-
-        // Here you would update password in backend
-        hasCustomPassword = true
-        password = newPassword
-        showPasswordChangeSheet = false
-        alertType = .success("Password updated successfully")
-        newPassword = ""
-        confirmPassword = ""
-    }
-
-    private func handleOTPVerification() {
-        if otp.count != 6 {
-            alertType = .error("Please enter a valid 6-digit OTP")
-            return
-        }
-
-        // Here you would verify OTP with backend
-        showOTPVerification = false
-        showPasswordChangeSheet = true
     }
 }
 
 #Preview {
     AdminLoginView()
-        .environment(\.colorScheme, .light)
 }

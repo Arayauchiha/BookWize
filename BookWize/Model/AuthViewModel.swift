@@ -7,6 +7,8 @@ class AuthViewModel: ObservableObject {
     @Published var showError = false
     @Published var errorMessage = ""
     
+    private let emailService = EmailService()
+    
     func login(email: String, password: String) {
         // TODO: Implement actual authentication
         // For demo purposes, we'll just simulate a successful login
@@ -25,15 +27,33 @@ class AuthViewModel: ObservableObject {
             return
         }
         
-        // TODO: Implement actual signup
-        // For demo purposes, we'll create a new user
+        // Create user
         let user = User(email: email, name: name, gender: gender, password: password, selectedLibrary: selectedLibrary)
         currentUser = user
         isAuthenticated = true
+        
+        // Send welcome email
+        Task {
+            let subject = "Welcome to BookWize!"
+            let body = """
+            Hello \(name),
+            
+            Welcome to BookWize! Your account has been successfully created.
+            
+            Your selected library: \(selectedLibrary)
+            
+            You can now enjoy all the benefits of our library management system.
+            
+            Regards,
+            BookWize Team
+            """
+            
+            _ = await emailService.sendEmail(to: email, subject: subject, body: body)
+        }
     }
     
     func logout() {
         currentUser = nil
         isAuthenticated = false
     }
-} 
+}
