@@ -35,4 +35,5 @@ enum AvailabilityStatus: String, Codable {
     case available
     case borrowed
     case reserved
+    case unavailable
 }

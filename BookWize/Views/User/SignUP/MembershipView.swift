@@ -286,7 +286,7 @@ struct GenreSelectionView: View {
             NavigationUtil.popToRootView()
             let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
             let window = windowScene?.windows.first
-            window?.rootViewController = UIHostingController(rootView: SearchBrowseView())
+            window?.rootViewController = UIHostingController(rootView: Search_BrowseApp())
         })
     }
 } 
