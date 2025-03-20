@@ -13,14 +13,15 @@ extension Color {
     
     static let iconBackgroundOpacity: Double = 0.15
     static let secondaryIconOpacity: Double = 0.6
-    
 }
 
-private extension Color {
-    init(hex: String) {
+// Proper initializer for hex colors
+extension Color {
+    func color(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
+        
         let a, r, g, b: UInt64
         switch hex.count {
         case 3: // RGB (12-bit)
@@ -32,14 +33,13 @@ private extension Color {
         default:
             (a, r, g, b) = (255, 0, 0, 0)
         }
-        self.init(
+        
+        type(of: self).init(
             .sRGB,
             red: Double(r) / 255,
             green: Double(g) / 255,
-            blue:  Double(b) / 255,
+            blue: Double(b) / 255,
             opacity: Double(a) / 255
         )
     }
 }
-
-// End of file
