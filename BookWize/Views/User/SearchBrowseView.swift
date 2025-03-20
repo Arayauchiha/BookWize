@@ -12,68 +12,40 @@ struct SearchBrowseView: View {
     @State private var selectedFilter: String? = nil
     @State private var selectedGenreFromCard: String? = nil
     @State private var showingSuggestions = false
-    @State private var selectedBook: UserBook? = nil
     @State private var selectedAuthor: String? = nil
     @State private var initialBooksByGenre: [String: [UserBook]] = [:]
+    @FocusState private var isSearchFocused: Bool
+    @State private var scrollOffset: CGFloat = 0
+    let userPreferredGenres: [String]
     
-    let userName = "Bunny"
-    let genres = ["Fiction", "Science", "History", "Technology", "Business"]
+    let genres = [
+        "Fiction", "Non-Fiction", "Science", "History", "Technology", 
+        "Business", "Mystery", "Romance", "Biography", "Poetry",
+        "Children's Books", "Self Help", "Travel", "Art", "Cooking"
+    ]
     let columns = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16)
     ]
     
+    init(userPreferredGenres: [String] = []) {
+        self.userPreferredGenres = userPreferredGenres
+        
+        // Configure the navigation bar appearance
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .systemBackground
+        
+        // Apply the appearance to all navigation bars
+        UINavigationBar.appearance().standardAppearance = appearance
+        UINavigationBar.appearance().scrollEdgeAppearance = appearance
+        UINavigationBar.appearance().compactAppearance = appearance
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    if viewModel.searchText.isEmpty {
-                        Text("Hi \(userName)")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-                    }
-                    
-                    // Search Bar
-                    VStack(alignment: .leading) {
-                        HStack {
-                            HStack {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundColor(.gray)
-                                TextField("Search by title, author or genre...", text: $viewModel.searchText)
-                                    .disableAutocorrection(true)
-                                    .onChange(of: viewModel.searchText) { oldValue, newValue in
-                                        showingSuggestions = !newValue.isEmpty
-                                    }
-                                if !viewModel.searchText.isEmpty {
-                                    Button(action: {
-                                        viewModel.searchText = ""
-                                        showingSuggestions = false
-                                    }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.gray)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(10)
-                            
-                            if !viewModel.searchText.isEmpty {
-                                Button("Cancel") {
-                                    viewModel.searchText = ""
-                                    showingSuggestions = false
-                                    hideKeyboard()
-                                }
-                                .foregroundColor(.red)
-                                .transition(.move(edge: .trailing))
-                            }
-                        }
-                        .animation(.default, value: viewModel.searchText)
-                    }
-                    .padding(.horizontal)
-                    
                     if !viewModel.searchText.isEmpty {
                         if viewModel.isLoading {
                             ProgressView()
@@ -92,15 +64,12 @@ struct SearchBrowseView: View {
                         } else {
                             LazyVGrid(columns: columns, spacing: 16) {
                                 ForEach(Array(viewModel.searchResults.prefix(8))) { book in
-                                    NavigationLink(isActive: Binding(
-                                        get: { selectedBook?.id == book.id },
-                                        set: { isActive in
-                                            if isActive {
-                                                selectedBook = book
-                                            }
-                                        }
-                                    )) {
+                                    NavigationLink {
                                         UserBookDetailView(book: book)
+                                            .onAppear {
+                                                isSearchFocused = false
+                                                showingSuggestions = false
+                                            }
                                     } label: {
                                         BookCard(book: book)
                                             .frame(maxWidth: .infinity)
@@ -116,6 +85,7 @@ struct SearchBrowseView: View {
                             selectedFilter: $selectedFilter,
                             selectedGenreFromCard: $selectedGenreFromCard
                         )
+                        .padding(.top, 16)
                         
                         if let selectedGenre = selectedFilter ?? selectedGenreFromCard {
                             // Selected Genre Grid View
@@ -127,10 +97,18 @@ struct SearchBrowseView: View {
                                 
                                 LazyVGrid(columns: columns, spacing: 16) {
                                     ForEach(initialBooksByGenre[selectedGenre] ?? []) { book in
-                                        BookCard(book: book)
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 280)
-                                            .padding(.horizontal, 8)
+                                        NavigationLink {
+                                            UserBookDetailView(book: book)
+                                                .onAppear {
+                                                    isSearchFocused = false
+                                                    showingSuggestions = false
+                                                }
+                                        } label: {
+                                            BookCard(book: book)
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 280)
+                                                .padding(.horizontal, 8)
+                                        }
                                     }
                                 }
                                 .padding(.horizontal)
@@ -141,7 +119,8 @@ struct SearchBrowseView: View {
                                 popularBooks: viewModel.popularBooks,
                                 booksByGenre: initialBooksByGenre,
                                 selectedGenreFromCard: $selectedGenreFromCard,
-                                selectedFilter: $selectedFilter
+                                selectedFilter: $selectedFilter,
+                                userPreferredGenres: userPreferredGenres
                             )
                         }
                     }
@@ -149,21 +128,24 @@ struct SearchBrowseView: View {
                 .onAppear {
                     initialBooksByGenre = viewModel.booksByGenre
                 }
-                .onChange(of: selectedBook) { oldValue, newValue in
-                    if newValue == nil {
-                        selectedGenreFromCard = nil
-                        viewModel.searchText = ""
-                        showingSuggestions = false
-                    }
-                }
-                .onChange(of: selectedAuthor) { oldValue, newValue in
-                    if newValue == nil {
-                        selectedGenreFromCard = nil
-                        viewModel.searchText = ""
-                        showingSuggestions = false
-                    }
-                }
+            }
+            .navigationTitle("Explore")
+            .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Books, Authors, or Genres")
+            .onChange(of: viewModel.searchText) { oldValue, newValue in
+                showingSuggestions = !newValue.isEmpty && isSearchFocused
             }
         }
+        .tabItem {
+            Image(systemName: "safari")
+            Text("Explore")
+        }
+    }
+}
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }

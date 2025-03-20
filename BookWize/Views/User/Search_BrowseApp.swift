@@ -9,6 +9,11 @@ import SwiftUI
 
 struct Search_BrowseApp: View {
     @State private var selectedTab = 1  // Start on search tab (index 1)
+    let userPreferredGenres: [String]
+    
+    init(userPreferredGenres: [String] = []) {
+        self.userPreferredGenres = userPreferredGenres
+    }
         
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -23,7 +28,7 @@ struct Search_BrowseApp: View {
             .tag(0)
             
             // Search Tab (Default)
-            SearchBrowseView()
+            SearchBrowseView(userPreferredGenres: userPreferredGenres)
                 .tabItem {
                     Label("Search", systemImage: "magnifyingglass")
                 }

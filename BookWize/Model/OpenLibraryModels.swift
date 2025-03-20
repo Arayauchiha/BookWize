@@ -78,51 +78,51 @@ struct OpenLibraryBook: Codable {
             
             // Check for genre matches
             if normalizedSubjects.contains(where: { subject in
-                fictionKeywords.contains(where: subject.contains)
+                fictionKeywords.contains(where: { subject.contains($0) })
             }) {
                 genre = "Fiction"
             } else if normalizedSubjects.contains(where: { subject in
-                scienceKeywords.contains(where: subject.contains)
+                scienceKeywords.contains(where: { subject.contains($0) })
             }) {
                 genre = "Science"
             } else if normalizedSubjects.contains(where: { subject in
-                historyKeywords.contains(where: subject.contains)
+                historyKeywords.contains(where: { subject.contains($0) })
             }) {
                 genre = "History"
             } else if normalizedSubjects.contains(where: { subject in
-                technologyKeywords.contains(where: subject.contains)
+                technologyKeywords.contains(where: { subject.contains($0) })
             }) {
                 genre = "Technology"
             } else if normalizedSubjects.contains(where: { subject in
-                businessKeywords.contains(where: subject.contains)
+                businessKeywords.contains(where: { subject.contains($0) })
             }) {
                 genre = "Business"
             } else {
                 // Try to find any partial match as a fallback
                 let allKeywords = fictionKeywords + scienceKeywords + historyKeywords + technologyKeywords + businessKeywords
                 if let matchedSubject = normalizedSubjects.first(where: { subject in
-                    allKeywords.contains(where: subject.contains)
+                    allKeywords.contains(where: { subject.contains($0) })
                 }) {
                     // Determine genre based on the matched keyword
-                    if fictionKeywords.contains(where: matchedSubject.contains) {
+                    if fictionKeywords.contains(where: { matchedSubject.contains($0) }) {
                         genre = "Fiction"
-                    } else if scienceKeywords.contains(where: matchedSubject.contains) {
+                    } else if scienceKeywords.contains(where: { matchedSubject.contains($0) }) {
                         genre = "Science"
-                    } else if historyKeywords.contains(where: matchedSubject.contains) {
+                    } else if historyKeywords.contains(where: { matchedSubject.contains($0) }) {
                         genre = "History"
-                    } else if technologyKeywords.contains(where: matchedSubject.contains) {
+                    } else if technologyKeywords.contains(where: { matchedSubject.contains($0) }) {
                         genre = "Technology"
-                    } else if businessKeywords.contains(where: matchedSubject.contains) {
+                    } else if businessKeywords.contains(where: { matchedSubject.contains($0) }) {
                         genre = "Business"
                     } else {
-                        genre = "Uncategorized"
+                        genre = "Fiction" // Default to Fiction if no clear match
                     }
                 } else {
-                    genre = "Uncategorized"
+                    genre = "Fiction" // Default to Fiction if no match found
                 }
             }
         } else {
-            genre = "Uncategorized"
+            genre = "Fiction" // Default to Fiction if no subjects available
         }
         
         return UserBook(

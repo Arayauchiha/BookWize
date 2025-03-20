@@ -258,8 +258,9 @@ struct GenreSelectionView: View {
     @State private var selectedGenres: Set<String> = []
     
     let genres = [
-        "Fiction", "Non-Fiction", "Mystery", "Romance", "Science Fiction",
-        "Fantasy", "Biography", "History", "Poetry", "Children's Books"
+        "Fiction", "Non-Fiction", "Science", "History", "Technology", 
+        "Business", "Mystery", "Romance", "Biography", "Poetry",
+        "Children's Books", "Self Help", "Travel", "Art", "Cooking"
     ]
     
     var body: some View {
@@ -286,7 +287,7 @@ struct GenreSelectionView: View {
             NavigationUtil.popToRootView()
             let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
             let window = windowScene?.windows.first
-            window?.rootViewController = UIHostingController(rootView: Search_BrowseApp())
+            window?.rootViewController = UIHostingController(rootView: Search_BrowseApp(userPreferredGenres: Array(selectedGenres)))
         })
     }
 } 
