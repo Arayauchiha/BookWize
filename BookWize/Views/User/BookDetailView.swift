@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct BookDetailView: View {
-    let book: Book
+    let book: UserBook
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Book: Identifiable, Codable, Equatable {
+struct UserBook: Identifiable, Codable, Equatable {
     let id: UUID
     let title: String
     let author: String
@@ -18,7 +18,7 @@ struct Book: Identifiable, Codable, Equatable {
     let reservedBy: UUID?
     let imageURL: String?
     
-    static func == (lhs: Book, rhs: Book) -> Bool {
+    static func == (lhs: UserBook, rhs: UserBook) -> Bool {
         return lhs.id == rhs.id &&
                lhs.title == rhs.title &&
                lhs.author == rhs.author &&

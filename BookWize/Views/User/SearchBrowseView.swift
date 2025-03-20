@@ -12,9 +12,9 @@ struct SearchBrowseView: View {
     @State private var selectedFilter: String? = nil
     @State private var selectedGenreFromCard: String? = nil
     @State private var showingSuggestions = false
-    @State private var selectedBook: Book? = nil
+    @State private var selectedBook: UserBook? = nil
     @State private var selectedAuthor: String? = nil
-    @State private var initialBooksByGenre: [String: [Book]] = [:]
+    @State private var initialBooksByGenre: [String: [UserBook]] = [:]
     
     let userName = "Bunny"
     let genres = ["Fiction", "Science", "History", "Technology", "Business"]

@@ -14,9 +14,9 @@ struct Author: Identifiable {
 
 struct AuthorBooksView: View {
     let author: String
-    let books: [Book]
+    let books: [UserBook]
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
-    @State private var selectedBook: Book?
+    @State private var selectedBook: UserBook?
     
     var body: some View {
         ScrollView {

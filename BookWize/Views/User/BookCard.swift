@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct BookCard: View {
-    let book: Book
+    let book: UserBook
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

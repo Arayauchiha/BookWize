@@ -9,41 +9,41 @@ import Foundation
 import Combine
 
 class BookSearchViewModel: ObservableObject {
-    @Published var searchResults: [Book] = []
-    @Published var books: [Book] = [
+    @Published var searchResults: [UserBook] = []
+    @Published var books: [UserBook] = [
         // Technology Books
-        Book(id: UUID(), title: "The Design of Everyday Things", author: "Don Norman", isbn: "978-0465050659", genre: "Technology", publicationYear: 2013, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780465050659-L.jpg"),
-        Book(id: UUID(), title: "The Innovators", author: "Walter Isaacson", isbn: "978-1476708690", genre: "Technology", publicationYear: 2014, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781476708690-L.jpg"),
-        Book(id: UUID(), title: "Clean Code", author: "Robert C. Martin", isbn: "978-0132350884", genre: "Technology", publicationYear: 2008, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780132350884-L.jpg"),
+        UserBook(id: UUID(), title: "The Design of Everyday Things", author: "Don Norman", isbn: "978-0465050659", genre: "Technology", publicationYear: 2013, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780465050659-L.jpg"),
+        UserBook(id: UUID(), title: "The Innovators", author: "Walter Isaacson", isbn: "978-1476708690", genre: "Technology", publicationYear: 2014, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781476708690-L.jpg"),
+        UserBook(id: UUID(), title: "Clean Code", author: "Robert C. Martin", isbn: "978-0132350884", genre: "Technology", publicationYear: 2008, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780132350884-L.jpg"),
         
         // Fiction Books
-        Book(id: UUID(), title: "Dune", author: "Frank Herbert", isbn: "978-0441172719", genre: "Fiction", publicationYear: 1965, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780441172719-L.jpg"),
-        Book(id: UUID(), title: "1984", author: "George Orwell", isbn: "978-0451524935", genre: "Fiction", publicationYear: 1949, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780451524935-L.jpg"),
-        Book(id: UUID(), title: "The Great Gatsby", author: "F. Scott Fitzgerald", isbn: "978-0743273565", genre: "Fiction", publicationYear: 1925, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780743273565-L.jpg"),
-        Book(id: UUID(), title: "To Kill a Mockingbird", author: "Harper Lee", isbn: "978-0446310789", genre: "Fiction", publicationYear: 1960, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780446310789-L.jpg"),
+        UserBook(id: UUID(), title: "Dune", author: "Frank Herbert", isbn: "978-0441172719", genre: "Fiction", publicationYear: 1965, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780441172719-L.jpg"),
+        UserBook(id: UUID(), title: "1984", author: "George Orwell", isbn: "978-0451524935", genre: "Fiction", publicationYear: 1949, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780451524935-L.jpg"),
+        UserBook(id: UUID(), title: "The Great Gatsby", author: "F. Scott Fitzgerald", isbn: "978-0743273565", genre: "Fiction", publicationYear: 1925, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780743273565-L.jpg"),
+        UserBook(id: UUID(), title: "To Kill a Mockingbird", author: "Harper Lee", isbn: "978-0446310789", genre: "Fiction", publicationYear: 1960, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780446310789-L.jpg"),
         
         // Science Books
-        Book(id: UUID(), title: "A Brief History of Time", author: "Stephen Hawking", isbn: "978-0553380163", genre: "Science", publicationYear: 1988, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780553380163-L.jpg"),
-        Book(id: UUID(), title: "Cosmos", author: "Carl Sagan", isbn: "978-0345539435", genre: "Science", publicationYear: 1980, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780345539435-L.jpg"),
-        Book(id: UUID(), title: "The Selfish Gene", author: "Richard Dawkins", isbn: "978-0198788607", genre: "Science", publicationYear: 1976, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780198788607-L.jpg"),
+        UserBook(id: UUID(), title: "A Brief History of Time", author: "Stephen Hawking", isbn: "978-0553380163", genre: "Science", publicationYear: 1988, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780553380163-L.jpg"),
+        UserBook(id: UUID(), title: "Cosmos", author: "Carl Sagan", isbn: "978-0345539435", genre: "Science", publicationYear: 1980, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780345539435-L.jpg"),
+        UserBook(id: UUID(), title: "The Selfish Gene", author: "Richard Dawkins", isbn: "978-0198788607", genre: "Science", publicationYear: 1976, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780198788607-L.jpg"),
         
         // History Books
-        Book(id: UUID(), title: "1776", author: "David McCullough", isbn: "978-0743226721", genre: "History", publicationYear: 2005, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780743226721-L.jpg"),
-        Book(id: UUID(), title: "Sapiens", author: "Yuval Noah Harari", isbn: "978-0062316097", genre: "History", publicationYear: 2014, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780062316097-L.jpg"),
-        Book(id: UUID(), title: "Guns, Germs, and Steel", author: "Jared Diamond", isbn: "978-0393354324", genre: "History", publicationYear: 1997, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780393354324-L.jpg"),
+        UserBook(id: UUID(), title: "1776", author: "David McCullough", isbn: "978-0743226721", genre: "History", publicationYear: 2005, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780743226721-L.jpg"),
+        UserBook(id: UUID(), title: "Sapiens", author: "Yuval Noah Harari", isbn: "978-0062316097", genre: "History", publicationYear: 2014, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780062316097-L.jpg"),
+        UserBook(id: UUID(), title: "Guns, Germs, and Steel", author: "Jared Diamond", isbn: "978-0393354324", genre: "History", publicationYear: 1997, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780393354324-L.jpg"),
         
         // Business Books
-        Book(id: UUID(), title: "Zero to One", author: "Peter Thiel", isbn: "978-0804139298", genre: "Business", publicationYear: 2014, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780804139298-L.jpg"),
-        Book(id: UUID(), title: "Good to Great", author: "Jim Collins", isbn: "978-0066620992", genre: "Business", publicationYear: 2001, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780066620992-L.jpg"),
-        Book(id: UUID(), title: "The Lean Startup", author: "Eric Ries", isbn: "978-0307887894", genre: "Business", publicationYear: 2011, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780307887894-L.jpg"),
-        Book(id: UUID(), title: "Start with Why", author: "Simon Sinek", isbn: "978-1591846444", genre: "Business", publicationYear: 2009, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781591846444-L.jpg")
+        UserBook(id: UUID(), title: "Zero to One", author: "Peter Thiel", isbn: "978-0804139298", genre: "Business", publicationYear: 2014, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780804139298-L.jpg"),
+        UserBook(id: UUID(), title: "Good to Great", author: "Jim Collins", isbn: "978-0066620992", genre: "Business", publicationYear: 2001, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780066620992-L.jpg"),
+        UserBook(id: UUID(), title: "The Lean Startup", author: "Eric Ries", isbn: "978-0307887894", genre: "Business", publicationYear: 2011, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780307887894-L.jpg"),
+        UserBook(id: UUID(), title: "Start with Why", author: "Simon Sinek", isbn: "978-1591846444", genre: "Business", publicationYear: 2009, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781591846444-L.jpg")
     ]
     
-    @Published var forYouBooks: [Book] = []
-    @Published var popularBooks: [Book] = []
-    @Published var booksByAuthor: [String: [Book]] = [:]
+    @Published var forYouBooks: [UserBook] = []
+    @Published var popularBooks: [UserBook] = []
+    @Published var booksByAuthor: [String: [UserBook]] = [:]
     
-    var booksByGenre: [String: [Book]] {
+    var booksByGenre: [String: [UserBook]] {
         Dictionary(grouping: books, by: { $0.genre })
     }
     
@@ -112,7 +112,7 @@ class BookSearchViewModel: ObservableObject {
         
         // First search local books
         let filteredBooks = books
-            .map { book -> (Book, Int) in
+            .map { book -> (UserBook, Int) in
                 var score = 0
                 let title = book.title.lowercased()
                 let author = book.author.lowercased()

@@ -8,12 +8,12 @@
 import SwiftUI
 
 struct BookSectionsView: View {
-    let forYouBooks: [Book]
-    let popularBooks: [Book]
-    let booksByGenre: [String: [Book]]
+    let forYouBooks: [UserBook]
+    let popularBooks: [UserBook]
+    let booksByGenre: [String: [UserBook]]
     @Binding var selectedGenreFromCard: String?
     @Binding var selectedFilter: String?
-    @State private var selectedBook: Book?
+    @State private var selectedBook: UserBook?
     
     var body: some View {
         VStack(spacing: 20) {
