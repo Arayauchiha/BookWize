@@ -100,7 +100,7 @@ struct SearchBrowseView: View {
                                             }
                                         }
                                     )) {
-                                        BookDetailView(book: book)
+                                        UserBookDetailView(book: book)
                                     } label: {
                                         BookCard(book: book)
                                             .frame(maxWidth: .infinity)

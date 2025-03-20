@@ -35,7 +35,7 @@ struct BookSectionsView: View {
         }
     }
 )) {
-    BookDetailView(book: book)
+    UserBookDetailView(book: book)
 } label: {
                                 BookCard(book: book)
                                     .frame(width: 180)
@@ -65,7 +65,7 @@ struct BookSectionsView: View {
         }
     }
 )) {
-    BookDetailView(book: book)
+    UserBookDetailView(book: book)
 } label: {
                                 BookCard(book: book)
                                     .frame(width: 180)
