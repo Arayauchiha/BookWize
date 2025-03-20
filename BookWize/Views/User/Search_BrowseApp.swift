@@ -38,6 +38,16 @@ struct Search_BrowseApp: View {
                 Label("Wishlist", systemImage: "heart")
             }
             .tag(2)
+            
+            // Book Club Tab
+            NavigationView {
+                Text("Book Club Coming Soon")
+                    .navigationTitle("Book Club")
+            }
+            .tabItem {
+                Label("Book Club", systemImage: "person.3.fill")
+            }
+            .tag(3)
         }
         .accentColor(.blue)
         .onAppear {
