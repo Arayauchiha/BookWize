@@ -32,7 +32,7 @@ struct LibrarianData: Encodable {
     }
 }
 
-class UserManager {
+class UserManagerSupabase {
     static let shared = UserManager()
     private let client = SupabaseManager.shared.client
     
