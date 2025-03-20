@@ -1,78 +1,141 @@
+//
+//  GenerateCredentialsView.swift
+//  BookWize
+//
+//  Created by Aditya Singh on 18/03/25.
+//
+
 import SwiftUI
 
 struct GenerateCredentialsView: View {
-    @Environment(\.dismiss) private var dismiss
-    let email: String
-    let password: String
+    @Environment(\.dismiss) var dismiss
     let onSend: () -> Void
     
+    @State private var email: String
+    @State private var password: String
+    @State private var isSending = false
+    @State private var isSent = false
+    @State private var errorMessage = ""
+    
+    private let emailService = EmailService()
+    
+    init(email: String, password: String, onSend: @escaping () -> Void) {
+        self._email = State(initialValue: email)
+        self._password = State(initialValue: password)
+        self.onSend = onSend
+    }
+    
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Text("Generated Credentials")
-                    .font(.title2)
-                    .foregroundStyle(Color.customText)
+        VStack(spacing: 20) {
+            Text("Librarian Credentials")
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(Color.librarianColor)
+            
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Email:")
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.customText)
+                Text(email)
+                    .padding(.bottom, 10)
                 
-                VStack(alignment: .leading, spacing: 16) {
-                    credentialRow(title: "Email:", value: email)
-                    credentialRow(title: "Password:", value: password)
+                Text("Temporary Password:")
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.customText)
+                Text(password)
+                    .foregroundColor(Color.customButton)
+                    .fontWeight(.medium)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.customCardBackground)
+            .cornerRadius(10)
+            
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .padding(.top, 5)
+            }
+            
+            Button(action: {
+                Task {
+                    await sendCredentialsEmail()
                 }
-                .padding(16)
-                .background(Color.customCardBackground)
-                .cornerRadius(12)
-                
-                Text("These credentials will be sent to the librarian's email address.")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.customText.opacity(0.6))
-                    .multilineTextAlignment(.center)
-                
-                Button(action: sendCredentials) {
-                    Text("Send Credentials")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.librarianColor)
-                        )
+            }) {
+                if isSending {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                } else if isSent {
+                    Label("Email Sent", systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                } else {
+                    Label("Send Credentials by Email", systemImage: "envelope.fill")
                 }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color.customBackground)
-            .navigationTitle("Credentials")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(isSent ? Color.green.opacity(0.2) : Color.librarianColor)
+            .foregroundColor(isSent ? .green : .white)
+            .cornerRadius(10)
+            .disabled(isSending || isSent)
+            
+            Button("Done") {
+                if isSent {
+                    onSend()
+                    dismiss()
+                } else {
+                    errorMessage = "Please send credentials first"
                 }
             }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(isSent ? Color.librarianColor : Color.gray)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .disabled(!isSent)
         }
+        .padding()
+        .background(Color.customBackground)
     }
     
-    private func credentialRow(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(Color.customText.opacity(0.6))
-            Text(value)
-                .font(.system(.body, design: .monospaced))
-                .foregroundStyle(Color.customText)
+    private func sendCredentialsEmail() async {
+        isSending = true
+        errorMessage = ""
+        
+        let subject = "BookWize: Your Librarian Account Credentials"
+        let body = """
+        Hello,
+        
+        Your account for BookWize Library Management System has been created.
+        
+        Here are your login credentials:
+        
+        Email: \(email)
+        Temporary Password: \(password)
+        
+        Please note that you will be required to change your password on first login.
+        
+        Regards,
+        BookWize Administration
+        """
+        
+        let success = await emailService.sendEmail(to: email, subject: subject, body: body)
+        
+        DispatchQueue.main.async {
+            isSending = false
+            if success {
+                isSent = true
+            } else {
+                errorMessage = "Failed to send email. Please try again."
+            }
         }
-    }
-    
-    private func sendCredentials() {
-        // Here you would implement actual email sending
-        // For now, we'll just simulate it
-        onSend()
     }
 }
 
 #Preview {
     GenerateCredentialsView(
-        email: "john@example.com",
-        password: "Ab12!@cd34#$",
+        email: "librarian@example.com", 
+        password: "temp123", 
         onSend: {}
     )
 }

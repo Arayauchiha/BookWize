@@ -71,9 +71,6 @@ struct InventoryManagerView: View {
                         }
                     }
                 }
-                .sheet(isPresented: $showingLoginSheet) {
-                    LoginViews(isLoggedIn: $isLoggedIn)
-                }
             }
         }
         .alert("Logout", isPresented: $showingLogoutAlert) {
@@ -84,124 +81,6 @@ struct InventoryManagerView: View {
         } message: {
             Text("Are you sure you want to logout?")
         }
-    }
-}
-
-
-
-struct LoginViews: View {
-    @Environment(\.dismiss) var dismiss
-    @Binding var isLoggedIn: Bool
-    @State private var username = ""
-    @State private var password = ""
-    @State private var showingError = false
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                Color(hex: "FCFCFC").ignoresSafeArea()
-                
-                VStack(spacing: 25) {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(AppTheme.primaryColor)
-                        .padding(.top, 40)
-                    
-                    VStack(spacing: 20) {
-                        CustomTextField(text: $username,
-                                     placeholder: "Username",
-                                     systemImage: "person.fill")
-                        
-                        CustomSecureField(text: $password,
-                                        placeholder: "Password",
-                                        systemImage: "lock.fill")
-                    }
-                    .padding(.horizontal, 30)
-                    
-                    Button(action: {
-                        if UserDefaultsManager.shared.validateCredentials(username: username, password: password) {
-                            isLoggedIn = true
-                            dismiss()
-                        } else {
-                            showingError = true
-                        }
-                    }) {
-                        Text("Login")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity, maxHeight: 54)
-                            .background(
-                                username.isEmpty || password.isEmpty ?
-                                Color(hex: "BDC3C7") :
-                                AppTheme.primaryColor
-                            )
-                            .cornerRadius(12)
-                    }
-                    .disabled(username.isEmpty || password.isEmpty)
-                    .padding(.horizontal, 30)
-                    .padding(.top, 20)
-                    
-                    Spacer()
-                }
-            }
-            .navigationTitle("Librarian Login")
-            .navigationBarTitleDisplayMode(.inline)
-            .alert("Invalid Credentials", isPresented: $showingError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Please check your username and password")
-            }
-        }
-    }
-}
-
-
-// Custom UI Components
-struct CustomTextField: View {
-    @Binding var text: String
-    let placeholder: String
-    let systemImage: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: systemImage)
-                .foregroundColor(Color(hex: "7F8C8D"))
-                .frame(width: 24)
-            TextField(placeholder, text: $text)
-                .autocapitalization(.none)
-            
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(hex: "E5E5E5"), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-    }
-}
-
-struct CustomSecureField: View {
-    @Binding var text: String
-    let placeholder: String
-    let systemImage: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: systemImage)
-                .foregroundColor(Color(hex: "7F8C8D"))
-                .frame(width: 24)
-            SecureField(placeholder, text: $text)
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(hex: "E5E5E5"), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 

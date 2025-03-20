@@ -6,6 +6,7 @@ struct CustomTextFieldStyle: TextFieldStyle {
             .padding(12)
             .background(Color.customInputBackground)
             .cornerRadius(8)
+            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 2)
     }
 }
 

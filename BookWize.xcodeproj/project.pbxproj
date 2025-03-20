@@ -8,6 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		3A8E59EA2D8AE4A800CF1570 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8E59E92D8AE4A800CF1570 /* LoginView.swift */; };
+		D3731C212D8BC9610020CCEB /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C202D8BC9610020CCEB /* Auth */; };
+		D3731C232D8BC9610020CCEB /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C222D8BC9610020CCEB /* Functions */; };
+		D3731C252D8BC9610020CCEB /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C242D8BC9610020CCEB /* PostgREST */; };
+		D3731C272D8BC9610020CCEB /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C262D8BC9610020CCEB /* Realtime */; };
+		D3731C292D8BC9610020CCEB /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C282D8BC9610020CCEB /* Storage */; };
+		D3731C2B2D8BC9610020CCEB /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C2A2D8BC9610020CCEB /* Supabase */; };
+		D3731C322D8BCDD70020CCEB /* SwiftSMTP in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C312D8BCDD70020CCEB /* SwiftSMTP */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +50,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D3731C252D8BC9610020CCEB /* PostgREST in Frameworks */,
+				D3731C232D8BC9610020CCEB /* Functions in Frameworks */,
+				D3731C2B2D8BC9610020CCEB /* Supabase in Frameworks */,
+				D3731C212D8BC9610020CCEB /* Auth in Frameworks */,
+				D3731C292D8BC9610020CCEB /* Storage in Frameworks */,
+				D3731C322D8BCDD70020CCEB /* SwiftSMTP in Frameworks */,
+				D3731C272D8BC9610020CCEB /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -92,6 +106,13 @@
 			);
 			name = BookWize;
 			packageProductDependencies = (
+				D3731C202D8BC9610020CCEB /* Auth */,
+				D3731C222D8BC9610020CCEB /* Functions */,
+				D3731C242D8BC9610020CCEB /* PostgREST */,
+				D3731C262D8BC9610020CCEB /* Realtime */,
+				D3731C282D8BC9610020CCEB /* Storage */,
+				D3731C2A2D8BC9610020CCEB /* Supabase */,
+				D3731C312D8BCDD70020CCEB /* SwiftSMTP */,
 			);
 			productName = BookWize;
 			productReference = 3A0AD2F82D8879E20053270C /* BookWize.app */;
@@ -121,6 +142,10 @@
 			);
 			mainGroup = 3A0AD2EF2D8879E20053270C;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				D3731C302D8BCDD70020CCEB /* XCRemoteSwiftPackageReference "Swift-SMTP" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3A0AD2F92D8879E20053270C /* Products */;
 			projectDirPath = "";
@@ -280,8 +305,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BookWize/Preview Content\"";
+				DEVELOPMENT_TEAM = SQJG28K9NA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "we need camera access to scan isbn code";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -292,7 +319,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Team03Infosys.BookWize;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Team03Infosys.BookWizell;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -308,8 +335,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BookWize/Preview Content\"";
+				DEVELOPMENT_TEAM = SQJG28K9NA;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "we need camera access to scan isbn code";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -320,7 +349,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Team03Infosys.BookWize;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Team03Infosys.BookWizell;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -350,6 +379,63 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+		D3731C302D8BCDD70020CCEB /* XCRemoteSwiftPackageReference "Swift-SMTP" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Kitura/Swift-SMTP";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D3731C202D8BC9610020CCEB /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		D3731C222D8BC9610020CCEB /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		D3731C242D8BC9610020CCEB /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		D3731C262D8BC9610020CCEB /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		D3731C282D8BC9610020CCEB /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		D3731C2A2D8BC9610020CCEB /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3731C1F2D8BC9610020CCEB /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+		D3731C312D8BCDD70020CCEB /* SwiftSMTP */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3731C302D8BCDD70020CCEB /* XCRemoteSwiftPackageReference "Swift-SMTP" */;
+			productName = SwiftSMTP;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 3A0AD2F02D8879E20053270C /* Project object */;
 }

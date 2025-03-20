@@ -10,13 +10,42 @@ import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var showAdminDashboard = false
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
+    @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
+    @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
 
     var body: some View {
         Group {
             if isAdminLoggedIn {
                 AdminDashboardView()
+            } else if isLibrarianLoggedIn {
+                LibrarianDashboardScreen()
+            } else if isMemberLoggedIn {
+                // Replace with your MemberDashboardView
+                VStack {
+                    Text("Member Dashboard")
+                        .font(.largeTitle)
+                        .padding(.bottom, 30)
+                    
+                    Text("Coming Soon")
+                        .font(.title2)
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 50)
+                    
+                    // Logout Button
+                    Button(action: {
+                        isMemberLoggedIn = false
+                    }) {
+                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: 200)
+                            .background(Color.customButton)
+                            .cornerRadius(10)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.customBackground)
             } else {
                 NavigationStack {
                     ScrollView {
@@ -32,7 +61,7 @@ struct ContentView: View {
                             // Role selection cards with appropriate colors
                             VStack(spacing: 16) {
                                 NavigationLink {
-                                    LoginView(userRole: .member)
+                                    MemberLoginView()
                                 } label: {
                                     RoleCard(
                                         title: "Member",
@@ -54,7 +83,7 @@ struct ContentView: View {
                                 }
 
                                 NavigationLink {
-                                    LoginView(userRole: .admin)
+                                    AdminLoginView()
                                 } label: {
                                     RoleCard(
                                         title: "Admin",
