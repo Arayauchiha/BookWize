@@ -30,20 +30,25 @@ struct GenerateCredentialsView: View {
             Text("Librarian Credentials")
                 .font(.title)
                 .fontWeight(.bold)
+                .foregroundColor(Color.librarianColor)
             
             VStack(alignment: .leading, spacing: 5) {
                 Text("Email:")
                     .fontWeight(.semibold)
+                    .foregroundColor(Color.customText)
                 Text(email)
                     .padding(.bottom, 10)
                 
                 Text("Temporary Password:")
                     .fontWeight(.semibold)
+                    .foregroundColor(Color.customText)
                 Text(password)
+                    .foregroundColor(Color.customButton)
+                    .fontWeight(.medium)
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.gray.opacity(0.1))
+            .background(Color.customCardBackground)
             .cornerRadius(10)
             
             if !errorMessage.isEmpty {
@@ -74,12 +79,6 @@ struct GenerateCredentialsView: View {
             .cornerRadius(10)
             .disabled(isSending || isSent)
             
-            Button("Generate New Password") {
-                password = generateRandomPassword()
-            }
-            .padding()
-            .foregroundColor(.librarianColor)
-            
             Button("Done") {
                 if isSent {
                     onSend()
@@ -90,18 +89,13 @@ struct GenerateCredentialsView: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(isSent ? Color.blue : Color.gray)
+            .background(isSent ? Color.librarianColor : Color.gray)
             .foregroundColor(.white)
             .cornerRadius(10)
             .disabled(!isSent)
         }
         .padding()
-    }
-    
-    private func generateRandomPassword() -> String {
-        let length = 8
-        let characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
-        return String((0..<length).map { _ in characters.randomElement()! })
+        .background(Color.customBackground)
     }
     
     private func sendCredentialsEmail() async {

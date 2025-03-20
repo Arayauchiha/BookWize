@@ -46,8 +46,8 @@ struct AddLibrarianView: View {
                     
                     // Generate Credentials Button
                     if formIsValid && !credentialsSent {
-                        Button(action: generateCredentials) {
-                            Text("Generate Credentials")
+                        Button(action: showCredentialsSheet) {
+                            Text("Proceed to Credentials")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(Color.white)
                                 .frame(maxWidth: .infinity)
@@ -100,16 +100,24 @@ struct AddLibrarianView: View {
             } message: {
                 Text(alertType?.message ?? "")
             }
+            .onAppear {
+                // Generate a random password when view appears
+                generatedPassword = generateRandomPassword()
+            }
         }
     }
     
-    private func generateCredentials() {
-        // Generate random password
-        let password = String((0..<12).map { _ in
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*".randomElement()!
-        })
-        generatedPassword = password
+    private func showCredentialsSheet() {
         showCredentials = true
+    }
+    
+    private func generateRandomPassword() -> String {
+        // Generate random password
+        let length = 8
+        let characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+        return "temp" + String((0..<length).map { _ in
+            characters.randomElement()!
+        })
     }
     
     private func addLibrarian() {

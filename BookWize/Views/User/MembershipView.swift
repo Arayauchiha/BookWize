@@ -6,7 +6,11 @@ struct MembershipView: View {
     @State private var isLoading = false
     @State private var qrCodeImage: UIImage? = nil
     @State private var showDigitalCard = false
+    @State private var showLogoutAlert = false
     let membershipAmount = 49.99
+    
+    @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
+    @Environment(\.dismiss) private var dismiss
     
     // User information passed from SignupView
     let userName: String
@@ -74,7 +78,7 @@ struct MembershipView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.blue)
+                                .background(Color.customButton)
                                 .cornerRadius(10)
                         }
                         .padding(.horizontal)
@@ -95,11 +99,27 @@ struct MembershipView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.blue)
+                                .background(Color.customButton)
                                 .cornerRadius(10)
                         }
                         .padding(.horizontal)
                     }
+                    
+                    // Logout Button - Updated for proper logout
+                    Button(action: {
+                        showLogoutAlert = true
+                    }) {
+                        HStack {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                            Text("Logout")
+                        }
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(maxWidth: 200)
+                        .background(Color.customButton)
+                        .cornerRadius(10)
+                    }
+                    .padding(.top, 30)
                 }
                 .padding()
             }
@@ -111,6 +131,17 @@ struct MembershipView: View {
             } message: {
                 Text("Your membership has been activated successfully!")
             }
+            .alert("Logout", isPresented: $showLogoutAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Logout", role: .destructive) {
+                    // This will log out the member and return to role selection
+                    isMemberLoggedIn = false
+                    dismiss()
+                }
+            } message: {
+                Text("Are you sure you want to logout?")
+            }
+            .background(Color.customBackground)
         }
     }
     
@@ -218,7 +249,7 @@ struct DigitalLibraryCard: View {
         .padding()
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color.blue, Color.purple]),
+                gradient: Gradient(colors: [Color.customButton, Color.purple]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -261,5 +292,6 @@ struct GenreSelectionView: View {
         .navigationBarItems(trailing: Button("Done") {
             dismiss()
         })
+        .background(Color.customBackground)
     }
-} 
+}

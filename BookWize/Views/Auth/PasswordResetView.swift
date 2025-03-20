@@ -25,6 +25,7 @@ struct PasswordResetView: View {
                     .font(.subheadline)
                     .foregroundStyle(Color.customText.opacity(0.6))
                     .padding(.top, 20)
+                    .multilineTextAlignment(.center)
                 
                 VStack(alignment: .leading, spacing: 16) {
                     // New password field
@@ -37,53 +38,58 @@ struct PasswordResetView: View {
                             Group {
                                 if isNewPasswordVisible {
                                     TextField("Enter new password", text: $newPassword)
-                                        .textFieldStyle(CustomTextFieldStyle())
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .newPassword)
                                 } else {
                                     SecureField("Enter new password", text: $newPassword)
-                                        .textFieldStyle(CustomTextFieldStyle())
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .newPassword)
                                 }
                             }
-                            .textContentType(.newPassword)
-                            .textInputAutocapitalization(.never)
-                            .focused($focusedField, equals: .newPassword)
                             
                             Button(action: { isNewPasswordVisible.toggle() }) {
                                 Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                     .foregroundStyle(Color.customButton.opacity(Color.secondaryIconOpacity))
                             }
                         }
-                        .padding(12)
+                        .padding()
                         .background(Color.customInputBackground)
                         .cornerRadius(8)
-                        .padding(.horizontal, 20)
-                        
-                        // Confirm password field
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Confirm Password")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.customText.opacity(0.6))
-                            
-                            HStack {
-                                Group {
-                                    if isNewPasswordVisible {
-                                        TextField("Confirm new password", text: $confirmPassword)
-                                            .textFieldStyle(CustomTextFieldStyle())
-                                    } else {
-                                        SecureField("Confirm new password", text: $confirmPassword)
-                                            .textFieldStyle(CustomTextFieldStyle())
-                                    }
-                                }
-                                .textContentType(.newPassword)
-                                .textInputAutocapitalization(.never)
-                                .focused($focusedField, equals: .confirmPassword)
-                            }
-                            .padding(12)
-                            .background(Color.customInputBackground)
-                            .cornerRadius(8)
-                            .padding(.horizontal, 20)
-                        }
                     }
-                    .padding(.horizontal, 0)
+                    
+                    // Confirm password field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Confirm Password")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.6))
+                        
+                        HStack {
+                            Group {
+                                if isNewPasswordVisible {
+                                    TextField("Confirm new password", text: $confirmPassword)
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .confirmPassword)
+                                } else {
+                                    SecureField("Confirm new password", text: $confirmPassword)
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .confirmPassword)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color.customInputBackground)
+                        .cornerRadius(8)
+                    }
+                    
+                    // Password requirements info
+                    Text("Password must be at least 8 characters long")
+                        .font(.caption)
+                        .foregroundStyle(Color.customText.opacity(0.5))
+                        .padding(.top, 4)
                     
                     Button(action: onSave) {
                         Text(buttonTitle)
@@ -91,27 +97,46 @@ struct PasswordResetView: View {
                             .foregroundStyle(Color.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.customButton)
-                            )
                     }
-                    .padding(.horizontal, 20)
-                    
-                    Spacer()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.customButton)
+                    )
+                    .padding(.top, 16)
+                    .disabled(newPassword.isEmpty || confirmPassword.isEmpty)
+                    .opacity(newPassword.isEmpty || confirmPassword.isEmpty ? 0.7 : 1)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.customBackground)
-                .ignoresSafeArea(.keyboard, edges: .bottom)
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel", action: onCancel)
-                            .foregroundStyle(Color.customButton)
-                    }
+                .padding(.horizontal, 24)
+                
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.customBackground)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                        .foregroundStyle(Color.customButton)
                 }
+            }
+            .onAppear { 
+                focusedField = .newPassword
             }
         }
     }
+}
+
+#Preview {
+    PasswordResetView(
+        newPassword: .constant(""),
+        confirmPassword: .constant(""),
+        isNewPasswordVisible: .constant(false),
+        title: "Create New Password",
+        message: "Please set a new password for your account",
+        buttonTitle: "Set Password",
+        onSave: {},
+        onCancel: {}
+    )
 }

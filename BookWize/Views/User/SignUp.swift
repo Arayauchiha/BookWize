@@ -2,19 +2,25 @@ import SwiftUI
 
 struct SignupView: View {
     @Environment(\.dismiss) var dismiss
-    @StateObject private var authViewModel = AuthViewModel()
     
+    // Form fields
     @State private var name = ""
     @State private var email = ""
     @State private var gender = Gender.male
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var selectedLibrary = "Central Library"
-    @State private var showSuccessAlert = false
+    
+    // Verification
+    @State private var showVerificationView = false
+    @State private var otpCode = ""
+    
+    // Loading and Errors
+    @State private var isLoading = false
+    @State private var errorMessage = ""
     @State private var showMembershipView = false
     
-    @State private var showPassword = false
-    @State private var showConfirmPassword = false
+    // Field validation errors
     @State private var emailError: String?
     @State private var passwordError: String?
     @State private var confirmPasswordError: String?
@@ -32,143 +38,232 @@ struct SignupView: View {
     }
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Personal Information")) {
-                    TextField("Email", text: $email)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Header
+                Text("Create Account")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.customText)
+                    .padding(.bottom, 8)
+                
+                // Personal Information Section
+                sectionTitle("Personal Information")
+                
+                // Email
+                inputField(title: "Email", error: emailError) {
+                    TextField("Enter your email", text: $email)
                         .autocapitalization(.none)
                         .keyboardType(.emailAddress)
-                        .submitLabel(.next)
                         .onChange(of: email) { newValue in
-                            if !newValue.isEmpty {
-                                emailError = ValidationUtils.getEmailError(newValue)
-                            } else {
-                                emailError = nil
-                            }
+                            emailError = ValidationUtils.getEmailError(newValue)
                         }
-                    
-                    if let emailError = emailError {
-                        Text(emailError)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
-                    
-                    TextField("Name", text: $name)
-                        .submitLabel(.next)
+                }
+                
+                // Name
+                inputField(title: "Full Name", error: nil) {
+                    TextField("Enter your full name", text: $name)
+                }
+                
+                // Gender
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Gender")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.customText)
                     
                     Picker("Gender", selection: $gender) {
                         ForEach(Gender.allCases, id: \.self) { gender in
                             Text(gender.rawValue).tag(gender)
                         }
                     }
+                    .pickerStyle(.segmented)
+                    .padding(4)
                 }
                 
-                Section(header: Text("Security")) {
-                    HStack {
-                        if showPassword {
-                            TextField("Password", text: $password)
-                        } else {
-                            SecureField("Password", text: $password)
-                        }
-                        
-                        Button(action: {
-                            showPassword.toggle()
-                        }) {
-                            Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    .onChange(of: password) { newValue in
-                        if !newValue.isEmpty {
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 1)
+                    .padding(.vertical, 8)
+                
+                // Security Section
+                sectionTitle("Security")
+                
+                // Password
+                inputField(title: "Password", error: passwordError) {
+                    SecureField("Enter password", text: $password)
+                        .onChange(of: password) { newValue in
                             passwordError = ValidationUtils.getPasswordError(newValue)
-                        } else {
-                            passwordError = nil
-                        }
-                    }
-                    
-                    if let passwordError = passwordError {
-                        Text(passwordError)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
-                    
-                    HStack {
-                        if showConfirmPassword {
-                            TextField("Confirm Password", text: $confirmPassword)
-                        } else {
-                            SecureField("Confirm Password", text: $confirmPassword)
-                        }
-                        
-                        Button(action: {
-                            showConfirmPassword.toggle()
-                        }) {
-                            Image(systemName: showConfirmPassword ? "eye.slash.fill" : "eye.fill")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    .onChange(of: confirmPassword) { newValue in
-                        if !newValue.isEmpty {
-                            if newValue != password {
-                                confirmPasswordError = "Passwords do not match"
-                            } else {
-                                confirmPasswordError = nil
+                            if !confirmPassword.isEmpty {
+                                confirmPasswordError = confirmPassword != newValue ? "Passwords do not match" : nil
                             }
-                        } else {
-                            confirmPasswordError = nil
                         }
-                    }
-                    
-                    if let confirmPasswordError = confirmPasswordError {
-                        Text(confirmPasswordError)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
                 }
                 
-                Section(header: Text("Library Selection")) {
-                    Picker("Select Library", selection: $selectedLibrary) {
-                        ForEach(libraries, id: \.self) { library in
-                            Text(library).tag(library)
+                // Confirm Password
+                inputField(title: "Confirm Password", error: confirmPasswordError) {
+                    SecureField("Confirm your password", text: $confirmPassword)
+                        .onChange(of: confirmPassword) { newValue in
+                            confirmPasswordError = newValue != password ? "Passwords do not match" : nil
                         }
-                    }
                 }
                 
-                Section {
-                    Button("Create Account") {
-                        authViewModel.signup(
-                            email: email,
-                            name: name,
-                            gender: gender,
-                            password: password,
-                            confirmPassword: confirmPassword,
-                            selectedLibrary: selectedLibrary
-                        )
-                        showSuccessAlert = true
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 1)
+                    .padding(.vertical, 8)
+                
+                // Library Selection
+                sectionTitle("Select Your Library")
+                
+                Picker("Select Library", selection: $selectedLibrary) {
+                    ForEach(libraries, id: \.self) { library in
+                        Text(library).tag(library)
                     }
-                    .frame(maxWidth: .infinity)
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(isFormValid ? Color.blue : Color.gray)
-                    .cornerRadius(10)
-                    .disabled(!isFormValid)
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(10)
+                
+                // Error message
+                if !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                        .padding(.vertical, 4)
+                }
+                
+                // Create Account Button
+                Button(action: createAccount) {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Text("Continue")
+                            .fontWeight(.semibold)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(isFormValid ? Color.customButton : Color.gray)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+                .disabled(!isFormValid || isLoading)
+                .padding(.top, 16)
+            }
+            .padding(24)
+        }
+        .background(Color.customBackground)
+        .sheet(isPresented: $showVerificationView) {
+            OTPVerificationView(
+                email: email,
+                otp: $otpCode,
+                onVerify: {
+                    // Call completeSignup when OTP is verified
+                    print("OTP verified, calling completeSignup()")
+                    completeSignup()
+                },
+                onCancel: {
+                    showVerificationView = false
+                }
+            )
+        }
+        .navigationTitle("Sign Up")
+        .fullScreenCover(isPresented: $showMembershipView) {
+            MembershipView(userName: name, userEmail: email)
+        }
+    }
+    
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.headline)
+            .foregroundStyle(Color.customText)
+    }
+    
+    private func inputField<Content: View>(title: String, error: String?, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(Color.customText)
+            
+            content()
+                .padding()
+                .background(Color.customInputBackground)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(error != nil ? Color.red : Color.clear, lineWidth: 1)
+                )
+            
+            if let error = error {
+                Text(error)
+                    .foregroundStyle(Color.red)
+                    .font(.caption)
+                    .padding(.leading, 4)
+            }
+        }
+    }
+    
+    private func createAccount() {
+        isLoading = true
+        
+        // Send verification OTP to verify email
+        Task {
+            let sent = await EmailService.shared.sendOTPEmail(to: email)
+            
+            DispatchQueue.main.async {
+                isLoading = false
+                if sent {
+                    showVerificationView = true
+                } else {
+                    errorMessage = "Failed to send verification code. Please try again."
                 }
             }
-            .navigationTitle("Sign Up")
-            .alert("Error", isPresented: $authViewModel.showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(authViewModel.errorMessage)
-            }
-            .alert("Success", isPresented: $showSuccessAlert) {
-                Button("Continue to Membership") {
-                    showMembershipView = true
-                }
-            } message: {
-                Text("Account created successfully!")
-            }
-            .fullScreenCover(isPresented: $showMembershipView) {
-                MembershipView(userName: name, userEmail: email)
-            }
+        }
+    }
+    
+    private func completeSignup() {
+        print("OTP verified successfully for: \(email), proceeding with signup")
+        
+        // Create user object
+        let user = User(
+            email: email,
+            name: name,
+            gender: gender,
+            password: password,
+            selectedLibrary: selectedLibrary
+        )
+        
+        // Here you would typically save the user to your database
+        
+        // Send welcome email
+        Task {
+            let emailService = EmailService()
+            let subject = "Welcome to BookWize!"
+            let body = """
+            Hello \(name),
+            
+            Welcome to BookWize! Your account has been successfully created.
+            
+            Your selected library: \(selectedLibrary)
+            
+            You can now enjoy all the benefits of our library management system.
+            
+            Regards,
+            BookWize Team
+            """
+            
+            _ = await emailService.sendEmail(to: email, subject: subject, body: body)
+            print("Welcome email sent to: \(email)")
+        }
+        
+        // Close the verification sheet first
+        showVerificationView = false
+        
+        // Then navigate to membership view
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            showMembershipView = true
         }
     }
 }
@@ -185,5 +280,11 @@ import SwiftUI
 struct SignUp: View {
     var body: some View {
         SignupView() // This redirects to your actual implementation
+    }
+}
+
+#Preview {
+    NavigationView {
+        SignupView()
     }
 }

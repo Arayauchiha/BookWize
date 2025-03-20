@@ -28,6 +28,7 @@ struct LoginView: View {
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var showingPasswordChangeView = false
+    @State private var isNewPasswordVisible = false
     
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
@@ -38,6 +39,7 @@ struct LoginView: View {
             Text("\(roleTitle) Login")
                 .font(.largeTitle)
                 .fontWeight(.bold)
+                .foregroundColor(roleColor)
             
             TextField("Email", text: $email)
                 .padding()
@@ -67,7 +69,7 @@ struct LoginView: View {
                 }
             }
             .padding()
-            .background(Color.blue)
+            .background(Color.customButton)
             .foregroundColor(.white)
             .cornerRadius(10)
             .disabled(isLoading)
@@ -75,9 +77,9 @@ struct LoginView: View {
             if userRole == .member {
                 HStack {
                     NavigationLink("Create Account") {
-                        SignupView() // Fixed to match your actual view name
+                        SignUp()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.customButton)
                     
                     Spacer()
                     
@@ -89,87 +91,66 @@ struct LoginView: View {
                             errorMessage = "Please enter your email first"
                         }
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.customButton)
                 }
             }
         }
         .padding()
         .sheet(isPresented: $showingOTPView) {
-            // OTP verification sheet
-            VStack(spacing: 20) {
-                Text("Verify Your Email")
-                    .font(.headline)
-                
-                Text("Enter the code sent to your email")
-                    .font(.subheadline)
-                
-                TextField("Verification Code", text: $otpCode)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                    .keyboardType(.numberPad)
-                
-                if !errorMessage.isEmpty {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-                
-                Button("Verify") {
+            // Use the consistent OTP verification view
+            OTPVerificationView(
+                email: email,
+                otp: $otpCode,
+                onVerify: {
                     verifyOTP()
+                },
+                onCancel: {
+                    showingOTPView = false
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-                
-                Button("Resend Code") {
-                    sendVerificationOTP()
-                }
-                .foregroundColor(.blue)
-            }
-            .padding()
+            )
         }
         .sheet(isPresented: $showingPasswordChangeView) {
             // Password change sheet for librarian first login
-            VStack(spacing: 20) {
-                Text("Create New Password")
-                    .font(.headline)
-                
-                SecureField("New Password", text: $newPassword)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                
-                SecureField("Confirm Password", text: $confirmPassword)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                
-                if !errorMessage.isEmpty {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-                
-                Button("Set Password") {
-                    if newPassword == confirmPassword && !newPassword.isEmpty {
-                        // Update password would happen here
-                        showingPasswordChangeView = false
-                        // Send verification email
-                        sendVerificationOTP()
-                    } else {
-                        errorMessage = "Passwords don't match or are empty"
+            PasswordResetView(
+                newPassword: $newPassword,
+                confirmPassword: $confirmPassword,
+                isNewPasswordVisible: $isNewPasswordVisible,
+                title: "Create New Password",
+                message: "Please set a new password for your account",
+                buttonTitle: "Set Password",
+                onSave: {
+                    if newPassword.isEmpty || confirmPassword.isEmpty {
+                        errorMessage = "Passwords cannot be empty"
+                        return
                     }
+                    
+                    if newPassword != confirmPassword {
+                        errorMessage = "Passwords don't match"
+                        return
+                    }
+                    
+                    // Update password would happen here in a real app
+                    password = newPassword
+                    showingPasswordChangeView = false
+                    
+                    // Send verification email after password change
+                    sendVerificationOTP()
+                },
+                onCancel: {
+                    showingPasswordChangeView = false
                 }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-            }
-            .padding()
+            )
+        }
+    }
+    
+    var roleColor: Color {
+        switch userRole {
+        case .admin:
+            return Color.adminColor
+        case .librarian:
+            return Color.librarianColor
+        case .member:
+            return Color.memberColor
         }
     }
     
@@ -198,20 +179,23 @@ struct LoginView: View {
         switch userRole {
         case .admin:
             // Redirect to AdminLoginView
-            if email == "admin@example.com" && password == "admin123" {
+            if email == "ss0854850@gmail.com" && password == "admin@12345" {
                 isAdminLoggedIn = true
             } else {
                 errorMessage = "Invalid admin credentials"
             }
             
         case .librarian:
-            // Simulate checking if this is first login
-            isFirstLogin = (email == "librarian@example.com" && password == "temp123")
+            // Simulate checking if this is first login by checking for temp password pattern
+            isFirstLogin = (email == "librarian@example.com" && password == "temp123") || 
+                           password.hasPrefix("temp") || 
+                           password.count < 10 // Assuming temporary passwords are shorter
             
             if isFirstLogin {
+                // Show password change view for first login
                 showingPasswordChangeView = true
             } else {
-                // Send verification OTP
+                // Regular login flow - send verification OTP
                 sendVerificationOTP()
             }
             
@@ -226,7 +210,7 @@ struct LoginView: View {
     func sendVerificationOTP() {
         Task {
             isLoading = true
-            let sent = await OTPManager.shared.sendOTPEmail(to: email) // Use the correct method
+            let sent = await EmailService.shared.sendOTPEmail(to: email)
             
             DispatchQueue.main.async {
                 isLoading = false
@@ -241,9 +225,9 @@ struct LoginView: View {
     }
     
     func verifyOTP() {
-        if OTPManager.shared.verifyOTP(email: email, code: otpCode) {
+        if EmailService.shared.verifyOTP(email: email, code: otpCode) {
             // OTP verified
-            OTPManager.shared.clearOTP(for: email)
+            EmailService.shared.clearOTP(for: email)
             showingOTPView = false
             
             // Set login state based on role

@@ -6,6 +6,8 @@ class AuthViewModel: ObservableObject {
     @Published var isAuthenticated = false
     @Published var showError = false
     @Published var errorMessage = ""
+    @Published var isVerificationNeeded = false
+    @Published var verificationEmail = ""
     
     private let emailService = EmailService()
     
@@ -13,7 +15,9 @@ class AuthViewModel: ObservableObject {
         // TODO: Implement actual authentication
         // For demo purposes, we'll just simulate a successful login
         if !email.isEmpty && !password.isEmpty {
-            isAuthenticated = true
+            // Set verification email for OTP
+            verificationEmail = email
+            isVerificationNeeded = true
         } else {
             showError = true
             errorMessage = "Please fill in all fields"
@@ -50,6 +54,14 @@ class AuthViewModel: ObservableObject {
             
             _ = await emailService.sendEmail(to: email, subject: subject, body: body)
         }
+    }
+    
+    func sendVerificationOTP(to email: String) async -> Bool {
+        return await EmailService.shared.sendOTPEmail(to: email)
+    }
+    
+    func verifyOTP(email: String, code: String) -> Bool {
+        return EmailService.shared.verifyOTP(email: email, code: code)
     }
     
     func logout() {

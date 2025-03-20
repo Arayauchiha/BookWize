@@ -7,6 +7,11 @@ struct OTPVerificationView: View {
     let onVerify: () -> Void
     let onCancel: () -> Void
     @FocusState private var isOTPFieldFocused: Bool
+    @State private var errorMessage = ""
+    @State private var isResending = false
+    
+    // Reference to the email service
+    private let emailService = EmailService.shared
 
     var body: some View {
         NavigationStack {
@@ -38,20 +43,54 @@ struct OTPVerificationView: View {
                         .padding(.horizontal, 20)
                 }
                 .padding(.horizontal, 20)
+                
+                if !errorMessage.isEmpty {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
 
-                Button(action: onVerify) {
+                Button(action: {
+                    print("Verify button pressed with OTP: \(otp)")
+                    if otp.count != 6 {
+                        errorMessage = "Please enter a valid 6-digit code"
+                        return
+                    }
+                    
+                    errorMessage = ""
+                    // Call the onVerify callback which should handle all verification logic
+                    onVerify()
+                    
+                    // Important: Do NOT dismiss here - let the parent view determine
+                    // when to dismiss based on successful verification
+                }) {
                     Text("Verify")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.customButton)
-                        )
                 }
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.customButton)
+                )
                 .padding(.horizontal, 20)
                 .disabled(otp.count != 6)
+                .opacity(otp.count != 6 ? 0.7 : 1)
+
+                Button(action: {
+                    resendCode()
+                }) {
+                    if isResending {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                    } else {
+                        Text("Resend Code")
+                    }
+                }
+                .foregroundColor(Color.customButton)
+                .padding(.top, 8)
+                .disabled(isResending)
 
                 Spacer()
             }
@@ -67,6 +106,28 @@ struct OTPVerificationView: View {
                 }
             }
             .onAppear { isOTPFieldFocused = true }
+        }
+    }
+    
+    private func resendCode() {
+        isResending = true
+        
+        // Clear the current OTP input
+        otp = ""
+        
+        Task {
+            // Send a new OTP
+            let sent = await emailService.sendOTPEmail(to: email)
+            
+            DispatchQueue.main.async {
+                isResending = false
+                if !sent {
+                    errorMessage = "Failed to resend verification code"
+                } else {
+                    errorMessage = ""
+                    isOTPFieldFocused = true
+                }
+            }
         }
     }
 }

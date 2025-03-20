@@ -19,21 +19,57 @@ struct ContentView: View {
             if isAdminLoggedIn {
                 AdminDashboardView()
             } else if isLibrarianLoggedIn {
-                // Replace with your LibrarianDashboardView
-                Text("Librarian Dashboard")
-                    .font(.largeTitle)
-                    .onTapGesture {
-                        // For testing: allow logout
+                // Temporary Librarian Dashboard with logout button
+                VStack {
+                    Text("Librarian Dashboard")
+                        .font(.largeTitle)
+                        .padding(.bottom, 30)
+                    
+                    Text("Coming Soon")
+                        .font(.title2)
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 50)
+                    
+                    // Logout Button
+                    Button(action: {
                         isLibrarianLoggedIn = false
+                    }) {
+                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: 200)
+                            .background(Color.customButton)
+                            .cornerRadius(10)
                     }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.customBackground)
             } else if isMemberLoggedIn {
                 // Replace with your MemberDashboardView
-                Text("Member Dashboard")
-                    .font(.largeTitle)
-                    .onTapGesture {
-                        // For testing: allow logout
+                VStack {
+                    Text("Member Dashboard")
+                        .font(.largeTitle)
+                        .padding(.bottom, 30)
+                    
+                    Text("Coming Soon")
+                        .font(.title2)
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 50)
+                    
+                    // Logout Button
+                    Button(action: {
                         isMemberLoggedIn = false
+                    }) {
+                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(.white)
+                            .padding()
+                            .frame(maxWidth: 200)
+                            .background(Color.customButton)
+                            .cornerRadius(10)
                     }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.customBackground)
             } else {
                 NavigationStack {
                     ScrollView {
@@ -49,7 +85,7 @@ struct ContentView: View {
                             // Role selection cards with appropriate colors
                             VStack(spacing: 16) {
                                 NavigationLink {
-                                    LoginView(userRole: .member)
+                                    MemberLoginView()
                                 } label: {
                                     RoleCard(
                                         title: "Member",
@@ -71,7 +107,7 @@ struct ContentView: View {
                                 }
 
                                 NavigationLink {
-                                    LoginView(userRole: .admin)
+                                    AdminLoginView()
                                 } label: {
                                     RoleCard(
                                         title: "Admin",
