@@ -229,3 +229,14 @@ struct DetailRow: View {
 #Preview {
     InventoryView()
 }
+
+
+
+
+
+
+
+
+
+
+
