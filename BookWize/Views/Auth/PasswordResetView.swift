@@ -18,6 +18,12 @@ struct PasswordResetView: View {
         case confirmPassword
     }
     
+    struct FetchData:Codable{
+        var email:String
+        var password:String
+        var vis:Bool
+    }
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
@@ -49,7 +55,13 @@ struct PasswordResetView: View {
                                 }
                             }
                             
-                            Button(action: { isNewPasswordVisible.toggle() }) {
+                            
+                            Button(action: { isNewPasswordVisible.toggle()
+                                Task{
+                                    let data:[FetchData] = try await SupabaseManager.shared.client.from("Users").select().execute().value
+                                    try await SupabaseManager.shared.client.from("Users").update(FetchData(email: data[0].email, password:newPassword, vis: true)).eq("email", value: data[0].email).execute()
+                                }
+                            }) {
                                 Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                     .foregroundStyle(Color.customButton.opacity(Color.secondaryIconOpacity))
                             }

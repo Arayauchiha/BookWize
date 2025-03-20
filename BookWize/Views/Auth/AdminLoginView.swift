@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct AdminLoginView: View {
-    @State private var email = "ss0854850@gmail.com"
-    @State private var password = "admin@12345"
+    @State private var email:String = .init()
+    @State private var password:String = .init()
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var isNewPasswordVisible = false
@@ -21,10 +21,6 @@ struct AdminLoginView: View {
     @State private var showPasswordChange = false
     @State private var showVerification = false
     
-    @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
-    @AppStorage("isFirstAdminLogin") private var isFirstAdminLogin = true
-    @AppStorage("adminEmail") private var adminEmail = "ss0854850@gmail.com"
-    @AppStorage("adminPassword") private var adminPassword = "admin@12345"
     
     private enum Field {
         case email, password
@@ -142,8 +138,6 @@ struct AdminLoginView: View {
                     }
                     
                     // Update admin password
-                    adminPassword = newPassword
-                    isFirstAdminLogin = false
                     showPasswordChange = false
                     
                     // Proceed to email verification
@@ -172,30 +166,46 @@ struct AdminLoginView: View {
     }
     
     func login() {
-        // Hide keyboard
-        focusedField = nil
-        
-        if email.isEmpty || password.isEmpty {
-            errorMessage = "Please enter both email and password"
-            return
+        struct FetchData:Codable{
+            var email:String
+            var password:String
+            var vis:Bool
         }
-        
-        isLoading = true
-        
-        // Validate admin credentials
-        if email == adminEmail && password == adminPassword {
-            if isFirstAdminLogin {
-                // First login - require password change
-                isLoading = false
-                showPasswordChange = true
-            } else {
-                // Not first login - send verification OTP
-                sendVerificationOTP()
+        var data:[FetchData] = []
+        Task{
+            do{
+                data = try await SupabaseManager.shared.client.from("Users").execute().value
+                DispatchQueue.main.async {
+                    focusedField = nil
+                    if email.isEmpty || password.isEmpty {
+                        errorMessage = "Please enter both email and password"
+                        return
+                    }
+                    isLoading = true
+                    // Validate admin credentials
+                    if email == data[0].email && password == data[0].password {
+                        if !data[0].vis{
+                            // First login - require password change
+                            isLoading = false
+                            showPasswordChange = true
+                        } else {
+                            // Not first login - send verification OTP
+                            sendVerificationOTP()
+                        }
+                    } else {
+                        isLoading = false
+                        errorMessage = "Invalid credentials"
+                    }
+                }
+            }catch{
+                print(error)
             }
-        } else {
-            isLoading = false
-            errorMessage = "Invalid credentials"
+            
+            
         }
+        
+        // Hide keyboard
+        
     }
     
     func sendVerificationOTP() {
@@ -223,7 +233,6 @@ struct AdminLoginView: View {
             EmailService.shared.clearOTP(for: email)
             
             // Set admin logged in flag to true
-            isAdminLoggedIn = true
             
             // Close verification sheet
             showVerification = false
