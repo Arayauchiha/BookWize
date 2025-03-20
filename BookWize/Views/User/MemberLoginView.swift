@@ -189,7 +189,7 @@ struct MemberLoginView: View {
                 message: "Please enter your new password",
                 buttonTitle: "Reset Password",
                 onSave: {
-                    // Reset password logic
+                    // Validation
                     if newPassword.isEmpty || confirmPassword.isEmpty {
                         errorMessage = "Please enter a new password"
                         return
@@ -200,11 +200,28 @@ struct MemberLoginView: View {
                         return
                     }
                     
-                    // In a real app, you would update the user's password in your database
-                    // For this demo, we'll just close the sheet and pre-fill the login field
-                    showPasswordReset = false
-                    password = newPassword
-                    errorMessage = "Password reset successful. Please sign in."
+                    // Update password in Supabase
+                    Task {
+                        do {
+                            let client = SupabaseConfig.shared
+                            
+                            let response = try await client.database
+                                .from("Members")
+                                .update(["password": newPassword])
+                                .eq("email", value: resetEmail)
+                                .execute()
+                            
+                            DispatchQueue.main.async {
+                                showPasswordReset = false
+                                password = newPassword
+                                errorMessage = "Password reset successful. Please sign in."
+                            }
+                        } catch {
+                            DispatchQueue.main.async {
+                                errorMessage = "Failed to reset password: \(error.localizedDescription)"
+                            }
+                        }
+                    }
                 },
                 onCancel: {
                     showPasswordReset = false
