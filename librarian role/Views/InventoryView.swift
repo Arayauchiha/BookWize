@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct InventoryView: View {
-    @StateObject private var inventoryManager = InventoryManager()
+    @State private var inventoryManager = InventoryManager()
     @State private var searchText = ""
     @State private var showingAddBookSheet = false
     @State private var showingISBNScanner = false
@@ -137,7 +137,7 @@ struct BookRowView: View {
 
 struct AddBookView: View {
     @Environment(\.dismiss) var dismiss
-    @ObservedObject var inventoryManager: InventoryManager
+    @State var inventoryManager: InventoryManager
     
     @State private var isbn = ""
     @State private var title = ""
@@ -179,7 +179,7 @@ struct AddBookView: View {
 
 struct BookDetailView: View {
     let book: Book
-    @ObservedObject var inventoryManager: InventoryManager
+    @State var inventoryManager: InventoryManager
     @Environment(\.dismiss) var dismiss
     
     var body: some View {

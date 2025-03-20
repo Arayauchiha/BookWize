@@ -97,4 +97,4 @@ class InventoryManager: ObservableObject {
             saveBooks()
         }
     }
-} 
+}

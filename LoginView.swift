@@ -163,7 +163,7 @@ struct LoginView: View {
             .navigationDestination(isPresented: $navigateToApp) {
                 switch userRole {
                 case .admin: AdminDashboardView()
-                case .librarian: Text("Librarian Dashboard") // Replace with actual view
+                case .librarian: InventoryManagerView() // Replace with actual view
                 case .member: Text("Member Dashboard") // Replace with actual view
                 }
             }
