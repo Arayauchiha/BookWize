@@ -12,6 +12,7 @@ struct SignupView: View {
     @State private var selectedLibrary = "Central Library"
     @State private var showSuccessAlert = false
     @State private var showMembershipView = false
+    @State private var selectedGenres: Set<String> = []
     
     @State private var showPassword = false
     @State private var showConfirmPassword = false
@@ -141,7 +142,8 @@ struct SignupView: View {
                             gender: gender,
                             password: password,
                             confirmPassword: confirmPassword,
-                            selectedLibrary: selectedLibrary
+                            selectedLibrary: selectedLibrary,
+                            selectedGenres: Array(selectedGenres)
                         )
                         showSuccessAlert = true
                     }

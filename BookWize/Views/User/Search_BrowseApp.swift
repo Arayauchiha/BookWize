@@ -57,5 +57,7 @@ struct Search_BrowseApp: View {
             UITabBar.appearance().scrollEdgeAppearance = appearance
             UITabBar.appearance().standardAppearance = appearance
         }
+        .navigationBarBackButtonHidden(true)
     }
+    
 }

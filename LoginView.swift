@@ -164,7 +164,7 @@ struct LoginView: View {
                 switch userRole {
                 case .admin: AdminDashboardView()
                 case .librarian: InventoryManagerView() // Replace with actual view
-                case .member: Text("Member Dashboard") // Replace with actual view
+                case .member: Search_BrowseApp() // Replace with actual view
                 }
             }
             .sheet(isPresented: $showPasswordChangeSheet) {
@@ -196,6 +196,7 @@ struct LoginView: View {
             } message: {
                 Text(alertType?.message ?? "")
             }
+            .navigationBarBackButtonHidden(userRole == .member)
         }
     }
     

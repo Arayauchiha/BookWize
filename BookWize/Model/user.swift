@@ -7,14 +7,15 @@ struct User: Codable, Identifiable {
     var gender: Gender
     var password: String
     var selectedLibrary: String?
-    
-    init(id: UUID = UUID(), email: String, name: String, gender: Gender, password: String, selectedLibrary: String? = nil) {
+    var selectedGenres: [String]
+    init(id: UUID = UUID(), email: String, name: String, gender: Gender, password: String, selectedLibrary: String? = nil, selectedGenres: [String] = []) {
         self.id = id
         self.email = email
         self.name = name
         self.gender = gender
         self.password = password
         self.selectedLibrary = selectedLibrary
+        self.selectedGenres = selectedGenres
     }
 }
 
