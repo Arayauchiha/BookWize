@@ -1,28 +1,4 @@
 import SwiftUI
-import BookWize
-
-struct NavigationUtil {
-    static func popToRootView() {
-        findNavigationController(viewController: UIApplication.shared.windows.filter { $0.isKeyWindow }.first?.rootViewController)?
-            .popToRootViewController(animated: true)
-    }
-    
-    static func findNavigationController(viewController: UIViewController?) -> UINavigationController? {
-        guard let viewController = viewController else {
-            return nil
-        }
-        
-        if let navigationController = viewController as? UINavigationController {
-            return navigationController
-        }
-        
-        for childViewController in viewController.children {
-            return findNavigationController(viewController: childViewController)
-        }
-        
-        return nil
-    }
-}
 
 struct MembershipView: View {
     @State private var showPaymentSuccess = false
@@ -31,6 +7,7 @@ struct MembershipView: View {
     @State private var qrCodeImage: UIImage? = nil
     @State private var showDigitalCard = false
     @State private var showLogoutAlert = false
+    @State private var showDigitalPass = false
     let membershipAmount = 49.99
     
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
@@ -39,10 +16,131 @@ struct MembershipView: View {
     // User information passed from SignupView
     let userName: String
     let userEmail: String
+    let selectedLibrary: String
+    let userGender: Gender
+    let userPassword: String
+    @State private var selectedGenres: Set<String> = []
+    @State private var errorMessage: String? = nil
+    @State private var showSuccessAlert = false
+    @State private var isProcessing = false
     
-    init(userName: String, userEmail: String) {
+    init(userName: String, userEmail: String, selectedLibrary: String, gender: Gender, password: String) {
         self.userName = userName
         self.userEmail = userEmail
+        self.selectedLibrary = selectedLibrary
+        self.userGender = gender
+        self.userPassword = password
+    }
+    
+    private func saveUserData() async throws {
+        let client = SupabaseManager.shared.client
+        
+        let user = User(
+            email: userEmail,
+            name: userName,
+            gender: userGender,
+            password: userPassword,
+            selectedLibrary: selectedLibrary,
+            selectedGenres: Array(selectedGenres)
+        )
+        
+        do {
+            let response = try await client.database
+                .from("Members")
+                .insert(user)
+                .execute()
+            
+            print("Successfully saved user data to Supabase")
+            
+            // Send welcome email
+            let emailService = EmailService()
+            let subject = "Welcome to BookWize!"
+            let body = """
+            Hello \(userName),
+            
+            Welcome to BookWize! Your account has been successfully created.
+            
+            Your selected library: \(selectedLibrary)
+            
+            You can now enjoy all the benefits of our library management system.
+            
+            Regards,
+            BookWize Team
+            """
+            
+            let emailSent = await emailService.sendEmail(to: userEmail, subject: subject, body: body)
+            print("Welcome email sent: \(emailSent)")
+            
+        } catch {
+            print("Error saving user data: \(error)")
+            throw error
+        }
+    }
+    
+    // Generate QR Code using API
+    func generateQRCode() {
+        let userData = [
+            "name": userName,
+            "email": userEmail,
+            "library": selectedLibrary,
+            "membershipType": "Annual",
+            "memberId": "LIB" + String(Int.random(in: 10000...99999)) // Generate a random member ID
+        ]
+        
+        // Convert to JSON string
+        if let jsonData = try? JSONSerialization.data(withJSONObject: userData, options: .prettyPrinted),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            // Start loading
+            isProcessing = true
+            
+            // Call QR code API
+            let apiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=\(jsonString)"
+            if let url = URL(string: apiUrl.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!) {
+                fetchQRCode(from: url)
+            }
+        }
+    }
+    
+    // Fetch QR Code from API
+    func fetchQRCode(from url: URL) {
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            DispatchQueue.main.async {
+                self.isProcessing = false
+                if let data = data, let image = UIImage(data: data) {
+                    self.qrCodeImage = image
+                    self.showDigitalCard = true
+                }
+            }
+        }.resume()
+    }
+    
+    private func handlePaymentAndSaveData() {
+        // Simulate payment process
+        isProcessing = true
+        
+        // Clear any previous error message
+        errorMessage = nil
+        
+        // Simulate API call delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            Task {
+                do {
+                    // Save user data to Supabase
+                    try await saveUserData()
+                    
+                    // Show success alert
+                    self.showSuccessAlert = true
+                    
+                    // Set processing to false
+                    self.isProcessing = false
+                    
+                } catch {
+                    print("Error during payment process: \(error)")
+                    self.errorMessage = "Error processing payment: \(error.localizedDescription)"
+                    self.isProcessing = false
+                }
+            }
+        }
     }
     
     var body: some View {
@@ -52,10 +150,9 @@ struct MembershipView: View {
                     if !showDigitalCard {
                         // Library Card
                         VStack {
-                            Text("Central Library")
+                            Text(selectedLibrary)
                                 .font(.title)
                                 .fontWeight(.bold)
-                            
                             
                             Text("Annual Membership")
                                 .font(.subheadline)
@@ -87,7 +184,6 @@ struct MembershipView: View {
                             PerkRow(icon: "book.fill", text: "Advance Book Reservation")
                             PerkRow(icon: "star.fill", text: "Access to Popular Books Catalog")
                             PerkRow(icon: "arrow.clockwise", text: "Book Renewal Option")
-                            PerkRow(icon: "person.2.fill", text: "Member-only Events")
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -96,29 +192,43 @@ struct MembershipView: View {
                         
                         // Payment Button
                         Button(action: {
-                            showPaymentSuccess = true
+                            handlePaymentAndSaveData()
                         }) {
-                            Text("Pay Now")
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.customButton)
-                                .cornerRadius(10)
+                            if isProcessing {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text("Pay Now")
+                            }
                         }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.customButton)
+                        .cornerRadius(10)
+                        .disabled(isProcessing)
                         .padding(.horizontal)
+                        
+                        // Show error message if any
+                        if let errorMessage = errorMessage {
+                            Text(errorMessage)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                                .padding(.horizontal)
+                        }
                     } else {
                         // Digital Library Card
                         if let qrCodeImage = qrCodeImage {
                             DigitalLibraryCard(
                                 userName: userName,
                                 userEmail: userEmail,
-                                libraryName: "Central Library",
+                                libraryName: selectedLibrary,
                                 qrCodeImage: qrCodeImage
                             )
                         }
                         
                         // Continue Button
-                        NavigationLink(destination: GenreSelectionView()) {
+                        NavigationLink(destination: GenreSelectionView(userEmail: userEmail)) {
                             Text("Continue to Genre Selection")
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -129,7 +239,7 @@ struct MembershipView: View {
                         .padding(.horizontal)
                     }
                     
-                    // Logout Button - Updated for proper logout
+                    // Logout Button
                     Button(action: {
                         showLogoutAlert = true
                     }) {
@@ -148,7 +258,7 @@ struct MembershipView: View {
                 .padding()
             }
             .navigationTitle("Membership")
-            .alert("Payment Successful", isPresented: $showPaymentSuccess) {
+            .alert("Payment Successful!", isPresented: $showSuccessAlert) {
                 Button("Generate Digital Card") {
                     generateQRCode()
                 }
@@ -158,7 +268,6 @@ struct MembershipView: View {
             .alert("Logout", isPresented: $showLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Logout", role: .destructive) {
-                    // This will log out the member and return to role selection
                     isMemberLoggedIn = false
                     dismiss()
                 }
@@ -167,43 +276,6 @@ struct MembershipView: View {
             }
             .background(Color.customBackground)
         }
-    }
-    
-    // Generate QR Code using API
-    func generateQRCode() {
-        let userData = [
-            "name": userName,
-            "email": userEmail,
-            "library": "Central Library",
-            "membershipType": "Annual",
-            "memberId": "LIB" + String(Int.random(in: 10000...99999)) // Generate a random member ID
-        ]
-        
-        // Convert to JSON string
-        if let jsonData = try? JSONSerialization.data(withJSONObject: userData, options: .prettyPrinted),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            // Start loading
-            isLoading = true
-            
-            // Call QR code API
-            let apiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=\(jsonString)"
-            if let url = URL(string: apiUrl.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!) {
-                fetchQRCode(from: url)
-            }
-        }
-    }
-    
-    // Fetch QR Code from API
-    func fetchQRCode(from url: URL) {
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                isLoading = false
-                if let data = data, let image = UIImage(data: data) {
-                    qrCodeImage = image
-                    showDigitalCard = true
-                }
-            }
-        }.resume()
     }
 }
 
@@ -287,11 +359,11 @@ struct DigitalLibraryCard: View {
 struct GenreSelectionView: View {
     @Environment(\.dismiss) var dismiss
     @State private var selectedGenres: Set<String> = []
+    let userEmail: String
     
     let genres = [
-        "Fiction", "Non-Fiction", "Science", "History", "Technology", 
-        "Business", "Mystery", "Romance", "Biography", "Poetry",
-        "Children's Books", "Self Help", "Travel", "Art", "Cooking"
+        "Fiction", "Non-Fiction", "Mystery", "Romance", "Science Fiction",
+        "Fantasy", "Biography", "History", "Poetry", "Children's Books"
     ]
     
     var body: some View {
@@ -315,11 +387,29 @@ struct GenreSelectionView: View {
         }
         .navigationTitle("Select Genres")
         .navigationBarItems(trailing: Button("Done") {
-            NavigationUtil.popToRootView()
-            let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-            let window = windowScene?.windows.first
-            window?.rootViewController = UIHostingController(rootView: Search_BrowseApp(userPreferredGenres: Array(selectedGenres)))
+            Task {
+                await saveSelectedGenres()
+            }
         })
         .background(Color.customBackground)
+    }
+    
+    private func saveSelectedGenres() async {
+        let client = SupabaseManager.shared.client
+        
+        do {
+            // Update the selectedGenres column for the user
+            let response = try await client.database
+                .from("Members")
+                .update(["selectedGenres": Array(selectedGenres)])
+                .eq("email", value: userEmail)
+                .execute()
+            
+            print("Successfully saved selected genres to Supabase")
+            dismiss()
+            
+        } catch {
+            print("Error saving selected genres: \(error)")
+        }
     }
 }
