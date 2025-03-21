@@ -9,12 +9,22 @@ import SwiftUI
 
 struct ForYouGridView: View {
     let books: [UserBook]
+    let userPreferredGenres: [String]
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
+    
+    var filteredBooks: [UserBook] {
+        if userPreferredGenres.isEmpty {
+            return books
+        }
+        return books.filter { book in
+            userPreferredGenres.contains(book.genre)
+        }
+    }
     
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(books) { book in
+                ForEach(filteredBooks) { book in
                     NavigationLink {
                         UserBookDetailView(book: book)
                     } label: {
@@ -38,6 +48,8 @@ struct BookSectionsView: View {
     @Binding var selectedFilter: String?
     let userPreferredGenres: [String]
     @State private var showingForYouGrid = false
+    @State private var showingPopularGrid = false
+    @ObservedObject var viewModel: BookSearchViewModel
     
     var filteredForYouBooks: [UserBook] {
         if userPreferredGenres.isEmpty {
@@ -61,7 +73,7 @@ struct BookSectionsView: View {
                     
                     if !filteredForYouBooks.isEmpty {
                         NavigationLink {
-                            ForYouGridView(books: filteredForYouBooks)
+                            ForYouGridView(books: viewModel.books, userPreferredGenres: userPreferredGenres)
                         } label: {
                             HStack(spacing: 4) {
                                 Text("See All")
@@ -99,10 +111,40 @@ struct BookSectionsView: View {
             
             // Popular Books Section
             VStack(alignment: .leading) {
-                Text("Popular Books")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .padding(.horizontal)
+                HStack {
+                    Text("Popular Books")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Spacer()
+                    
+                    NavigationLink {
+                        ScrollView {
+                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+                                ForEach(popularBooks) { book in
+                                    NavigationLink {
+                                        UserBookDetailView(book: book)
+                                    } label: {
+                                        BookCard(book: book)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 280)
+                                    }
+                                }
+                            }
+                            .padding()
+                        }
+                        .navigationTitle("Popular Books")
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("See All")
+                                .font(.subheadline)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.blue)
+                    }
+                }
+                .padding(.horizontal)
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
@@ -130,10 +172,9 @@ struct BookSectionsView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(Array(booksByGenre.keys.sorted()), id: \.self) { genre in
-                            Button(action: {
-                                selectedGenreFromCard = genre
-                                selectedFilter = nil
-                            }) {
+                            NavigationLink {
+                                GenreBooksView(genre: genre, books: booksByGenre[genre] ?? [])
+                            } label: {
                                 VStack(spacing: 6) {
                                     if let firstBook = booksByGenre[genre]?.first,
                                        let imageURL = firstBook.imageURL,

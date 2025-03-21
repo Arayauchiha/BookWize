@@ -14,6 +14,7 @@ class BookSearchViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
     @Published var selectedGenre: String? = nil
+    let userPreferredGenres: [String]
     
     private var searchTextSubject = PassthroughSubject<String, Never>()
     private var cancellables = Set<AnyCancellable>()
@@ -75,6 +76,7 @@ class BookSearchViewModel: ObservableObject {
     @Published var forYouBooks: [UserBook] = []
     @Published var popularBooks: [UserBook] = []
     @Published var booksByAuthor: [String: [UserBook]] = [:]
+    @Published var allPreferredBooks: [UserBook] = []
     
     var booksByGenre: [String: [UserBook]] {
         Dictionary(grouping: books, by: { $0.genre })
@@ -84,13 +86,24 @@ class BookSearchViewModel: ObservableObject {
         Array(Set(books.map { $0.genre })).sorted()
     }
     
-    init() {
+    init(userPreferredGenres: [String] = []) {
+        self.userPreferredGenres = userPreferredGenres
         setupInitialData()
     }
     
     private func setupInitialData() {
-        // Setup For You section with a mix of books
-        forYouBooks = Array(books.shuffled().prefix(6))
+        // Setup For You section with books from user's preferred genres
+        if userPreferredGenres.isEmpty {
+            forYouBooks = Array(books.shuffled().prefix(6))
+            allPreferredBooks = books
+        } else {
+            // Filter books by user's preferred genres
+            let preferredBooks = books.filter { book in
+                userPreferredGenres.contains(book.genre)
+            }
+            allPreferredBooks = preferredBooks // Store all books from preferred genres
+            forYouBooks = Array(preferredBooks.shuffled().prefix(6))
+        }
         
         // Setup Popular Books
         popularBooks = Array(books.shuffled().prefix(8))

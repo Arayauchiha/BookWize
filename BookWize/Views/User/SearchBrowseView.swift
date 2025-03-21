@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SearchBrowseView: View {
-    @StateObject private var viewModel = BookSearchViewModel()
+    @StateObject private var viewModel: BookSearchViewModel
     @State private var selectedFilter: String? = nil
     @State private var selectedGenreFromCard: String? = nil
     @State private var showingSuggestions = false
@@ -30,6 +30,7 @@ struct SearchBrowseView: View {
     
     init(userPreferredGenres: [String] = []) {
         self.userPreferredGenres = userPreferredGenres
+        self._viewModel = StateObject(wrappedValue: BookSearchViewModel(userPreferredGenres: userPreferredGenres))
         
         // Configure the navigation bar appearance
         let appearance = UINavigationBarAppearance()
@@ -66,10 +67,6 @@ struct SearchBrowseView: View {
                                 ForEach(Array(viewModel.searchResults.prefix(8))) { book in
                                     NavigationLink {
                                         UserBookDetailView(book: book)
-                                            .onAppear {
-                                                isSearchFocused = false
-                                                showingSuggestions = false
-                                            }
                                     } label: {
                                         BookCard(book: book)
                                             .frame(maxWidth: .infinity)
@@ -80,49 +77,15 @@ struct SearchBrowseView: View {
                             .padding(.horizontal)
                         }
                     } else {
-                        GenreCategoriesView(
-                            genres: genres,
+                        BookSectionsView(
+                            forYouBooks: viewModel.forYouBooks,
+                            popularBooks: viewModel.popularBooks,
+                            booksByGenre: initialBooksByGenre,
+                            selectedGenreFromCard: $selectedGenreFromCard,
                             selectedFilter: $selectedFilter,
-                            selectedGenreFromCard: $selectedGenreFromCard
+                            userPreferredGenres: userPreferredGenres,
+                            viewModel: viewModel
                         )
-                        .padding(.top, 16)
-                        
-                        if let selectedGenre = selectedFilter ?? selectedGenreFromCard {
-                            // Selected Genre Grid View
-                            VStack(alignment: .leading) {
-                                Text(selectedGenre)
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .padding(.horizontal)
-                                
-                                LazyVGrid(columns: columns, spacing: 16) {
-                                    ForEach(initialBooksByGenre[selectedGenre] ?? []) { book in
-                                        NavigationLink {
-                                            UserBookDetailView(book: book)
-                                                .onAppear {
-                                                    isSearchFocused = false
-                                                    showingSuggestions = false
-                                                }
-                                        } label: {
-                                            BookCard(book: book)
-                                                .frame(maxWidth: .infinity)
-                                                .frame(height: 280)
-                                                .padding(.horizontal, 8)
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                        } else {
-                            BookSectionsView(
-                                forYouBooks: viewModel.forYouBooks,
-                                popularBooks: viewModel.popularBooks,
-                                booksByGenre: initialBooksByGenre,
-                                selectedGenreFromCard: $selectedGenreFromCard,
-                                selectedFilter: $selectedFilter,
-                                userPreferredGenres: userPreferredGenres
-                            )
-                        }
                     }
                 }
                 .onAppear {
@@ -133,7 +96,13 @@ struct SearchBrowseView: View {
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Books, Authors, or Genres")
             .onChange(of: viewModel.searchText) { oldValue, newValue in
-                showingSuggestions = !newValue.isEmpty && isSearchFocused
+                if !newValue.isEmpty {
+                    showingSuggestions = isSearchFocused
+                }
+            }
+            .onSubmit(of: .search) {
+                isSearchFocused = false
+                showingSuggestions = false
             }
         }
         .tabItem {

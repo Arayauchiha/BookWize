@@ -77,11 +77,14 @@ struct Search_BrowseApp: View {
                     
                     Section {
                         Button(role: .destructive) {
-                            // Removed navigation action
+                            isMemberLoggedIn = false
+                            NavigationUtil.popToRootView()
+                            let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                            let window = windowScene?.windows.first
+                            window?.rootViewController = UIHostingController(rootView: ContentView())
                         } label: {
                             Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
                         }
-                        .disabled(true) // Make the button appear disabled
                     }
                     
                     Section {
