@@ -16,21 +16,21 @@ struct UserData: Encodable {
     let role: String
 }
 
-struct LibrarianData: Encodable {
-    let name: String
-    let email: String
-    let phone: String
-    let age: Int
-    let status: String
-    let dateAdded: String
-    let requiresPasswordReset: Bool
-    
-    enum CodingKeys: String, CodingKey {
-        case name, email, phone, age, status
-        case dateAdded = "date_added"
-        case requiresPasswordReset = "requires_password_reset"
-    }
-}
+//struct LibrarianData: Encodable {
+//    let name: String
+//    let email: String
+//    let phone: String
+//    let age: Int
+//    let status: String
+//    let dateAdded: String
+//    let requiresPasswordReset: Bool
+//    
+//    enum CodingKeys: String, CodingKey {
+//        case name, email, phone, age, status
+//        case dateAdded = "date_added"
+//        case requiresPasswordReset = "requires_password_reset"
+//    }
+//}
 
 class UserManagerSupabase {
     static let shared = UserManager()
@@ -48,14 +48,15 @@ class UserManagerSupabase {
             .execute()
     }
     
-    func storeLibrarianCredentials(librarian: Librarian, password: String) async throws {
+    func storeLibrarianCredentials(librarian: LibrarianData, password: String) async throws {
         let librarianData = LibrarianData(
             name: librarian.name,
+            age: librarian.age,
             email: librarian.email,
             phone: librarian.phone,
-            age: librarian.age,
-            status: librarian.status.rawValue,
-            dateAdded: ISO8601DateFormatter().string(from: librarian.dateAdded),
+            password: "",
+            status: librarian.status,
+            dateAdded:librarian.dateAdded,
             requiresPasswordReset: true
         )
         
