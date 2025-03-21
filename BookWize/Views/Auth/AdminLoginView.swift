@@ -21,6 +21,8 @@ struct AdminLoginView: View {
     @State private var showPasswordChange = false
     @State private var showVerification = false
     
+    @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
+    
     
     private enum Field {
         case email, password
@@ -232,7 +234,7 @@ struct AdminLoginView: View {
             // Clear OTP from storage
             EmailService.shared.clearOTP(for: email)
             
-            // Set admin logged in flag to true
+            isAdminLoggedIn = true
             
             // Close verification sheet
             showVerification = false
