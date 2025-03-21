@@ -244,9 +244,47 @@ struct MemberLoginView: View {
         
         isLoading = true
         
-        // For demo purposes, proceed to OTP verification
+        // Check credentials in Supabase
         Task {
-            await sendVerificationEmail()
+            do {
+                let client = SupabaseConfig.shared
+                
+                let response = try await client.database
+                    .from("Members")
+                    .select()
+                    .eq("email", value: email)
+                    .single()
+                    .execute()
+                
+                if let jsonString = String(data: response.data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let member = try? JSONDecoder().decode(Member.self, from: jsonData) {
+                    
+                    DispatchQueue.main.async {
+                        // Check if password matches
+                        if member.password == self.password {
+                            // Password matches, proceed with OTP verification
+                            Task {
+                                await self.sendVerificationEmail()
+                            }
+                        } else {
+                            self.isLoading = false
+                            self.errorMessage = "Invalid email or password"
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.errorMessage = "No account found with this email"
+                    }
+                }
+            } catch {
+                print("Login error: \(error)")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.errorMessage = "Login failed: \(error.localizedDescription)"
+                }
+            }
         }
     }
     
@@ -449,6 +487,14 @@ struct PasswordResetRequestView: View {
             }
         }
     }
+}
+
+// Add Member struct for decoding response
+private struct Member: Codable {
+    let email: String
+    let password: String
+    let name: String
+    let gender: String
 }
 
 #Preview {
