@@ -15,10 +15,12 @@ struct MembershipView: View {
     // User information passed from SignupView
     let userName: String
     let userEmail: String
+    let selectedLibrary: String
     
-    init(userName: String, userEmail: String) {
+    init(userName: String, userEmail: String, selectedLibrary: String) {
         self.userName = userName
         self.userEmail = userEmail
+        self.selectedLibrary = selectedLibrary
     }
     
     var body: some View {
@@ -28,7 +30,7 @@ struct MembershipView: View {
                     if !showDigitalCard {
                         // Library Card
                         VStack {
-                            Text("Central Library")
+                            Text(selectedLibrary)
                                 .font(.title)
                                 .fontWeight(.bold)
                             
@@ -63,7 +65,6 @@ struct MembershipView: View {
                             PerkRow(icon: "book.fill", text: "Advance Book Reservation")
                             PerkRow(icon: "star.fill", text: "Access to Popular Books Catalog")
                             PerkRow(icon: "arrow.clockwise", text: "Book Renewal Option")
-                            PerkRow(icon: "person.2.fill", text: "Member-only Events")
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -88,7 +89,7 @@ struct MembershipView: View {
                             DigitalLibraryCard(
                                 userName: userName,
                                 userEmail: userEmail,
-                                libraryName: "Central Library",
+                                libraryName: selectedLibrary,
                                 qrCodeImage: qrCodeImage
                             )
                         }
