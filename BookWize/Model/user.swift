@@ -23,3 +23,11 @@ enum Gender: String, Codable, CaseIterable {
     case female = "Female"
     case other = "Other"
 }
+
+enum Library: String,CaseIterable{
+    case centralLibrary = "Central Library"
+    case cityLibrary = "City Library"
+}
+
+//var selectedLibrary: [Library]
+

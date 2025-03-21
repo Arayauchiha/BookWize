@@ -1,14 +1,15 @@
 import SwiftUI
+import Supabase
 
 struct AddLibrarianView: View {
     @Environment(\.dismiss) private var dismiss
-    let onAdd: (Librarian) -> Void
+    let onAdd: (LibrarianData) -> Void
     
     // Form fields
     @State private var name = ""
     @State private var age = ""
     @State private var email = ""
-    @State private var phone = ""
+    @State private var phone = "" // Still a String for TextField input, but will convert to Int
     
     // Credentials
     @State private var generatedPassword = ""
@@ -30,7 +31,6 @@ struct AddLibrarianView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Form fields
                     Group {
                         TextField("Full Name", text: $name)
                         TextField("Age", text: $age)
@@ -39,12 +39,11 @@ struct AddLibrarianView: View {
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                         TextField("Phone", text: $phone)
-                            .keyboardType(.phonePad)
+                            .keyboardType(.numberPad) // Use numberPad for integer input
                     }
                     .textFieldStyle(CustomTextFieldStyle())
                     .padding(.horizontal, 20)
                     
-                    // Generate Credentials Button
                     if formIsValid && !credentialsSent {
                         Button(action: showCredentialsSheet) {
                             Text("Proceed to Credentials")
@@ -60,7 +59,6 @@ struct AddLibrarianView: View {
                         .padding(.horizontal, 20)
                     }
                     
-                    // Add Button
                     Button(action: addLibrarian) {
                         Text("Add Librarian")
                             .font(.system(size: 16, weight: .semibold))
@@ -89,7 +87,7 @@ struct AddLibrarianView: View {
                 GenerateCredentialsView(
                     email: email,
                     password: generatedPassword,
-                    onSend: { 
+                    onSend: {
                         credentialsSent = true
                         showCredentials = false
                     }
@@ -101,7 +99,6 @@ struct AddLibrarianView: View {
                 Text(alertType?.message ?? "")
             }
             .onAppear {
-                // Generate a random password when view appears
                 generatedPassword = generateRandomPassword()
             }
         }
@@ -112,12 +109,9 @@ struct AddLibrarianView: View {
     }
     
     private func generateRandomPassword() -> String {
-        // Generate random password
         let length = 8
         let characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
-        return "temp" + String((0..<length).map { _ in
-            characters.randomElement()!
-        })
+        return String((0..<length).map { _ in characters.randomElement()! })
     }
     
     private func addLibrarian() {
@@ -126,15 +120,35 @@ struct AddLibrarianView: View {
             return
         }
         
-        let librarian = Librarian(
+        guard let phoneInt = Int(phone) else { // Convert phone to Int
+            alertType = .error("Invalid phone number")
+            return
+        }
+        
+        let librarianData = LibrarianData(
             name: name,
             age: ageInt,
             email: email,
-            phone: phone
+            phone: phoneInt, // Now an Int
+            password: generatedPassword,
+            status: .pending,
+            dateAdded: Date(),
+            requiresPasswordReset: true
         )
         
-        onAdd(librarian)
-        dismiss()
+        Task {
+            do {
+                try await SupabaseManager.shared.client.database
+                    .from("librarians")
+                    .insert(librarianData)
+                    .execute()
+                onAdd(librarianData)
+                dismiss()
+            } catch {
+                print("Error: \(error.localizedDescription)")
+                alertType = .error("Failed to add librarian: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
@@ -143,9 +157,7 @@ private enum AlertType: Identifiable {
     case error(String)
     
     var id: String { "error" }
-    
     var title: String { "Error" }
-    
     var message: String {
         switch self {
         case .error(let message): return message
@@ -153,7 +165,32 @@ private enum AlertType: Identifiable {
     }
 }
 
-#Preview {
-    AddLibrarianView { _ in }
+struct LibrarianData: Encodable {
+    let lib_Id = UUID()
+    let name: String
+    let age: Int
+    let email: String
+    let phone: Int // Changed from String to Int
+    let password: String
+    var status: Status
+    let dateAdded: Date
+    let requiresPasswordReset: Bool
+    
+    enum Status: String, CaseIterable, Codable {
+        case pending = "pending"
+        case working = "working"
+        
+        var color: Color {
+            switch self {
+            case .pending: return .orange
+            case .working: return .green
+            }
+        }
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case name, email, phone, age, status, password
+        case dateAdded = "date_added"
+        case requiresPasswordReset = "requires_password_reset"
+    }
 }
-

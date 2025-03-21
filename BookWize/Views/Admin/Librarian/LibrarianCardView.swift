@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LibrarianCardView: View {
-    let librarian: Librarian
+    let librarian: LibrarianData
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -27,7 +27,7 @@ struct LibrarianCardView: View {
             // Contact info
             VStack(alignment: .leading, spacing: 8) {
                 Label(librarian.email, systemImage: "envelope.fill")
-                Label(librarian.phone, systemImage: "phone.fill")
+                Label(String(librarian.phone), systemImage: "phone.fill")
             }
             .font(.system(size: 15))
             .foregroundStyle(Color.customText.opacity(0.6))
@@ -43,19 +43,5 @@ struct LibrarianCardView: View {
                 .fill(Color.customCardBackground)
         )
     }
-}
-
-#Preview {
-    LibrarianCardView(
-        librarian: Librarian(
-            name: "John Doe",
-            age: 30,
-            email: "john@example.com",
-            phone: "+1 234 567 8900",
-            status: .pending
-        )
-    )
-    .padding()
-    .background(Color.customBackground)
 }
 
