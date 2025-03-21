@@ -24,7 +24,7 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    func signup(email: String, name: String, gender: Gender, password: String, confirmPassword: String, selectedLibrary: String) {
+    func signup(email: String, name: String, gender: Gender, password: String, confirmPassword: String, selectedLibrary: String, selectedGenres: [String] = []) {
         if password != confirmPassword {
             showError = true
             errorMessage = "Passwords do not match"
@@ -32,7 +32,7 @@ class AuthViewModel: ObservableObject {
         }
         
         // Create user
-        let user = User(email: email, name: name, gender: gender, password: password, selectedLibrary: selectedLibrary)
+        let user = User(email: email, name: name, gender: gender, password: password, selectedLibrary: selectedLibrary, selectedGenres: selectedGenres)
         currentUser = user
         isAuthenticated = true
         

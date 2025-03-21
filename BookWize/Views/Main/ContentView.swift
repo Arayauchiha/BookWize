@@ -19,31 +19,7 @@ struct ContentView: View {
             if isAdminLoggedIn {
                 AdminDashboardView()
             } else if isLibrarianLoggedIn {
-                // Temporary Librarian Dashboard with logout button
-                VStack {
-                    Text("Librarian Dashboard")
-                        .font(.largeTitle)
-                        .padding(.bottom, 30)
-                    
-                    Text("Coming Soon")
-                        .font(.title2)
-                        .foregroundColor(.gray)
-                        .padding(.bottom, 50)
-                    
-                    // Logout Button
-                    Button(action: {
-                        isLibrarianLoggedIn = false
-                    }) {
-                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: 200)
-                            .background(Color.customButton)
-                            .cornerRadius(10)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.customBackground)
+                LibrarianDashboardScreen()
             } else if isMemberLoggedIn {
                 // Replace with your MemberDashboardView
                 VStack {
