@@ -9,7 +9,7 @@ struct SignupView: View {
     @State private var gender = Gender.male
     @State private var password = ""
     @State private var confirmPassword = ""
-    @State private var selectedLibrary = "Central Library"
+    @State private var selectedLibrary = "Good Reads Library"
     
     // Verification
     @State private var showVerificationView = false
@@ -19,13 +19,14 @@ struct SignupView: View {
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var showMembershipView = false
+    @State private var selectedGenres: Set<String> = []
     
     // Field validation errors
     @State private var emailError: String?
     @State private var passwordError: String?
     @State private var confirmPasswordError: String?
     
-    let libraries = ["Central Library", "City Library", "University Library", "Community Library"]
+    let libraries = ["Good Reads Library"]
     
     private var isFormValid: Bool {
         !name.isEmpty &&
@@ -171,7 +172,7 @@ struct SignupView: View {
         }
         .navigationTitle("Sign Up")
         .fullScreenCover(isPresented: $showMembershipView) {
-            MembershipView(userName: name, userEmail: email)
+            MembershipView(userName: name, userEmail: email, selectedLibrary: selectedLibrary)
         }
     }
     
@@ -226,54 +227,65 @@ struct SignupView: View {
     private func completeSignup() {
         print("OTP verified successfully for: \(email), proceeding with signup")
         
-        // Create user object
-        let user = User(
-            email: email,
-            name: name,
-            gender: gender,
-            password: password,
-            selectedLibrary: selectedLibrary
-        )
-        
-        // Here you would typically save the user to your database
-        
-        // Send welcome email
+        // Save user to Supabase database
         Task {
-            let emailService = EmailService()
-            let subject = "Welcome to BookWize!"
-            let body = """
-            Hello \(name),
-            
-            Welcome to BookWize! Your account has been successfully created.
-            
-            Your selected library: \(selectedLibrary)
-            
-            You can now enjoy all the benefits of our library management system.
-            
-            Regards,
-            BookWize Team
-            """
-            
-            _ = await emailService.sendEmail(to: email, subject: subject, body: body)
-            print("Welcome email sent to: \(email)")
-        }
-        
-        // Close the verification sheet first
-        showVerificationView = false
-        
-        // Then navigate to membership view
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            showMembershipView = true
+            do {
+                let client = SupabaseManager.shared.client
+                
+                let member = [
+                    "email": email,
+                    "name": name,
+                    "gender": gender.rawValue,
+                    "password": password,
+                    "selectedLibrary": selectedLibrary,
+                    "selectedGenres": Array(selectedGenres)
+                    // Note: In production, hash the password
+                ]
+                
+                let response = try await client.database
+                    .from("Members")
+                    .insert(member)
+                    .execute()
+                
+                print("User saved to Supabase successfully")
+                
+                // Send welcome email
+                let emailService = EmailService()
+                let subject = "Welcome to BookWize!"
+                let body = """
+                Hello \(name),
+                
+                Welcome to BookWize! Your account has been successfully created.
+                
+                Your selected library: \(selectedLibrary)
+                
+                You can now enjoy all the benefits of our library management system.
+                
+                Regards,
+                BookWize Team
+                """
+                
+                _ = await emailService.sendEmail(to: email, subject: subject, body: body)
+                print("Welcome email sent to: \(email)")
+                
+                // Close the verification sheet first
+                DispatchQueue.main.async {
+                    showVerificationView = false
+                    
+                    // Then navigate to membership view
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        showMembershipView = true
+                    }
+                }
+            } catch {
+                print("Error saving user to Supabase: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    errorMessage = "Failed to create account. Please try again."
+                }
+            }
         }
     }
 }
-
-//
-//  SignUp.swift
-//  BookWize
-//
-//  Created by Aditya Singh on 18/03/25.
-//
 
 import SwiftUI
 

@@ -1,10 +1,3 @@
-//
-//  MemberLoginView.swift
-//  BookWize
-//
-//  Created by Aditya Singh on 20/03/25.
-//
-
 import SwiftUI
 
 struct MemberLoginView: View {
@@ -189,7 +182,7 @@ struct MemberLoginView: View {
                 message: "Please enter your new password",
                 buttonTitle: "Reset Password",
                 onSave: {
-                    // Reset password logic
+                    // Validation
                     if newPassword.isEmpty || confirmPassword.isEmpty {
                         errorMessage = "Please enter a new password"
                         return
@@ -200,11 +193,28 @@ struct MemberLoginView: View {
                         return
                     }
                     
-                    // In a real app, you would update the user's password in your database
-                    // For this demo, we'll just close the sheet and pre-fill the login field
-                    showPasswordReset = false
-                    password = newPassword
-                    errorMessage = "Password reset successful. Please sign in."
+                    // Update password in Supabase
+                    Task {
+                        do {
+                            let client = SupabaseManager.shared.client
+                            
+                            let response = try await client.database
+                                .from("Members")
+                                .update(["password": newPassword])
+                                .eq("email", value: resetEmail)
+                                .execute()
+                            
+                            DispatchQueue.main.async {
+                                showPasswordReset = false
+                                password = newPassword
+                                errorMessage = "Password reset successful. Please sign in."
+                            }
+                        } catch {
+                            DispatchQueue.main.async {
+                                errorMessage = "Failed to reset password: \(error.localizedDescription)"
+                            }
+                        }
+                    }
                 },
                 onCancel: {
                     showPasswordReset = false
@@ -226,10 +236,70 @@ struct MemberLoginView: View {
         focusedField = nil
         
         isLoading = true
+        print("Attempting login for email: \(email)")
         
-        // For demo purposes, proceed to OTP verification
+        // Check credentials in Supabase
         Task {
-            await sendVerificationEmail()
+            do {
+                let client = SupabaseManager.shared.client
+                
+                let response = try await client.database
+                    .from("Members")
+                    .select()
+                    .eq("email", value: email)
+                    .single()
+                    .execute()
+                
+                print("Supabase response data: \(String(describing: response.data))")
+                
+                if let jsonString = String(data: response.data, encoding: .utf8) {
+                    print("JSON String: \(jsonString)")
+                    
+                    if let jsonData = jsonString.data(using: .utf8) {
+                        do {
+                            let member = try JSONDecoder().decode(MemberResponse.self, from: jsonData)
+                            print("Successfully decoded member: \(member)")
+                            
+                            DispatchQueue.main.async {
+                                // Check if password matches
+                                if member.password == self.password {
+                                    // Password matches, proceed with OTP verification
+                                    Task {
+                                        await self.sendVerificationEmail()
+                                    }
+                                } else {
+                                    self.isLoading = false
+                                    self.errorMessage = "Invalid email or password"
+                                }
+                            }
+                        } catch {
+                            print("JSON Decoding error: \(error)")
+                            DispatchQueue.main.async {
+                                self.isLoading = false
+                                self.errorMessage = "Error decoding user data"
+                            }
+                        }
+                    } else {
+                        print("Failed to convert JSON string to data")
+                        DispatchQueue.main.async {
+                            self.isLoading = false
+                            self.errorMessage = "Error processing response"
+                        }
+                    }
+                } else {
+                    print("Failed to convert response data to string")
+                    DispatchQueue.main.async {
+                        self.isLoading = false
+                        self.errorMessage = "No account found with this email"
+                    }
+                }
+            } catch {
+                print("Login error: \(error)")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.errorMessage = "Login failed: \(error.localizedDescription)"
+                }
+            }
         }
     }
     
@@ -431,6 +501,18 @@ struct PasswordResetRequestView: View {
                 isEmailFocused = true
             }
         }
+    }
+}
+
+// Add Member struct for decoding response
+private struct MemberResponse: Codable {
+    let email: String
+    let password: String
+    let name: String
+    let gender: String
+    
+    private enum CodingKeys: String, CodingKey {
+        case email, password, name, gender
     }
 }
 

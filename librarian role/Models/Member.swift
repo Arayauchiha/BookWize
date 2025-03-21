@@ -6,6 +6,7 @@ struct Member: Identifiable, Codable {
     var membershipNumber: String
     var email: String
     var phone: String
+    var password: String
     var membershipType: MembershipType
     var status: MemberStatus
     var joinDate: Date
