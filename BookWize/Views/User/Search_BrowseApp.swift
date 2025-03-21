@@ -8,7 +8,8 @@
 import SwiftUI
 
 struct Search_BrowseApp: View {
-    @State private var selectedTab = 1  // Start on search tab (index 1)
+    @State private var selectedTab = 1  // Start on explore tab (index 1)
+    @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     let userPreferredGenres: [String]
     
     init(userPreferredGenres: [String] = []) {
@@ -27,10 +28,10 @@ struct Search_BrowseApp: View {
             }
             .tag(0)
             
-            // Search Tab (Default)
+            // Explore Tab (Default)
             SearchBrowseView(userPreferredGenres: userPreferredGenres)
                 .tabItem {
-                    Label("Search", systemImage: "magnifyingglass")
+                    Label("Explore", systemImage: "safari")
                 }
                 .tag(1)
             
@@ -53,6 +54,51 @@ struct Search_BrowseApp: View {
                 Label("Book Club", systemImage: "person.3.fill")
             }
             .tag(3)
+            
+            // Account Tab
+            NavigationView {
+                List {
+                    Section {
+                        HStack(spacing: 16) {
+                            Image(systemName: "person.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundStyle(.gray)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Member")
+                                    .font(.headline)
+                                Text("member@example.com")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    
+                    Section {
+                        Button(role: .destructive) {
+                            // Removed navigation action
+                        } label: {
+                            Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                        .disabled(true) // Make the button appear disabled
+                    }
+                    
+                    Section {
+                        HStack {
+                            Text("Version")
+                            Spacer()
+                            Text("1.0.0")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .navigationTitle("Account")
+            }
+            .tabItem {
+                Label("Account", systemImage: "person.circle")
+            }
+            .tag(4)
         }
         .accentColor(.blue)
         .onAppear {

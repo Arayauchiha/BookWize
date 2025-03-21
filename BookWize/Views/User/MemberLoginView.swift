@@ -249,19 +249,12 @@ struct MemberLoginView: View {
     }
     
     private func verifyOTP() {
-        print("Verifying OTP: \(otpCode) for email: \(email)")
-        
-        if emailService.verifyOTP(email: email, code: otpCode) {
-            print("OTP verified successfully for member: \(email)")
-            emailService.clearOTP(for: email)
-            
-            // Set member logged in flag to true
-            isMemberLoggedIn = true
-            
-            // Dismiss the OTP sheet
+        if EmailService.shared.verifyOTP(email: email, code: otpCode) {
+            // OTP verified
+            EmailService.shared.clearOTP(for: email)
             showingOTPView = false
+            isMemberLoggedIn = true
         } else {
-            print("OTP verification failed: \(otpCode)")
             errorMessage = "Invalid verification code"
         }
     }

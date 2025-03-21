@@ -10,6 +10,14 @@ import Combine
 
 class BookSearchViewModel: ObservableObject {
     @Published var searchResults: [UserBook] = []
+    @Published var searchText = ""
+    @Published var isLoading = false
+    @Published var errorMessage: String? = nil
+    @Published var selectedGenre: String? = nil
+    
+    private var searchTextSubject = PassthroughSubject<String, Never>()
+    private var cancellables = Set<AnyCancellable>()
+    
     @Published var books: [UserBook] = [
         // Technology Books
         UserBook(id: UUID(), title: "The Design of Everyday Things", author: "Don Norman", isbn: "978-0465050659", genre: "Technology", publicationYear: 2013, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780465050659-L.jpg"),
@@ -36,7 +44,32 @@ class BookSearchViewModel: ObservableObject {
         UserBook(id: UUID(), title: "Zero to One", author: "Peter Thiel", isbn: "978-0804139298", genre: "Business", publicationYear: 2014, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780804139298-L.jpg"),
         UserBook(id: UUID(), title: "Good to Great", author: "Jim Collins", isbn: "978-0066620992", genre: "Business", publicationYear: 2001, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780066620992-L.jpg"),
         UserBook(id: UUID(), title: "The Lean Startup", author: "Eric Ries", isbn: "978-0307887894", genre: "Business", publicationYear: 2011, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780307887894-L.jpg"),
-        UserBook(id: UUID(), title: "Start with Why", author: "Simon Sinek", isbn: "978-1591846444", genre: "Business", publicationYear: 2009, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781591846444-L.jpg")
+        UserBook(id: UUID(), title: "Start with Why", author: "Simon Sinek", isbn: "978-1591846444", genre: "Business", publicationYear: 2009, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781591846444-L.jpg"),
+        
+        // Mystery Books
+        UserBook(id: UUID(), title: "The Silent Patient", author: "Alex Michaelides", isbn: "978-1250301697", genre: "Mystery", publicationYear: 2019, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781250301697-L.jpg"),
+        UserBook(id: UUID(), title: "Gone Girl", author: "Gillian Flynn", isbn: "978-0307588371", genre: "Mystery", publicationYear: 2012, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780307588371-L.jpg"),
+        UserBook(id: UUID(), title: "The Da Vinci Code", author: "Dan Brown", isbn: "978-0307474278", genre: "Mystery", publicationYear: 2003, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780307474278-L.jpg"),
+        
+        // Romance Books
+        UserBook(id: UUID(), title: "Pride and Prejudice", author: "Jane Austen", isbn: "978-0141439518", genre: "Romance", publicationYear: 1813, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780141439518-L.jpg"),
+        UserBook(id: UUID(), title: "The Notebook", author: "Nicholas Sparks", isbn: "978-0553816716", genre: "Romance", publicationYear: 1996, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780553816716-L.jpg"),
+        UserBook(id: UUID(), title: "Me Before You", author: "Jojo Moyes", isbn: "978-0143124542", genre: "Romance", publicationYear: 2012, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780143124542-L.jpg"),
+        
+        // Biography Books
+        UserBook(id: UUID(), title: "Steve Jobs", author: "Walter Isaacson", isbn: "978-1451648539", genre: "Biography", publicationYear: 2011, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781451648539-L.jpg"),
+        UserBook(id: UUID(), title: "Becoming", author: "Michelle Obama", isbn: "978-1524763138", genre: "Biography", publicationYear: 2018, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781524763138-L.jpg"),
+        UserBook(id: UUID(), title: "Long Walk to Freedom", author: "Nelson Mandela", isbn: "978-0316548182", genre: "Biography", publicationYear: 1994, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780316548182-L.jpg"),
+        
+        // Poetry Books
+        UserBook(id: UUID(), title: "Milk and Honey", author: "Rupi Kaur", isbn: "978-1449474256", genre: "Poetry", publicationYear: 2015, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781449474256-L.jpg"),
+        UserBook(id: UUID(), title: "The Sun and Her Flowers", author: "Rupi Kaur", isbn: "978-1449486792", genre: "Poetry", publicationYear: 2017, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781449486792-L.jpg"),
+        UserBook(id: UUID(), title: "Selected Poems", author: "Emily Dickinson", isbn: "978-0486264660", genre: "Poetry", publicationYear: 1890, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780486264660-L.jpg"),
+        
+        // Self Help Books
+        UserBook(id: UUID(), title: "Atomic Habits", author: "James Clear", isbn: "978-0735211292", genre: "Self Help", publicationYear: 2018, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9780735211292-L.jpg"),
+        UserBook(id: UUID(), title: "The 7 Habits of Highly Effective People", author: "Stephen Covey", isbn: "978-1982137274", genre: "Self Help", publicationYear: 1989, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781982137274-L.jpg"),
+        UserBook(id: UUID(), title: "Think and Grow Rich", author: "Napoleon Hill", isbn: "978-1585424337", genre: "Self Help", publicationYear: 1937, availability: .available, reservedBy: nil, imageURL: "https://covers.openlibrary.org/b/isbn/9781585424337-L.jpg")
     ]
     
     @Published var forYouBooks: [UserBook] = []
@@ -80,27 +113,8 @@ class BookSearchViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
-        @Published var searchText = ""
-    private var searchTextSubject = PassthroughSubject<String, Never>()
-    @Published var isLoading = false
-    @Published var errorMessage: String? = nil
-    @Published var selectedGenre: String? = nil
     
-    private var cancellables = Set<AnyCancellable>()
-    
-    private lazy var urlSession: URLSession = {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 60
-        config.waitsForConnectivity = true
-        config.allowsCellularAccess = true
-        config.allowsExpensiveNetworkAccess = true
-        config.allowsConstrainedNetworkAccess = true
-        config.urlCache = URLCache(memoryCapacity: 20 * 1024 * 1024, diskCapacity: 100 * 1024 * 1024, diskPath: nil)
-        return URLSession(configuration: config)
-    }()
-    
-    func searchBooks() {
+    private func searchBooks() {
         guard !searchText.isEmpty else { 
             searchResults = []
             isLoading = false
@@ -110,7 +124,7 @@ class BookSearchViewModel: ObservableObject {
         
         let searchQuery = searchText.lowercased()
         
-        // First search local books
+        // Search local books
         let filteredBooks = books
             .map { book -> (UserBook, Int) in
                 var score = 0
@@ -143,142 +157,12 @@ class BookSearchViewModel: ObservableObject {
                 
                 return (book, score)
             }
-            .filter { $0.1 > 0 } // Only keep matches
-            .sorted { $0.1 > $1.1 } // Sort by score descending
+            .filter { $0.1 > 0 } // Only keep results with a score greater than 0
+            .sorted { $0.1 > $1.1 } // Sort by score in descending order
             .map { $0.0 } // Extract just the books
         
-        // Update search results with local matches
-        self.searchResults = Array(filteredBooks)
-        
-        // Construct the OpenLibrary search URL for additional results
-        let baseURL = "https://openlibrary.org/search.json"
-        let encodedQuery = searchQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "\(baseURL)?q=\(encodedQuery)"
-        
-        guard let url = URL(string: urlString) else {
-            errorMessage = "Invalid URL"
-            isLoading = false
-            return
-        }
-        
-        urlSession.dataTaskPublisher(for: url)
-            .retry(3)
-            .delay(for: .seconds(1), scheduler: DispatchQueue.global())
-            .tryMap { output -> Data in
-                guard let response = output.response as? HTTPURLResponse else {
-                    throw URLError(.badServerResponse)
-                }
-                
-                switch response.statusCode {
-                case 200: return output.data
-                case 401: throw URLError(.userAuthenticationRequired)
-                case 429: throw URLError(.networkConnectionLost)
-                case 503: throw URLError(.badServerResponse)
-                default: throw URLError(.badServerResponse)
-                }
-            }
-            .decode(type: OpenLibraryResponse.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] (completion: Subscribers.Completion<Error>) in
-                self?.isLoading = false
-                if case .failure(let error) = completion {
-                    if let decodingError = error as? DecodingError {
-                        self?.errorMessage = "Failed to decode response: \(decodingError.localizedDescription)"
-                    } else if let urlError = error as? URLError {
-                        switch urlError.code {
-                        case .notConnectedToInternet:
-                            self?.errorMessage = "No internet connection. Please check your network settings."
-                        case .timedOut:
-                            self?.errorMessage = "Request timed out. Please try again."
-                        case .userAuthenticationRequired:
-                            self?.errorMessage = "API key authentication failed."
-                        case .badServerResponse:
-                            self?.errorMessage = "Service is temporarily unavailable. Please try again later."
-                        default:
-                            self?.errorMessage = "Network error: \(urlError.localizedDescription)"
-                        }
-                    } else {
-                        self?.errorMessage = "Failed to fetch books: \(error.localizedDescription)"
-                    }
-                }
-            }, receiveValue: { [weak self] (response: OpenLibraryResponse) in
-                let apiBooks = response.allBooks.map { $0.book }
-                DispatchQueue.main.async {
-                    if !apiBooks.isEmpty {
-                        // Append API results to existing local results
-                        self?.searchResults.append(contentsOf: apiBooks)
-                        self?.errorMessage = nil
-                    }
-                }
-            })
-            .store(in: &cancellables)
-    }
-    
-    func fetchBooksByGenre(_ genre: String) {
-        isLoading = true
+        searchResults = filteredBooks
+        isLoading = false
         errorMessage = nil
-        
-        let query = genre.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        let urlString = "https://openlibrary.org/subjects/\(query.lowercased()).json"
-        
-        guard let url = URL(string: urlString) else {
-            errorMessage = "Invalid URL"
-            isLoading = false
-            return
-        }
-        
-        urlSession.dataTaskPublisher(for: url)
-            .retry(3)
-            .delay(for: .seconds(1), scheduler: DispatchQueue.global())
-            .tryMap { output -> Data in
-                guard let response = output.response as? HTTPURLResponse else {
-                    throw URLError(.badServerResponse)
-                }
-                
-                switch response.statusCode {
-                case 200: return output.data
-                case 401: throw URLError(.userAuthenticationRequired)
-                case 429: throw URLError(.networkConnectionLost)
-                case 503: throw URLError(.badServerResponse)
-                default: throw URLError(.badServerResponse)
-                }
-            }
-            .decode(type: OpenLibraryResponse.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                self?.isLoading = false
-                if case .failure(let error) = completion {
-                    if let decodingError = error as? DecodingError {
-                        print("Decoding Error: \(decodingError)")
-                        self?.errorMessage = "Failed to decode response: \(decodingError.localizedDescription)"
-                    } else if let urlError = error as? URLError {
-                        switch urlError.code {
-                        case .notConnectedToInternet:
-                            self?.errorMessage = "No internet connection. Please check your network settings."
-                        case .timedOut:
-                            self?.errorMessage = "Request timed out. Please try again."
-                        case .userAuthenticationRequired:
-                            self?.errorMessage = "API key authentication failed."
-                        case .badServerResponse:
-                            self?.errorMessage = "Service is temporarily unavailable. Please try again later."
-                        default:
-                            self?.errorMessage = "Network error: \(urlError.localizedDescription)"
-                        }
-                    } else {
-                        self?.errorMessage = "Failed to fetch books: \(error.localizedDescription)"
-                    }
-                }
-            } receiveValue: { [weak self] response in
-                let books = response.docs?.map { $0.book } ?? []
-                DispatchQueue.main.async {
-                    self?.books = books
-                    if books.isEmpty {
-                        self?.errorMessage = "No books found"
-                    } else {
-                        self?.errorMessage = nil
-                    }
-                }
-            }
-            .store(in: &cancellables)
     }
 }
