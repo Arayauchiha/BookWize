@@ -12,8 +12,9 @@ import Supabase
 struct UserData: Encodable {
     let name: String
     let email: String
-    // Add other fields as needed
     let role: String
+    let selectedLibrary: String
+    let gender: String
 }
 
 //struct LibrarianData: Encodable {
@@ -33,7 +34,7 @@ struct UserData: Encodable {
 //}
 
 class UserManagerSupabase {
-    static let shared = UserManager()
+    static let shared = UserManagerSupabase()
     private let client = SupabaseManager.shared.client
     
     private init() {}
@@ -43,26 +44,35 @@ class UserManagerSupabase {
         
         // Add additional user data to a users table
         let _ = try await client
-            .from("users")
+            .from("Users")
             .insert(userData)
             .execute()
     }
     
-    func storeLibrarianCredentials(librarian: LibrarianData, password: String) async throws {
-        let librarianData = LibrarianData(
+    func storeLibrarianCredentials(librarian: LibrarianData) async throws {
+        let librarianData = UserData(
             name: librarian.name,
-            age: librarian.age,
             email: librarian.email,
-            phone: librarian.phone,
-            password: "",
-            status: librarian.status,
-            dateAdded:librarian.dateAdded,
-            requiresPasswordReset: true
+            role: UserRole.librarian.rawValue,
+            selectedLibrary: librarian.library,
+            gender: Gender.other.rawValue
         )
         
+        // Store in users table
         let _ = try await client
-            .from("librarians")
+            .from("Users")
             .insert(librarianData)
             .execute()
+    }
+    
+    func getLibrarians() async throws -> [LibrarianData] {
+        let response = try await client
+            .from("Users")
+            .select()
+            .eq("roleFetched", value: UserRole.librarian.rawValue)
+            .execute()
+        
+        let users = try JSONDecoder().decode([User].self, from: response.data)
+        return users.map { LibrarianData(from: $0) }
     }
 }

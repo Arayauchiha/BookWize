@@ -1,8 +1,10 @@
 import SwiftUI
+import Supabase
 
 struct AdminDashboardView: View {
     @State private var selectedTab = 0
     @State private var showProfile = false
+    let supabase: SupabaseClient
     
     var body: some View {
         NavigationStack {
@@ -19,7 +21,7 @@ struct AdminDashboardView: View {
                 
                 // Librarians Tab
                 NavigationStack {
-                    LibrarianManagementView()
+                    LibrarianManagementView(supabase: supabase)
                         .navigationTitle("Librarians")
                 }
                 .tabItem {
@@ -103,6 +105,6 @@ struct AdminDashboardView: View {
 }
 
 #Preview {
-    AdminDashboardView()
+    AdminDashboardView(supabase: SupabaseClient(supabaseURL: URL(string: "https://example.com")!, supabaseKey: ""))
         .environment(\.colorScheme, .light)
 }

@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3A8E59EA2D8AE4A800CF1570 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8E59E92D8AE4A800CF1570 /* LoginView.swift */; };
 		D3731C212D8BC9610020CCEB /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C202D8BC9610020CCEB /* Auth */; };
 		D3731C232D8BC9610020CCEB /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C222D8BC9610020CCEB /* Functions */; };
 		D3731C252D8BC9610020CCEB /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = D3731C242D8BC9610020CCEB /* PostgREST */; };
@@ -18,8 +17,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		3A0AD2F82D8879E20053270C /* BookWize.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BookWize.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		3A8E59E92D8AE4A800CF1570 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		3A0AD2F82D8879E20053270C /* BookWize.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = BookWize.app; path = "/Users/lakshya/Documents/GitHub/BookWize/build/Debug-iphoneos/BookWize.app"; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -67,20 +65,10 @@
 			isa = PBXGroup;
 			children = (
 				3A0AD2FA2D8879E20053270C /* BookWize */,
-				3A0AD2F92D8879E20053270C /* Products */,
-				3A8E59E92D8AE4A800CF1570 /* LoginView.swift */,
 				6A17FB152D8BC7DF0012DE53 /* librarian role */,
 				6A17FB172D8BC7DF0012DE53 /* librarian roleTests */,
 				6A17FB1A2D8BC7DF0012DE53 /* librarian roleUITests */,
 			);
-			sourceTree = "<group>";
-		};
-		3A0AD2F92D8879E20053270C /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				3A0AD2F82D8879E20053270C /* BookWize.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -147,7 +135,7 @@
 				D3731C302D8BCDD70020CCEB /* XCRemoteSwiftPackageReference "Swift-SMTP" */,
 			);
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 3A0AD2F92D8879E20053270C /* Products */;
+			productRefGroup = 3A0AD2EF2D8879E20053270C;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -171,7 +159,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3A8E59EA2D8AE4A800CF1570 /* LoginView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
