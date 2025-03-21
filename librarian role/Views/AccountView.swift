@@ -1,4 +1,5 @@
 import SwiftUI
+import BookWize  // Import to access NavigationUtil
 
 struct AccountView: View {
     @Binding var isLoggedIn: Bool
@@ -8,6 +9,7 @@ struct AccountView: View {
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var showingPasswordError = false
+    @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
     
     var body: some View {
         NavigationView {
@@ -60,6 +62,13 @@ struct AccountView: View {
                 Button("Cancel", role: .cancel) { }
                 Button("Logout", role: .destructive) {
                     isLoggedIn = false
+                    isLibrarianLoggedIn = false
+                    
+                    // Navigate to role selection screen
+                    NavigationUtil.popToRootView()
+                    let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                    let window = windowScene?.windows.first
+                    window?.rootViewController = UIHostingController(rootView: ContentView())
                 }
             } message: {
                 Text("Are you sure you want to logout?")
