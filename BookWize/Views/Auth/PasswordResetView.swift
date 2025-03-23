@@ -7,6 +7,7 @@ struct PasswordResetView: View {
     @Binding var isNewPasswordVisible: Bool
     @FocusState private var focusedField: Field?
     
+    let email: String
     let title: String
     let message: String
     let buttonTitle: String
@@ -58,8 +59,10 @@ struct PasswordResetView: View {
                             
                             Button(action: { isNewPasswordVisible.toggle()
                                 Task{
-                                    let data:[FetchData] = try await SupabaseManager.shared.client.from("Users").select().execute().value
-                                    try await SupabaseManager.shared.client.from("Users").update(FetchData(email: data[0].email, password:newPassword, vis: true)).eq("email", value: data[0].email).execute()
+//                                    let data:[FetchData] = try await SupabaseManager.shared.client.from("Users").select().execute().value
+//
+//                                    try await SupabaseManager.shared.client.from("Users").update(FetchData(email: data[0].email, password:newPassword, vis: true)).eq("email", value: data[0].email).execute()
+                                    
                                 }
                             }) {
                                 Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
@@ -103,7 +106,16 @@ struct PasswordResetView: View {
                         .foregroundStyle(Color.customText.opacity(0.5))
                         .padding(.top, 4)
                     
-                    Button(action: onSave) {
+                    Button(action: {
+                        onSave()
+                        Task {
+                            try await SupabaseManager.shared.client
+                                .from("Users")
+                                .update(FetchData(email: email, password: newPassword, vis: true))
+                                .eq("email", value: email)
+                                .execute()
+                        }
+                    }) {
                         Text(buttonTitle)
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Color.white)
@@ -138,17 +150,4 @@ struct PasswordResetView: View {
             }
         }
     }
-}
-
-#Preview {
-    PasswordResetView(
-        newPassword: .constant(""),
-        confirmPassword: .constant(""),
-        isNewPasswordVisible: .constant(false),
-        title: "Create New Password",
-        message: "Please set a new password for your account",
-        buttonTitle: "Set Password",
-        onSave: {},
-        onCancel: {}
-    )
 }

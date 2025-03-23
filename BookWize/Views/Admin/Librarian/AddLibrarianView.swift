@@ -1,6 +1,14 @@
 import SwiftUI
 import Supabase
 
+func isValidEmail(_ email: String) -> Bool {
+    let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+
+    let emailPred = NSPredicate(format:"SELF MATCHES %@", emailRegEx)
+    return emailPred.evaluate(with: email)
+}
+
+
 struct AddLibrarianView: View {
     @Environment(\.dismiss) private var dismiss
     let onAdd: (LibrarianData) -> Void
@@ -53,10 +61,11 @@ struct AddLibrarianView: View {
                                 .padding(.vertical, 12)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.librarianColor)
+                                        .fill(isValidEmail(email) && phone.count == 10 ? Color.librarianColor : Color.gray)
                                 )
                         }
                         .padding(.horizontal, 20)
+//                        .disabled(!isValidEmail(email) || phone.count != 10)
                     }
                     
                     Button(action: addLibrarian) {
@@ -119,27 +128,35 @@ struct AddLibrarianView: View {
             alertType = .error("Invalid age")
             return
         }
-        
+        guard isValidEmail(email) else {
+            alertType = .error("Invalid Email")
+            return
+        }
+        guard phone.count == 10 else {
+            alertType = .error("Phone number should be of 10 digit")
+            return
+        }
         guard let phoneInt = Int(phone) else { // Convert phone to Int
             alertType = .error("Invalid phone number")
             return
         }
         
-        let librarianData = LibrarianData(
-            name: name,
-            age: ageInt,
-            email: email,
-            phone: phoneInt, // Now an Int
-            password: generatedPassword,
-            status: .pending,
-            dateAdded: Date(),
-            requiresPasswordReset: true
-        )
+        var librarianData = LibrarianData()
+        
+        librarianData.name = name
+        librarianData.age = ageInt
+        librarianData.email = email
+        librarianData.phone = phoneInt
+        librarianData.password = generatedPassword
+        librarianData.status = .pending
+        librarianData.dateAdded = Date()
+        librarianData.requiresPasswordReset = true
+        librarianData.roleFetched = .librarian
         
         Task {
             do {
                 try await SupabaseManager.shared.client.database
-                    .from("librarians")
+                    .from("Users")
                     .insert(librarianData)
                     .execute()
                 onAdd(librarianData)
@@ -165,32 +182,33 @@ private enum AlertType: Identifiable {
     }
 }
 
-struct LibrarianData: Encodable {
-    let lib_Id = UUID()
-    let name: String
-    let age: Int
-    let email: String
-    let phone: Int // Changed from String to Int
-    let password: String
-    var status: Status
-    let dateAdded: Date
-    let requiresPasswordReset: Bool
-    
-    enum Status: String, CaseIterable, Codable {
-        case pending = "pending"
-        case working = "working"
-        
-        var color: Color {
-            switch self {
-            case .pending: return .orange
-            case .working: return .green
-            }
-        }
-    }
+struct LibrarianData: Codable {
+    var lib_Id = UUID()
+    var name: String = ""
+    var age: Int? = 0
+    var email: String = ""
+    var phone: Int? = 0 // Changed from String to Int
+    var password: String = ""
+    var status: Status = .pending
+    var dateAdded: Date = Date()
+    var requiresPasswordReset: Bool = true
+    var roleFetched: UserRole?
     
     enum CodingKeys: String, CodingKey {
-        case name, email, phone, age, status, password
+        case name, email, phone, age, status, password, roleFetched
         case dateAdded = "date_added"
         case requiresPasswordReset = "requires_password_reset"
+    }
+}
+
+enum Status: String, CaseIterable, Codable {
+    case pending = "pending"
+    case working = "working"
+    
+    var color: Color {
+        switch self {
+        case .pending: return .orange
+        case .working: return .green
+        }
     }
 }

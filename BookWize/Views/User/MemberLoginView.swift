@@ -178,6 +178,7 @@ struct MemberLoginView: View {
                 newPassword: $newPassword,
                 confirmPassword: $confirmPassword,
                 isNewPasswordVisible: $isNewPasswordVisible,
+                email: email,
                 title: "Reset Password",
                 message: "Please enter your new password",
                 buttonTitle: "Reset Password",

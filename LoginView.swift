@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum UserRole {
+enum UserRole: String, Codable {
     case admin
     case librarian
     case member
@@ -115,6 +115,7 @@ struct LoginView: View {
                 newPassword: $newPassword,
                 confirmPassword: $confirmPassword,
                 isNewPasswordVisible: $isNewPasswordVisible,
+                email: email,
                 title: "Create New Password",
                 message: "Please set a new password for your account",
                 buttonTitle: "Set Password",
@@ -166,45 +167,77 @@ struct LoginView: View {
     }
     
     func login() {
-        isLoading = true
-        
-        // Simple validation
-        if email.isEmpty || password.isEmpty {
+        Task {
+            isLoading = true
+            
+            // Simple validation
+            if email.isEmpty || password.isEmpty {
+                isLoading = false
+                errorMessage = "Please enter both email and password"
+                return
+            }
+            
+            if password.count < 8 {
+                isLoading = false
+                errorMessage = "Password must be 8 characters long & alphanumeric"
+                return
+            }
+            
+            
+            
+            // For demo, we'll use simple logic
+            //        switch userRole {
+            //        case .admin:
+            //            // Redirect to AdminLoginView
+            //            if email == "ss0854850@gmail.com" && password == "admin@12345" {
+            //                isAdminLoggedIn = true
+            //            } else {
+            //                errorMessage = "Invalid admin credentials"
+            //            }
+            //
+            //        case .librarian:
+            //            // Simulate checking if this is first login by checking for temp password pattern
+            //            isFirstLogin = (email == "librarian@example.com" && password == "temp123") ||
+            //                           password.hasPrefix("temp") ||
+            //                           password.count < 10 // Assuming temporary passwords are shorter
+            //
+            //            if isFirstLogin {
+            //                // Show password change view for first login
+            //                showingPasswordChangeView = true
+            //            } else {
+            //                // Regular login flow - send verification OTP
+            //                sendVerificationOTP()
+            //            }
+            //
+            //        case .member:
+            //            // For members, always send verification OTP
+            //            sendVerificationOTP()
+            //        }
+            
+            
+            let data: [FetchData] = try! await SupabaseManager.shared.client
+                .from("Users")
+                .select("*")
+                .eq("email", value: email)
+                .eq("password", value: password)
+                .execute()
+                .value
+            let fetchedData = data[0]
+            if !data.isEmpty {
+                if fetchedData.vis {
+                    sendVerificationOTP()
+                } else {
+                    showingPasswordChangeView = true
+                    
+                }
+            } else {
+                isLoading = false
+                errorMessage = "Invalid credentials"
+                return
+            }
+            
             isLoading = false
-            errorMessage = "Please enter both email and password"
-            return
         }
-        
-        // For demo, we'll use simple logic
-        switch userRole {
-        case .admin:
-            // Redirect to AdminLoginView
-            if email == "ss0854850@gmail.com" && password == "admin@12345" {
-                isAdminLoggedIn = true
-            } else {
-                errorMessage = "Invalid admin credentials"
-            }
-            
-        case .librarian:
-            // Simulate checking if this is first login by checking for temp password pattern
-            isFirstLogin = (email == "librarian@example.com" && password == "temp123") || 
-                           password.hasPrefix("temp") || 
-                           password.count < 10 // Assuming temporary passwords are shorter
-            
-            if isFirstLogin {
-                // Show password change view for first login
-                showingPasswordChangeView = true
-            } else {
-                // Regular login flow - send verification OTP
-                sendVerificationOTP()
-            }
-            
-        case .member:
-            // For members, always send verification OTP
-            sendVerificationOTP()
-        }
-        
-        isLoading = false
     }
     
     func sendVerificationOTP() {

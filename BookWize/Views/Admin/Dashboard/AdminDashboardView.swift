@@ -19,8 +19,7 @@ struct AdminDashboardView: View {
                 
                 // Librarians Tab
                 NavigationStack {
-                    LibrarianManagementView()
-                        .navigationTitle("Librarians")
+                   LibrarianManagementView().navigationTitle("Librarians")
                 }
                 .tabItem {
                     Label("Librarians", systemImage: "person.2.fill")
@@ -53,20 +52,10 @@ struct AdminDashboardView: View {
                     profileButton
                 }
             }
-            .toolbarBackground(Color.customBackground, for: .tabBar)
-            .toolbarBackground(.visible, for: .tabBar)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(.gray.opacity(0.2))
-                    .frame(height: 0.5)
-                    .ignoresSafeArea(edges: .bottom)
-            }
+//            .toolbarBackground(Color.customBackground, for: .tabBar)
+//            .toolbarBackground(.visible, for: .tabBar)
             .tint(Color.customButton)
-            .safeAreaInset(edge: .bottom) {
-                Color.clear
-                    .frame(height: 0)
-                    .background(.ultraThinMaterial)
-            }
+
             // Present profile as a sheet
             .sheet(isPresented: $showProfile) {
                 NavigationStack {
@@ -75,6 +64,18 @@ struct AdminDashboardView: View {
                         .navigationBarTitleDisplayMode(.inline)
                 }
                 .presentationDragIndicator(.visible)
+            }
+            .onAppear {
+                let appearance = UITabBarAppearance()
+                appearance.configureWithOpaqueBackground()
+                appearance.stackedLayoutAppearance.normal.iconColor = .gray
+                appearance.stackedLayoutAppearance.normal.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.gray]
+                
+                appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.black)
+                appearance.stackedLayoutAppearance.selected.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor(Color.black)]
+                
+                UITabBar.appearance().standardAppearance = appearance
+                UITabBar.appearance().scrollEdgeAppearance = appearance
             }
         }
     }

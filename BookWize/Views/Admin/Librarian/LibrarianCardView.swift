@@ -27,7 +27,7 @@ struct LibrarianCardView: View {
             // Contact info
             VStack(alignment: .leading, spacing: 8) {
                 Label(librarian.email, systemImage: "envelope.fill")
-                Label(String(librarian.phone), systemImage: "phone.fill")
+                Label(String(librarian.phone ?? 0), systemImage: "phone.fill")
             }
             .font(.system(size: 15))
             .foregroundStyle(Color.customText.opacity(0.6))

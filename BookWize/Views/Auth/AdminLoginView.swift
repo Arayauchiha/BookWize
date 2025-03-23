@@ -4,11 +4,15 @@
 //
 //  Created by Aditya Singh on 18/03/25.
 //
-
+struct FetchData:Codable{
+    var email:String
+    var password:String
+    var vis:Bool
+}
 import SwiftUI
 
 struct AdminLoginView: View {
-    @State private var email:String = .init()
+    @State private var email: String = .init()
     @State private var password:String = .init()
     @State private var newPassword = ""
     @State private var confirmPassword = ""
@@ -125,6 +129,7 @@ struct AdminLoginView: View {
                 newPassword: $newPassword,
                 confirmPassword: $confirmPassword,
                 isNewPasswordVisible: $isNewPasswordVisible,
+                email: email,
                 title: "Create New Password",
                 message: "Please set a new password for your admin account",
                 buttonTitle: "Set Password",
@@ -168,11 +173,7 @@ struct AdminLoginView: View {
     }
     
     func login() {
-        struct FetchData:Codable{
-            var email:String
-            var password:String
-            var vis:Bool
-        }
+        
         var data:[FetchData] = []
         Task{
             do{

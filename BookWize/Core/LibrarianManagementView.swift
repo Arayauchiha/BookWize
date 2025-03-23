@@ -63,27 +63,22 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import SwiftUI
 
 struct LibrarianManagementView: View {
     @State private var showAddLibrarian = false
     @State private var librarians: [LibrarianData] = [] // Using LibrarianData instead of Librarian
+    
+    func fetchLibrarian() async -> [LibrarianData]? {
+        let data: [LibrarianData]? = try? await SupabaseManager.shared.client
+            .from("Users")
+            .select("*")
+            .eq("roleFetched", value: "librarian")
+            .execute()
+            .value
+        return data
+       
+    }
     
     var body: some View {
         ScrollView {
@@ -130,6 +125,9 @@ struct LibrarianManagementView: View {
                 // Add librarian to the list
                 librarians.append(newLibrarian)
             }
+        }
+        .task {
+            librarians = (await fetchLibrarian())!
         }
     }
 }

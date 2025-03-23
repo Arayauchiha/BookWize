@@ -61,7 +61,7 @@ class UserManagerSupabase {
         )
         
         let _ = try await client
-            .from("librarians")
+            .from("Users")
             .insert(librarianData)
             .execute()
     }
