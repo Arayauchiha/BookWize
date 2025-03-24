@@ -128,6 +128,12 @@ class InventoryManager: ObservableObject {
             // Add new book
             books.append(book)
         }
+        Task {
+            try! await SupabaseManager.shared.client
+                .from("Books")
+                .insert(book)
+                .execute()
+        }
         saveBooks()
     }
     

@@ -1,6 +1,6 @@
 import Foundation
 
-struct Book: Identifiable, Codable {
+struct Book: Identifiable, Codable, Sendable {
     var id: UUID = UUID()
     var isbn: String
     var title: String
@@ -10,6 +10,9 @@ struct Book: Identifiable, Codable {
     var description: String?
     var pageCount: Int?
     var categories: [String]?
+    var genre: String? {
+        return categories?[0]
+    }
     var imageURL: String?
     var quantity: Int
     var availableQuantity: Int

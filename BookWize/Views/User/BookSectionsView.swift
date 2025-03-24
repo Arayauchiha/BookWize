@@ -8,16 +8,16 @@
 import SwiftUI
 
 struct ForYouGridView: View {
-    let books: [UserBook]
+    let books: [Book]
     let userPreferredGenres: [String]
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     
-    var filteredBooks: [UserBook] {
+    var filteredBooks: [Book] {
         if userPreferredGenres.isEmpty {
             return books
         }
         return books.filter { book in
-            userPreferredGenres.contains(book.genre)
+            userPreferredGenres.contains(book.genre ?? "")
         }
     }
     
@@ -41,9 +41,9 @@ struct ForYouGridView: View {
 }
 
 struct BookSectionsView: View {
-    let forYouBooks: [UserBook]
-    let popularBooks: [UserBook]
-    let booksByGenre: [String: [UserBook]]
+    let forYouBooks: [Book]
+    let popularBooks: [Book]
+    let booksByGenre: [String: [Book]]
     @Binding var selectedGenreFromCard: String?
     @Binding var selectedFilter: String?
     let userPreferredGenres: [String]
@@ -51,12 +51,12 @@ struct BookSectionsView: View {
     @State private var showingPopularGrid = false
     @ObservedObject var viewModel: BookSearchViewModel
     
-    var filteredForYouBooks: [UserBook] {
+    var filteredForYouBooks: [Book] {
         if userPreferredGenres.isEmpty {
             return forYouBooks
         }
         return forYouBooks.filter { book in
-            userPreferredGenres.contains(book.genre)
+            userPreferredGenres.contains(book.genre ?? "")
         }
     }
     

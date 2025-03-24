@@ -174,31 +174,48 @@ struct AdminLoginView: View {
     
     func login() {
         
-        var data:[FetchData] = []
+        
         Task{
             do{
-                data = try await SupabaseManager.shared.client.from("Users").execute().value
+                let data: [FetchData] = try await SupabaseManager.shared.client
+                    .from("Users")
+                    .select("*")
+                    .eq("email", value: email)
+                    .eq("password", value: password)
+                    .execute()
+                    .value
+                
                 DispatchQueue.main.async {
-                    focusedField = nil
-                    if email.isEmpty || password.isEmpty {
-                        errorMessage = "Please enter both email and password"
-                        return
-                    }
-                    isLoading = true
-                    // Validate admin credentials
-                    if email == data[0].email && password == data[0].password {
-                        if !data[0].vis{
-                            // First login - require password change
-                            isLoading = false
-                            showPasswordChange = true
-                        } else {
-                            // Not first login - send verification OTP
-                            sendVerificationOTP()
-                        }
-                    } else {
+                    if data.isEmpty {
                         isLoading = false
                         errorMessage = "Invalid credentials"
                     }
+                    let fetchedData = data[0]
+                    if !fetchedData.vis {
+                        isLoading = false
+                        showPasswordChange = true
+                    } else {
+                        sendVerificationOTP()
+                    }
+//                    focusedField = nil
+//                    if email.isEmpty || password.isEmpty {
+//                        errorMessage = "Please enter both email and password"
+//                        return
+//                    }
+//                    isLoading = true
+//                    // Validate admin credentials
+//                    if email == data[0].email && password == data[0].password {
+//                        if !data[0].vis{
+//                            // First login - require password change
+//
+//                        } else {
+//                            // Not first login - send verification OTP
+//
+//                        }
+//                    } else {
+//                        isLoading = false
+//                        errorMessage = "Invalid credentials"
+//                    }
                 }
             }catch{
                 print(error)

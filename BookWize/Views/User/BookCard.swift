@@ -78,7 +78,7 @@ struct CachedAsyncImage: View {
 }
 
 struct BookCard: View {
-    let book: UserBook
+    let book: Book
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -105,11 +105,11 @@ struct BookCard: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                 
-                Text(String(book.publicationYear))
+                Text(String(book.publishedDate ?? ""))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
-                Text(book.genre)
+                Text(book.genre ?? "")
                     .font(.caption)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)

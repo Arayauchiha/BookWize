@@ -8,9 +8,9 @@
 import SwiftUI
 
 struct SearchSuggestionsView: View {
-    let books: [UserBook]
+    let books: [Book]
     @Binding var showingSuggestions: Bool
-    @Binding var selectedBook: UserBook?
+    @Binding var selectedBook: Book?
     @Binding var selectedAuthor: String?
     @Binding var selectedFilter: String?
     @Binding var searchText: String

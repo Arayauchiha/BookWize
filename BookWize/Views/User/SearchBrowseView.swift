@@ -13,7 +13,7 @@ struct SearchBrowseView: View {
     @State private var selectedGenreFromCard: String? = nil
     @State private var showingSuggestions = false
     @State private var selectedAuthor: String? = nil
-    @State private var initialBooksByGenre: [String: [UserBook]] = [:]
+    @State private var initialBooksByGenre: [String: [Book]] = [:]
     @FocusState private var isSearchFocused: Bool
     @State private var scrollOffset: CGFloat = 0
     let userPreferredGenres: [String]

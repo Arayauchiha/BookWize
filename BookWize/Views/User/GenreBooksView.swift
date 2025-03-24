@@ -2,7 +2,7 @@ import SwiftUI
 
 struct GenreBooksView: View {
     let genre: String
-    let books: [UserBook]
+    let books: [Book]
     let columns = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16)

@@ -49,7 +49,7 @@ struct OpenLibraryBook: Codable {
         case coverI = "cover_i"
     }
     
-    var book: UserBook {
+    var book: Book {
         let coverId = if let coverI = coverI {
             String(coverI)
         } else {
@@ -125,17 +125,7 @@ struct OpenLibraryBook: Codable {
             genre = "Fiction" // Default to Fiction if no subjects available
         }
         
-        return UserBook(
-            id: UUID(),
-            title: title,
-            author: authorName,
-            isbn: isbn?.first ?? "",
-            genre: genre,
-            publicationYear: firstPublishYear ?? 0,
-            availability: .available,
-            reservedBy: nil,
-            imageURL: imageURL
-        )
+        return Book(isbn: "", title: title, author: authorName, publisher: "", quantity: 10)
     }
 }
 
