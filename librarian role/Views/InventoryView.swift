@@ -6,7 +6,7 @@ struct InventoryView: View {
     @State private var searchText = ""
     @State private var showingAddBookSheet = false
     @State private var showingISBNScanner = false
-    @State private var showingFileImporter = false
+    @State private var showingCSVUpload = false
     @State private var selectedBook: Book?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -39,7 +39,7 @@ struct InventoryView: View {
                             Label("Scan ISBN", systemImage: "barcode.viewfinder")
                         }
                         
-                        Button(action: { showingFileImporter = true }) {
+                        Button(action: { showingCSVUpload = true }) {
                             Label("Import CSV", systemImage: "doc.text.below.ecg")
                         }
                     } label: {
@@ -55,24 +55,8 @@ struct InventoryView: View {
                     handleScannedISBN(scannedISBN)
                 }
             }
-            .fileImporter(
-                isPresented: $showingFileImporter,
-                allowedContentTypes: [UTType.commaSeparatedText],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    guard let url = urls.first else { return }
-                    do {
-                        try inventoryManager.importCSV(from: url)
-                    } catch {
-                        errorMessage = "Error importing CSV: \(error.localizedDescription)"
-                        showError = true
-                    }
-                case .failure(let error):
-                    errorMessage = "Error selecting file: \(error.localizedDescription)"
-                    showError = true
-                }
+            .sheet(isPresented: $showingCSVUpload) {
+                CSVUploadView(viewModel: inventoryManager)
             }
             .sheet(item: $selectedBook) { book in
                 BookDetailView(book: book, inventoryManager: inventoryManager)
