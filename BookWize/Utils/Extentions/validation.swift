@@ -13,7 +13,7 @@ struct ValidationUtils {
     
     static func getEmailError(_ email: String) -> String? {
         if email.isEmpty {
-            return "Email is required"
+            return nil
         }
         if !isValidEmail(email) {
             return "Please enter a valid email address"
@@ -23,7 +23,7 @@ struct ValidationUtils {
     
     static func getPasswordError(_ password: String) -> String? {
         if password.isEmpty {
-            return "Password is required"
+            return nil
         }
         if !isValidPassword(password) {
             return "Password must be at least 8 characters long"

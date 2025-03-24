@@ -22,6 +22,8 @@ struct LoginView: View {
     @State private var otpCode = ""
     @State private var errorMessage = ""
     @State private var isLoading = false
+    @State private var emailError: String?
+    @State private var passwordError: String?
     
     // For first-time librarian login
     @State private var isFirstLogin = false
@@ -41,16 +43,46 @@ struct LoginView: View {
                 .fontWeight(.bold)
                 .foregroundColor(roleColor)
             
-            TextField("Email", text: $email)
-                .padding()
-                .background(Color.gray.opacity(0.2))
-                .cornerRadius(10)
-                .autocapitalization(.none)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Email")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.customText.opacity(0.7))
+                
+                TextField("Email", text: $email)
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                    .autocapitalization(.none)
+                    .onChange(of: email) { newValue in
+                        emailError = ValidationUtils.getEmailError(newValue)
+                    }
+                
+                if let error = emailError {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+            }
             
-            SecureField("Password", text: $password)
-                .padding()
-                .background(Color.gray.opacity(0.2))
-                .cornerRadius(10)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Password")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.customText.opacity(0.7))
+                
+                SecureField("Password", text: $password)
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(10)
+                    .onChange(of: password) { newValue in
+                        passwordError = ValidationUtils.getPasswordError(newValue)
+                    }
+                
+                if let error = passwordError {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                }
+            }
             
             if !errorMessage.isEmpty {
                 Text(errorMessage)
@@ -69,10 +101,10 @@ struct LoginView: View {
                 }
             }
             .padding()
-            .background(Color.customButton)
+            .background(isFormValid ? Color.customButton : Color.gray)
             .foregroundColor(.white)
             .cornerRadius(10)
-            .disabled(isLoading)
+            .disabled(isLoading || !isFormValid)
             
             if userRole == .member {
                 HStack {
@@ -166,9 +198,28 @@ struct LoginView: View {
         }
     }
     
+    private var isFormValid: Bool {
+        !email.isEmpty &&
+        !password.isEmpty &&
+        ValidationUtils.isValidEmail(email) &&
+        ValidationUtils.isValidPassword(password) &&
+        emailError == nil &&
+        passwordError == nil
+    }
+    
     func login() {
         Task {
             isLoading = true
+            
+            // Validate email and password
+            emailError = ValidationUtils.getEmailError(email)
+            passwordError = ValidationUtils.getPasswordError(password)
+            
+            if emailError != nil || passwordError != nil {
+                isLoading = false
+                errorMessage = "Please fix the validation errors"
+                return
+            }
             
             // Simple validation
             if email.isEmpty || password.isEmpty {

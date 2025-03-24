@@ -20,6 +20,8 @@ struct AdminLoginView: View {
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var verificationCode = ""
+    @State private var emailError: String?
+    @State private var passwordError: String?
     @FocusState private var focusedField: Field?
     
     @State private var showPasswordChange = false
@@ -64,6 +66,15 @@ struct AdminLoginView: View {
                         .onSubmit {
                             focusedField = .password
                         }
+                        .onChange(of: email) { newValue in
+                            emailError = ValidationUtils.getEmailError(newValue)
+                        }
+                    
+                    if let error = emailError {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
                 }
                 
                 // Password field
@@ -79,6 +90,15 @@ struct AdminLoginView: View {
                         .onSubmit {
                             login()
                         }
+                        .onChange(of: password) { newValue in
+                            passwordError = ValidationUtils.getPasswordError(newValue)
+                        }
+                    
+                    if let error = passwordError {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
                 }
                 
                 // Error message if any
@@ -104,10 +124,10 @@ struct AdminLoginView: View {
                     }
                 }
                 .padding(.vertical, 15)
-                .background(Color.customButton)
+                .background(isFormValid ? Color.customButton : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || email.isEmpty || password.isEmpty)
+                .disabled(isLoading || !isFormValid)
                 .padding(.top, 8)
             }
             .padding(.horizontal, 24)
@@ -172,11 +192,30 @@ struct AdminLoginView: View {
         }
     }
     
+    private var isFormValid: Bool {
+        !email.isEmpty &&
+        !password.isEmpty &&
+        ValidationUtils.isValidEmail(email) &&
+        ValidationUtils.isValidPassword(password) &&
+        emailError == nil &&
+        passwordError == nil
+    }
+    
     func login() {
-        
-        
-        Task{
-            do{
+        Task {
+            isLoading = true
+            
+            // Validate email and password
+            emailError = ValidationUtils.getEmailError(email)
+            passwordError = ValidationUtils.getPasswordError(password)
+            
+            if emailError != nil || passwordError != nil {
+                isLoading = false
+                errorMessage = "Please fix the validation errors"
+                return
+            }
+            
+            do {
                 let data: [FetchData] = try await SupabaseManager.shared.client
                     .from("Users")
                     .select("*")
@@ -197,35 +236,11 @@ struct AdminLoginView: View {
                     } else {
                         sendVerificationOTP()
                     }
-//                    focusedField = nil
-//                    if email.isEmpty || password.isEmpty {
-//                        errorMessage = "Please enter both email and password"
-//                        return
-//                    }
-//                    isLoading = true
-//                    // Validate admin credentials
-//                    if email == data[0].email && password == data[0].password {
-//                        if !data[0].vis{
-//                            // First login - require password change
-//
-//                        } else {
-//                            // Not first login - send verification OTP
-//
-//                        }
-//                    } else {
-//                        isLoading = false
-//                        errorMessage = "Invalid credentials"
-//                    }
                 }
-            }catch{
+            } catch {
                 print(error)
             }
-            
-            
         }
-        
-        // Hide keyboard
-        
     }
     
     func sendVerificationOTP() {
