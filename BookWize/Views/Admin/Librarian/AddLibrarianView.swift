@@ -17,16 +17,28 @@ struct AddLibrarianView: View {
     @State private var age = ""
     @State private var email = ""
     @State private var phone = ""
+    @State private var nameError: String?
+    @State private var ageError: String?
+    @State private var emailError: String?
+    @State private var phoneError: String?
 
     @State private var generatedPassword = ""
     @State private var showCredentials = false
     @State private var credentialsSent = false
     
-
     @State private var alertType: AlertType?
     
     var formIsValid: Bool {
-        !name.isEmpty && !age.isEmpty && !email.isEmpty && !phone.isEmpty
+        !name.isEmpty && 
+        !age.isEmpty && 
+        !email.isEmpty && 
+        !phone.isEmpty &&
+        ValidationUtils.isValidEmail(email) &&
+        phone.count == 10 &&
+        nameError == nil &&
+        ageError == nil &&
+        emailError == nil &&
+        phoneError == nil
     }
     
     var canAdd: Bool {
@@ -37,17 +49,106 @@ struct AddLibrarianView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    Group {
+                    // Name field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Full Name")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.7))
+                        
                         TextField("Full Name", text: $name)
+                            .textFieldStyle(CustomTextFieldStyle())
+                            .onChange(of: name) { newValue in
+                                if newValue.isEmpty {
+                                    nameError = "Name is required"
+                                } else {
+                                    nameError = nil
+                                }
+                            }
+                        
+                        if let error = nameError {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Age field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Age")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.7))
+                        
                         TextField("Age", text: $age)
+                            .textFieldStyle(CustomTextFieldStyle())
                             .keyboardType(.numberPad)
+                            .onChange(of: age) { newValue in
+                                if newValue.isEmpty {
+                                    ageError = "Age is required"
+                                } else if let ageInt = Int(newValue), ageInt < 18 || ageInt > 100 {
+                                    ageError = "Age must be between 18 and 100"
+                                } else {
+                                    ageError = nil
+                                }
+                            }
+                        
+                        if let error = ageError {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Email field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Email")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.7))
+                        
                         TextField("Email", text: $email)
+                            .textFieldStyle(CustomTextFieldStyle())
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
-                        TextField("Phone", text: $phone)
-                            .keyboardType(.numberPad)
+                            .onChange(of: email) { newValue in
+                                emailError = ValidationUtils.getEmailError(newValue)
+                            }
+                        
+                        if let error = emailError {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
-                    .textFieldStyle(CustomTextFieldStyle())
+                    .padding(.horizontal, 20)
+                    
+                    // Phone field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Phone")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.7))
+                        
+                        TextField("Phone", text: $phone)
+                            .textFieldStyle(CustomTextFieldStyle())
+                            .keyboardType(.numberPad)
+                            .onChange(of: phone) { newValue in
+                                if newValue.isEmpty {
+                                    phoneError = "Phone number is required"
+                                } else if newValue.count != 10 {
+                                    phoneError = "Phone number must be 10 digits"
+                                } else if Int(newValue) == nil {
+                                    phoneError = "Invalid phone number"
+                                } else {
+                                    phoneError = nil
+                                }
+                            }
+                        
+                        if let error = phoneError {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
                     .padding(.horizontal, 20)
                     
                     if formIsValid && !credentialsSent {
@@ -59,7 +160,7 @@ struct AddLibrarianView: View {
                                 .padding(.vertical, 12)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8)
-                                        .fill(isValidEmail(email) && phone.count == 10 ? Color.librarianColor : Color.gray)
+                                        .fill(Color.librarianColor)
                                 )
                         }
                         .padding(.horizontal, 20)
@@ -179,33 +280,4 @@ private enum AlertType: Identifiable {
     }
 }
 
-struct LibrarianData: Codable {
-    var lib_Id = UUID()
-    var name: String = ""
-    var age: Int? = 0
-    var email: String = ""
-    var phone: Int? = 0 
-    var password: String = ""
-    var status: Status = .pending
-    var dateAdded: Date = Date()
-    var requiresPasswordReset: Bool = true
-    var roleFetched: UserRole?
-    
-    enum CodingKeys: String, CodingKey {
-        case name, email, phone, age, status, password, roleFetched
-        case dateAdded = "date_added"
-        case requiresPasswordReset = "requires_password_reset"
-    }
-}
 
-enum Status: String, CaseIterable, Codable {
-    case pending = "pending"
-    case working = "working"
-    
-    var color: Color {
-        switch self {
-        case .pending: return .orange
-        case .working: return .green
-        }
-    }
-}

@@ -1,35 +1,34 @@
-//import Foundation
-//import SwiftUI
-//
-//struct Librarian: Identifiable {
-//    let id: UUID
-//    let name: String
-//    let age: Int
-//    let email: String
-//    let phone: String
-//    var status: Status
-//    let dateAdded: Date
-////    var joined_Library : Library
-//    
-//    enum Status: String,CaseIterable {
-//        case pending = "Pending"
-//        case working = "Working"
-//        
-//        var color: Color {
-//            switch self {
-//            case .pending: return .orange
-//            case .working: return .green
-//            }
-//        }
-//    }
-//    
-//    init(id: UUID = UUID(), name: String, age: Int, email: String, phone: String, status: Status = .pending) {
-//        self.id = id
-//        self.name = name
-//        self.age = age
-//        self.email = email
-//        self.phone = phone
-//        self.status = status
-//        self.dateAdded = Date()
-//    }
-//}
+import Foundation
+import SwiftUI
+
+struct LibrarianData: Codable {
+    var lib_Id = UUID()
+    var name: String = ""
+    var age: Int? = 0
+    var email: String = ""
+    var phone: Int? = 0
+    var password: String = ""
+    var status: Status = .pending
+    var dateAdded: Date = Date()
+    var requiresPasswordReset: Bool = true
+    var roleFetched: UserRole?
+    
+    enum CodingKeys: String, CodingKey {
+        case name, email, phone, age, status, password, roleFetched
+        case dateAdded = "date_added"
+        case requiresPasswordReset = "requires_password_reset"
+    }
+}
+
+enum Status: String, CaseIterable, Codable {
+    case pending = "pending"
+    case working = "working"
+    
+    var color: Color {
+        switch self {
+        case .pending: return .orange
+        case .working: return .green
+        }
+    }
+}
+
