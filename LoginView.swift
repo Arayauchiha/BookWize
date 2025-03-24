@@ -222,8 +222,9 @@ struct LoginView: View {
                 .eq("password", value: password)
                 .execute()
                 .value
-            let fetchedData = data[0]
+            
             if !data.isEmpty {
+                let fetchedData = data[0]
                 if fetchedData.vis {
                     sendVerificationOTP()
                 } else {
