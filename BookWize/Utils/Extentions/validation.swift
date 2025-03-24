@@ -8,7 +8,8 @@ struct ValidationUtils {
     }
     
     static func isValidPassword(_ password: String) -> Bool {
-        return password.count >= 8
+        let passwordRegex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$"
+            return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
     }
     
     static func getEmailError(_ email: String) -> String? {
@@ -25,9 +26,23 @@ struct ValidationUtils {
         if password.isEmpty {
             return nil
         }
-        if !isValidPassword(password) {
-            return "Password must be at least 8 characters long"
+        if password.count < 8 {
+            return "Password must be at least 8 characters long."
         }
-        return nil
+        if !password.contains(where: { $0.isUppercase }) {
+            return "Password must contain at least one uppercase letter."
+        }
+        if !password.contains(where: { $0.isLowercase }) {
+            return "Password must contain at least one lowercase letter."
+        }
+        if !password.contains(where: { $0.isNumber }) {
+            return "Password must contain at least one digit."
+        }
+        let specialCharacterSet = CharacterSet(charactersIn: "@$!%*?&")
+        if password.rangeOfCharacter(from: specialCharacterSet) == nil {
+            return "Password must contain at least one special character (@$!%*?&)."
+        }
+        return nil // Password is valid
     }
+
 }
