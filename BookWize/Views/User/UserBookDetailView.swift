@@ -108,8 +108,9 @@ struct UserBookDetailView: View {
     // Break down the image view into a separate computed property
     private var bookCoverImage: some View {
         Group {
-            if let imageURL = book.imageURL, let url = URL(string: imageURL) {
-                AsyncImage(url: url) { image in
+            if let imageURL = book.imageURL?.trimmingCharacters(in: .whitespacesAndNewlines),
+               let cleanedURL = URL(string: imageURL.trimmingCharacters(in: CharacterSet(charactersIn: "\""))) {
+                AsyncImage(url: cleanedURL) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -121,6 +122,7 @@ struct UserBookDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 15))
                 .shadow(radius: 5)
             }
+
         }
     }
     

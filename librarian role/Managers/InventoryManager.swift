@@ -290,22 +290,48 @@ class InventoryManager: ObservableObject {
         let csvString = try String(contentsOf: url, encoding: .utf8)
         let rows = csvString.components(separatedBy: "\n")
         
-        // Assuming CSV format: ISBN,Title,Author,Publisher,Quantity
         for row in rows.dropFirst() { // Skip header row
             let columns = row.components(separatedBy: ",")
-            guard columns.count >= 5 else { continue }
+            
+            // Ensure there are enough columns before parsing
+            guard columns.count >= 10 else {
+                print("Skipping invalid row: \(row)")
+                continue
+            }
+            
+            let isbn = columns[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = columns[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            let author = columns[2].trimmingCharacters(in: .whitespacesAndNewlines)
+            let publisher = columns[3].trimmingCharacters(in: .whitespacesAndNewlines)
+            let quantity = Int(columns[4].trimmingCharacters(in: .whitespacesAndNewlines)) ?? 1
+            let publishedDate = columns[5].trimmingCharacters(in: .whitespacesAndNewlines)
+            let description = columns[6].trimmingCharacters(in: .whitespacesAndNewlines)
+            let pageCount = Int(columns[7].trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            let genre = columns[8].trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Ensure Image URL is properly formatted
+            let imageURL = columns[9].trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"")) // Remove extra quotes
+            
+            print("Parsed Image URL: '\(imageURL)'") // Debugging
             
             let book = Book(
-                isbn: columns[0].trimmingCharacters(in: .whitespacesAndNewlines),
-                title: columns[1].trimmingCharacters(in: .whitespacesAndNewlines),
-                author: columns[2].trimmingCharacters(in: .whitespacesAndNewlines),
-                publisher: columns[3].trimmingCharacters(in: .whitespacesAndNewlines),
-                quantity: Int(columns[4].trimmingCharacters(in: .whitespacesAndNewlines)) ?? 1
+                isbn: isbn,
+                title: title,
+                author: author,
+                publisher: publisher,
+                quantity: quantity,
+                publishedDate: publishedDate.isEmpty ? nil : publishedDate, // Handle empty values
+                description: description.isEmpty ? nil : description,
+                pageCount: pageCount > 0 ? pageCount : nil,
+                categories: genre.isEmpty ? nil : [genre],
+                imageURL: imageURL.isEmpty ? nil : imageURL // Avoid storing empty URLs
             )
+            
             addBook(book)
         }
     }
-    
+
     // MARK: - Persistence
     
     private func saveBooks() {
