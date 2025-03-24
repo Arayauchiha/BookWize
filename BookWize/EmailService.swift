@@ -1,9 +1,3 @@
-//
-//  EmailService.swift
-//  BookWize
-//
-//  Created by Aditya Singh on 20/03/25.
-//
 
 import Foundation
 import SwiftSMTP
@@ -16,15 +10,13 @@ class EmailService {
     private var otpCodes: [String: String] = [:]
 
     init() {
-        // Configure your SMTP server settings
         smtp = SMTP(
-            hostname: "smtp.gmail.com", // e.g., smtp.gmail.com
-            email: "adddiiiyya@gmail.com", // Your email address
+            hostname: "smtp.gmail.com",
+            email: "adddiiiyya@gmail.com",
             password: "xhpv ekzt ipwf ksyb"
         )
     }
     
-    // OTP Functions
     func generateOTP() -> String {
         return String(format: "%06d", Int.random(in: 0..<1000000))
     }
