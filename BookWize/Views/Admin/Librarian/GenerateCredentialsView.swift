@@ -1,10 +1,3 @@
-//
-//  GenerateCredentialsView.swift
-//  BookWize
-//
-//  Created by Aditya Singh on 18/03/25.
-//
-
 import SwiftUI
 
 struct GenerateCredentialsView: View {

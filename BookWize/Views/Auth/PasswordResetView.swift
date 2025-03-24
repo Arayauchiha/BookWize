@@ -59,12 +59,11 @@ struct PasswordResetView: View {
                             
                             Button(action: { isNewPasswordVisible.toggle()
                                 Task{
-//                                    let data:[FetchData] = try await SupabaseManager.shared.client.from("Users").select().execute().value
-//
-//                                    try await SupabaseManager.shared.client.from("Users").update(FetchData(email: data[0].email, password:newPassword, vis: true)).eq("email", value: data[0].email).execute()
                                     
                                 }
-                            }) {
+                                
+                            })
+                            {
                                 Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                     .foregroundStyle(Color.customButton.opacity(Color.secondaryIconOpacity))
                             }
@@ -73,8 +72,7 @@ struct PasswordResetView: View {
                         .background(Color.customInputBackground)
                         .cornerRadius(8)
                     }
-                    
-                    // Confirm password field
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Confirm Password")
                             .font(.subheadline)
@@ -99,8 +97,7 @@ struct PasswordResetView: View {
                         .background(Color.customInputBackground)
                         .cornerRadius(8)
                     }
-                    
-                    // Password requirements info
+
                     Text("Password must be at least 8 characters long")
                         .font(.caption)
                         .foregroundStyle(Color.customText.opacity(0.5))

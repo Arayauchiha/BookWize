@@ -12,19 +12,17 @@ func isValidEmail(_ email: String) -> Bool {
 struct AddLibrarianView: View {
     @Environment(\.dismiss) private var dismiss
     let onAdd: (LibrarianData) -> Void
-    
-    // Form fields
+
     @State private var name = ""
     @State private var age = ""
     @State private var email = ""
-    @State private var phone = "" // Still a String for TextField input, but will convert to Int
-    
-    // Credentials
+    @State private var phone = ""
+
     @State private var generatedPassword = ""
     @State private var showCredentials = false
     @State private var credentialsSent = false
     
-    // Alert
+
     @State private var alertType: AlertType?
     
     var formIsValid: Bool {
@@ -47,7 +45,7 @@ struct AddLibrarianView: View {
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                         TextField("Phone", text: $phone)
-                            .keyboardType(.numberPad) // Use numberPad for integer input
+                            .keyboardType(.numberPad)
                     }
                     .textFieldStyle(CustomTextFieldStyle())
                     .padding(.horizontal, 20)
@@ -65,7 +63,6 @@ struct AddLibrarianView: View {
                                 )
                         }
                         .padding(.horizontal, 20)
-//                        .disabled(!isValidEmail(email) || phone.count != 10)
                     }
                     
                     Button(action: addLibrarian) {
@@ -136,7 +133,7 @@ struct AddLibrarianView: View {
             alertType = .error("Phone number should be of 10 digit")
             return
         }
-        guard let phoneInt = Int(phone) else { // Convert phone to Int
+        guard let phoneInt = Int(phone) else {
             alertType = .error("Invalid phone number")
             return
         }
@@ -187,7 +184,7 @@ struct LibrarianData: Codable {
     var name: String = ""
     var age: Int? = 0
     var email: String = ""
-    var phone: Int? = 0 // Changed from String to Int
+    var phone: Int? = 0 
     var password: String = ""
     var status: Status = .pending
     var dateAdded: Date = Date()

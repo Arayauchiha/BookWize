@@ -1,4 +1,3 @@
-// Create this new file for RoleCard
 import SwiftUI
 
 struct RoleCard: View {
@@ -42,14 +41,3 @@ struct RoleCard: View {
     }
 }
 
-// Preview
-#Preview {
-    RoleCard(
-        title: "Admin",
-        icon: "gear",
-        iconColor: Color.adminColor,
-        cardColor: Color.customCardBackground
-    )
-}
-
-// End of file

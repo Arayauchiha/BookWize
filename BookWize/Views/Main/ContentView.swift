@@ -1,9 +1,3 @@
-//
-//  ContentView.swift
-//  BookWize
-//
-//  Created by Aryan Singh on 17/03/25.
-//
 
 import SwiftUI
 import CoreData
@@ -26,15 +20,12 @@ struct ContentView: View {
                 NavigationStack {
                     ScrollView {
                         VStack(spacing: 25) {
-                            // Welcome message with adjusted alignment
                             Text("Select your role")
                                 .font(.system(size: 28, weight: .semibold))
                                 .foregroundStyle(Color.customText)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 20)
                                 .padding(.top, 50)
-
-                            // Role selection cards with appropriate colors
                             VStack(spacing: 16) {
                                 NavigationLink {
                                     MemberLoginView()

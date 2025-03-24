@@ -1,9 +1,3 @@
-//
-//  AdminLoginView.swift
-//  BookWize
-//
-//  Created by Aditya Singh on 18/03/25.
-//
 struct FetchData:Codable{
     var email:String
     var password:String
@@ -37,7 +31,6 @@ struct AdminLoginView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                // Header with greeting
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Hello, Admin!")
                         .font(.largeTitle)
@@ -76,8 +69,7 @@ struct AdminLoginView: View {
                             .font(.caption)
                     }
                 }
-                
-                // Password field
+
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Password")
                         .font(.subheadline)
@@ -100,15 +92,13 @@ struct AdminLoginView: View {
                             .font(.caption)
                     }
                 }
-                
-                // Error message if any
+
                 if !errorMessage.isEmpty {
                     Text(errorMessage)
                         .foregroundColor(.red)
                         .font(.caption)
                 }
-                
-                // Sign In Button
+
                 Button(action: login) {
                     if isLoading {
                         HStack {
@@ -137,7 +127,7 @@ struct AdminLoginView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Image("library_logo") // Replace with your app's logo if available
+                Image("library_logo")
                     .resizable()
                     .scaledToFit()
                     .frame(height: 30)
@@ -163,11 +153,8 @@ struct AdminLoginView: View {
                         errorMessage = "Passwords do not match"
                         return
                     }
-                    
-                    // Update admin password
                     showPasswordChange = false
-                    
-                    // Proceed to email verification
+
                     sendVerificationOTP()
                 },
                 onCancel: {
@@ -204,8 +191,6 @@ struct AdminLoginView: View {
     func login() {
         Task {
             isLoading = true
-            
-            // Validate email and password
             emailError = ValidationUtils.getEmailError(email)
             passwordError = ValidationUtils.getPasswordError(password)
             

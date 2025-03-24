@@ -5,7 +5,7 @@ struct LibrarianCardView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header with name and status
+
             HStack {
                 Text(librarian.name)
                     .font(.system(size: 17, weight: .semibold))

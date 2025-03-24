@@ -52,8 +52,6 @@ struct AdminDashboardView: View {
                     profileButton
                 }
             }
-//            .toolbarBackground(Color.customBackground, for: .tabBar)
-//            .toolbarBackground(.visible, for: .tabBar)
             .tint(Color.customButton)
 
             // Present profile as a sheet
@@ -90,8 +88,6 @@ struct AdminDashboardView: View {
                 .padding(.trailing, 4)
         }
     }
-    
-    // Add computed property for dynamic navigation title
     private var tabTitle: String {
         switch selectedTab {
         case 0: return "Summary"

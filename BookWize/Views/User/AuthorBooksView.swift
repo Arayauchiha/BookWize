@@ -1,10 +1,3 @@
-//
-//  AuthorBooksView.swift
-//  Search&Browse
-//
-//  Created by Devashish Upadhyay on 19/03/25.
-//
-
 import SwiftUI
 
 struct Author: Identifiable {

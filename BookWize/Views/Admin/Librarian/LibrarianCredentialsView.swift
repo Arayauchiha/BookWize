@@ -1,10 +1,3 @@
-//
-//  LibrarianCredentialsView.swift
-//  BookWize
-//
-//  Created by Aditya Singh on 20/03/25.
-//
-
 import SwiftUI
 
 struct LibrarianCredentials: Identifiable {
