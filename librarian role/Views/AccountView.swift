@@ -10,6 +10,7 @@ struct AccountView: View {
     @State private var confirmPassword = ""
     @State private var showingPasswordError = false
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     
     var body: some View {
         NavigationView {
@@ -61,6 +62,7 @@ struct AccountView: View {
             .alert("Logout", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Logout", role: .destructive) {
+                    // Reset login state
                     isLoggedIn = false
                     isLibrarianLoggedIn = false
                     

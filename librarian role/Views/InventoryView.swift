@@ -165,6 +165,9 @@ struct BookDetailView: View {
     let book: Book
     @ObservedObject var inventoryManager: InventoryManager
     @Environment(\.dismiss) var dismiss
+    @State private var showingEditSheet = false
+    @State private var showingDeleteAlert = false
+    @State private var editedBook: Book?
     
     var body: some View {
         NavigationView {
@@ -190,9 +193,120 @@ struct BookDetailView: View {
                         Text(description)
                     }
                 }
+                
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("Delete Book", systemImage: "trash")
+                    }
+                }
             }
             .navigationTitle("Book Details")
-            .navigationBarItems(trailing: Button("Done") { dismiss() })
+            .navigationBarItems(
+                trailing: HStack {
+                    Button("Edit") {
+                        editedBook = book
+                        showingEditSheet = true
+                    }
+                    Button("Done") { dismiss() }
+                }
+            )
+            .sheet(isPresented: $showingEditSheet) {
+                if let book = editedBook {
+                    EditBookView(book: book, inventoryManager: inventoryManager) { updatedBook in
+                        inventoryManager.updateBook(updatedBook)
+                        dismiss()
+                    }
+                }
+            }
+            .alert("Delete Book", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    inventoryManager.removeBook(isbn: book.isbn)
+                    dismiss()
+                }
+            } message: {
+                Text("Are you sure you want to delete this book? This action cannot be undone.")
+            }
+        }
+    }
+}
+
+struct EditBookView: View {
+    let book: Book
+    @ObservedObject var inventoryManager: InventoryManager
+    let onSave: (Book) -> Void
+    @Environment(\.dismiss) var dismiss
+    
+    @State private var title: String
+    @State private var author: String
+    @State private var publisher: String
+    @State private var quantity: Int
+    @State private var publishedDate: String
+    @State private var description: String
+    @State private var pageCount: String
+    @State private var genre: String
+    @State private var imageURL: String
+    
+    init(book: Book, inventoryManager: InventoryManager, onSave: @escaping (Book) -> Void) {
+        self.book = book
+        self.inventoryManager = inventoryManager
+        self.onSave = onSave
+        
+        _title = State(initialValue: book.title)
+        _author = State(initialValue: book.author)
+        _publisher = State(initialValue: book.publisher)
+        _quantity = State(initialValue: book.quantity)
+        _publishedDate = State(initialValue: book.publishedDate ?? "")
+        _description = State(initialValue: book.description ?? "")
+        _pageCount = State(initialValue: book.pageCount.map(String.init) ?? "")
+        _genre = State(initialValue: book.genre ?? "")
+        _imageURL = State(initialValue: book.imageURL ?? "")
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Book Details")) {
+                    TextField("Title", text: $title)
+                    TextField("Author", text: $author)
+                    TextField("Publisher", text: $publisher)
+                    TextField("ISBN", text: .constant(book.isbn))
+                        .disabled(true)
+                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+                }
+                
+                Section(header: Text("Additional Information")) {
+                    TextField("Published Date", text: $publishedDate)
+                    TextField("Description", text: $description, axis: .vertical)
+                        .lineLimit(3...6)
+                    TextField("Page Count", text: $pageCount)
+                        .keyboardType(.numberPad)
+                    TextField("Genre", text: $genre)
+                    TextField("Image URL", text: $imageURL)
+                }
+            }
+            .navigationTitle("Edit Book")
+            .navigationBarItems(
+                leading: Button("Cancel") { dismiss() },
+                trailing: Button("Save") {
+                    let updatedBook = Book(
+                        isbn: book.isbn,
+                        title: title,
+                        author: author,
+                        publisher: publisher,
+                        quantity: quantity,
+                        publishedDate: publishedDate.isEmpty ? nil : publishedDate,
+                        description: description.isEmpty ? nil : description,
+                        pageCount: Int(pageCount),
+                        categories: genre.isEmpty ? nil : [genre],
+                        imageURL: imageURL.isEmpty ? nil : imageURL
+                    )
+                    onSave(updatedBook)
+                }
+                .disabled(title.isEmpty || author.isEmpty || publisher.isEmpty)
+            )
         }
     }
 }
