@@ -9,17 +9,21 @@ import SwiftUI
 
 struct ForYouGridView: View {
     let books: [Book]
-    let userPreferredGenres: [String]
+    let memberSelectedGenres: [String]
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     
     var filteredBooks: [Book] {
-        if userPreferredGenres.isEmpty {
+        if memberSelectedGenres.isEmpty {
             return books
         }
         return books.filter { book in
-            userPreferredGenres.contains(book.genre ?? "")
+            if let genre = book.genre {
+                return memberSelectedGenres.contains(genre)
+            }
+            return false
         }
     }
+
     
     var body: some View {
         ScrollView {
@@ -52,12 +56,20 @@ struct BookSectionsView: View {
     @ObservedObject var viewModel: BookSearchViewModel
     
     var filteredForYouBooks: [Book] {
-        if userPreferredGenres.isEmpty {
+        print("Filtering For You books with genres: \(viewModel.memberSelectedGenres)")
+        if viewModel.memberSelectedGenres.isEmpty {
+            print("No selected genres, showing all For You books")
             return forYouBooks
         }
-        return forYouBooks.filter { book in
-            userPreferredGenres.contains(book.genre ?? "")
+        let filtered = forYouBooks.filter { book in
+            let matches = viewModel.memberSelectedGenres.contains(book.genre ?? "")
+            if matches {
+                print("Book '\(book.title)' matches genre: \(book.genre ?? "unknown")")
+            }
+            return matches
         }
+        print("Found \(filtered.count) filtered For You books")
+        return filtered
     }
     
     var body: some View {
@@ -73,7 +85,7 @@ struct BookSectionsView: View {
                     
                     if !filteredForYouBooks.isEmpty {
                         NavigationLink {
-                            ForYouGridView(books: viewModel.books, userPreferredGenres: userPreferredGenres)
+                            ForYouGridView(books: viewModel.allPreferredBooks, memberSelectedGenres: viewModel.memberSelectedGenres)
                         } label: {
                             HStack(spacing: 4) {
                                 Text("See All")
