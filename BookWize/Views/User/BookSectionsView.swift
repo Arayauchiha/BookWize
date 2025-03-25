@@ -9,15 +9,15 @@ import SwiftUI
 
 struct ForYouGridView: View {
     let books: [Book]
-    let userPreferredGenres: [String]
+    let memberSelectedGenres: [String]
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     
     var filteredBooks: [Book] {
-        if userPreferredGenres.isEmpty {
+        if memberSelectedGenres.isEmpty {
             return books
         }
         return books.filter { book in
-            userPreferredGenres.contains(book.genre ?? "")
+            memberSelectedGenres.contains(book.genre ?? "")
         }
     }
     
@@ -52,11 +52,11 @@ struct BookSectionsView: View {
     @ObservedObject var viewModel: BookSearchViewModel
     
     var filteredForYouBooks: [Book] {
-        if userPreferredGenres.isEmpty {
+        if viewModel.memberSelectedGenres.isEmpty {
             return forYouBooks
         }
         return forYouBooks.filter { book in
-            userPreferredGenres.contains(book.genre ?? "")
+            viewModel.memberSelectedGenres.contains(book.genre ?? "")
         }
     }
     
@@ -73,7 +73,7 @@ struct BookSectionsView: View {
                     
                     if !filteredForYouBooks.isEmpty {
                         NavigationLink {
-                            ForYouGridView(books: viewModel.books, userPreferredGenres: userPreferredGenres)
+                            ForYouGridView(books: viewModel.allPreferredBooks, memberSelectedGenres: viewModel.memberSelectedGenres)
                         } label: {
                             HStack(spacing: 4) {
                                 Text("See All")
