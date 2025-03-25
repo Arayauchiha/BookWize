@@ -1,8 +1,7 @@
 import SwiftUI
 
 struct LibrarianDashboardScreen: View {
-    @State private var isLoggedIn = true
-    @State private var showingLoginSheet = false
+    @AppStorage("isLibrarianLoggedIn") private var isLoggedIn = false
     @State private var showingLogoutAlert = false
     
     var body: some View {
@@ -36,6 +35,8 @@ struct LibrarianDashboardScreen: View {
                         }
                 }
                 .tint(AppTheme.primaryColor)
+            } else {
+                LoginView(userRole: .librarian)
             }
         }
     }

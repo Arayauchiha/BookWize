@@ -10,6 +10,7 @@ struct AccountView: View {
     @State private var confirmPassword = ""
     @State private var showingPasswordError = false
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     
     var body: some View {
         NavigationView {
@@ -61,14 +62,13 @@ struct AccountView: View {
             .alert("Logout", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Logout", role: .destructive) {
+                    // Reset all login states
                     isLoggedIn = false
                     isLibrarianLoggedIn = false
+                    hasSeenOnboarding = false
                     
-                    // Navigate to role selection screen
-                    NavigationUtil.popToRootView()
-                    let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-                    let window = windowScene?.windows.first
-                    window?.rootViewController = UIHostingController(rootView: ContentView())
+                    // Exit the app to force a fresh start
+                    exit(0)
                 }
             } message: {
                 Text("Are you sure you want to logout?")
