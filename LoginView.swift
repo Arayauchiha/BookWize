@@ -320,6 +320,13 @@ struct LoginView: View {
             case .admin:
                 isAdminLoggedIn = true
             case .librarian:
+                Task {
+                    try! await SupabaseManager.shared.client
+                        .from("Users")
+                        .update(["status": "working"])
+                        .eq("email", value: email)
+                        .execute()
+                }
                 isLibrarianLoggedIn = true
             case .member:
                 isMemberLoggedIn = true

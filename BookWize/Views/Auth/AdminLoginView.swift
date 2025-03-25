@@ -213,13 +213,14 @@ struct AdminLoginView: View {
                     if data.isEmpty {
                         isLoading = false
                         errorMessage = "Invalid credentials"
-                    }
-                    let fetchedData = data[0]
-                    if !fetchedData.vis {
-                        isLoading = false
-                        showPasswordChange = true
                     } else {
-                        sendVerificationOTP()
+                        let fetchedData = data[0]
+                        if !fetchedData.vis {
+                            isLoading = false
+                            showPasswordChange = true
+                        } else {
+                            sendVerificationOTP()
+                        }
                     }
                 }
             } catch {
