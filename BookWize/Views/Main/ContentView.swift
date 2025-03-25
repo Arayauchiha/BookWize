@@ -3,13 +3,17 @@ import CoreData
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
 
     var body: some View {
         Group {
-            if isAdminLoggedIn {
+            if !hasSeenOnboarding {
+                OnboardingView()
+            }
+            else if isAdminLoggedIn {
                 AdminDashboardView()
             } else if isLibrarianLoggedIn {
                 LibrarianDashboardScreen()
