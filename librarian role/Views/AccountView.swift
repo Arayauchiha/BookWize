@@ -62,13 +62,15 @@ struct AccountView: View {
             .alert("Logout", isPresented: $showingLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Logout", role: .destructive) {
-                    // Reset all login states
+                    // Reset login state
                     isLoggedIn = false
                     isLibrarianLoggedIn = false
-                    hasSeenOnboarding = false
                     
-                    // Exit the app to force a fresh start
-                    exit(0)
+                    // Navigate to role selection screen
+                    NavigationUtil.popToRootView()
+                    let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                    let window = windowScene?.windows.first
+                    window?.rootViewController = UIHostingController(rootView: ContentView())
                 }
             } message: {
                 Text("Are you sure you want to logout?")
