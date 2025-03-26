@@ -14,7 +14,7 @@ class BookSearchViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
     @Published var selectedGenre: String? = nil
-    let userPreferredGenres: [String]
+    //let userPreferredGenres: [String]
     
     private var searchTextSubject = PassthroughSubject<String, Never>()
     private var cancellables = Set<AnyCancellable>()
@@ -35,7 +35,7 @@ class BookSearchViewModel: ObservableObject {
     }
     
     init(userPreferredGenres: [String] = []) {
-        self.userPreferredGenres = userPreferredGenres
+        //self.userPreferredGenres = userPreferredGenres
         setupInitialData()
         Task {
             await fetchBooks()
@@ -44,31 +44,31 @@ class BookSearchViewModel: ObservableObject {
     }
     
     private func fetchMemberGenres() async {
-        do {
-            // Get the current user's ID from Supabase auth
-            if let userId = try? await SupabaseManager.shared.client.auth.session.user.id {
+            do {
+                // Get the current user's ID from Supabase auth
+                guard let userEmail = UserDefaults.standard.string(forKey: "userEmail") else {
+                    print("No email found in UserDefaults")
+                    return
+                }
                 let user: User? = try await SupabaseManager.shared.client
-                    .from("Members")
-                    .select("selectedGenres")
-                    .eq("id", value: userId)
-                    .single()
-                    .execute()
-                    .value
-                
-                DispatchQueue.main.async {
-                    if let selectedGenres = user?.selectedGenres {
-                        self.memberSelectedGenres = selectedGenres
-                        self.setupInitialData() // Update the sections with the fetched genres
-                        
-                        // Post notification that data was updated
-                        NotificationCenter.default.post(name: Notification.Name("BookDataUpdated"), object: nil)
+                        .from("Members")
+                        .select("*")
+                        .eq("email", value: userEmail)
+                        .single()
+                        .execute()
+                        .value
+                    
+                    DispatchQueue.main.async {
+                        if let selectedGenres = user?.selectedGenres {
+                            self.memberSelectedGenres = selectedGenres
+                            self.setupInitialData() // Update the sections with the fetched genres
+                        }
                     }
                 }
+            catch {
+                print("Error fetching member genres: \(error)")
             }
-        } catch {
-            print("Error fetching member genres: \(error)")
         }
-    }
     
     private func fetchBooks() async {
         DispatchQueue.main.async {
