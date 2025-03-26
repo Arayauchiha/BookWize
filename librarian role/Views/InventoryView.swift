@@ -7,6 +7,7 @@ struct InventoryView: View {
     @State private var showingAddBookSheet = false
     @State private var showingISBNScanner = false
     @State private var showingCSVUpload = false
+    @State private var showingRequestBook = false
     @State private var selectedBook: Book?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -42,6 +43,9 @@ struct InventoryView: View {
                         Button(action: { showingCSVUpload = true }) {
                             Label("Import CSV", systemImage: "doc.text.below.ecg")
                         }
+                        Button(action: { showingRequestBook = true }) {
+                                                    Label("Request Book", systemImage: "book.circle")
+                                                }
                     } label: {
                         Image(systemName: "plus.circle.fill")
                     }
@@ -58,6 +62,11 @@ struct InventoryView: View {
             .sheet(isPresented: $showingCSVUpload) {
                 CSVUploadView(viewModel: inventoryManager)
             }
+            // ... existing code ...
+            .sheet(isPresented: $showingRequestBook) {
+                RequestBookView()
+            }
+            // ... existing code ...
             .sheet(item: $selectedBook) { book in
                 BookDetailView(book: book, inventoryManager: inventoryManager)
             }
