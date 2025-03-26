@@ -26,16 +26,23 @@ struct SignupView: View {
     @State private var passwordError: String?
     @State private var confirmPasswordError: String?
     
+    // Password validation state
+    @State private var passwordValidation = ValidationUtils.PasswordValidation(
+        hasMinLength: false,
+        hasUppercase: false,
+        hasLowercase: false,
+        hasNumber: false,
+        hasSpecialChar: false
+    )
+    
     let libraries = ["Good Reads Library"]
     
     private var isFormValid: Bool {
         !name.isEmpty &&
         ValidationUtils.isValidEmail(email) &&
-        ValidationUtils.isValidPassword(password) &&
+        passwordValidation.isValid &&
         password == confirmPassword &&
-        emailError == nil &&
-        passwordError == nil &&
-        confirmPasswordError == nil
+        emailError == nil
     }
     
     var body: some View {
@@ -95,23 +102,79 @@ struct SignupView: View {
                         sectionTitle("Security")
                         
                         // Password
-                        inputField(title: "Password", error: passwordError) {
+                        inputField(title: "Password", error: nil) {
                             SecureField("Enter password", text: $password)
                                 .onChange(of: password) { newValue in
-                                    passwordError = ValidationUtils.getPasswordError(newValue)
+                                    passwordValidation = ValidationUtils.validatePassword(newValue)
+                                    
                                     if !confirmPassword.isEmpty {
                                         confirmPasswordError = confirmPassword != newValue ? "Passwords do not match" : nil
                                     }
                                 }
                         }
                         
-                        // Confirm Password
-                        inputField(title: "Confirm Password", error: confirmPasswordError) {
-                            SecureField("Confirm your password", text: $confirmPassword)
-                                .onChange(of: confirmPassword) { newValue in
-                                    confirmPasswordError = newValue != password ? "Passwords do not match" : nil
-                                }
+                        // Password requirements
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Password Requirements")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasMinLength ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasMinLength ? .green : .gray)
+                                Text("At least 8 characters")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.customText.opacity(0.7))
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasUppercase ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasUppercase ? .green : .gray)
+                                Text("One uppercase letter")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.customText.opacity(0.7))
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasLowercase ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasLowercase ? .green : .gray)
+                                Text("One lowercase letter")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.customText.opacity(0.7))
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasNumber ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasNumber ? .green : .gray)
+                                Text("One number")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.customText.opacity(0.7))
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasSpecialChar ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasSpecialChar ? .green : .gray)
+                                Text("One special character (@$!%*?&)")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.customText.opacity(0.7))
+                            }
                         }
+                        .padding(.leading, 4)
+                        
+                        // Confirm Password
+                        inputField(title: "Confirm Password", error: nil) {
+                            SecureField("Confirm your password", text: $confirmPassword)
+                        }
+                        
+                        // Password matching validation
+                        HStack {
+                            Image(systemName: !confirmPassword.isEmpty && password == confirmPassword ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(!confirmPassword.isEmpty && password == confirmPassword ? .green : .gray)
+                            Text("Passwords match")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                        .padding(.leading, 4)
                         
                         // Divider
                         Rectangle()
