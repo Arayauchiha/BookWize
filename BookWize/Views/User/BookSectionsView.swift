@@ -3,15 +3,15 @@ import SwiftUI
 
 struct ForYouGridView: View {
     let books: [Book]
-    let userPreferredGenres: [String]
+    let memberSelectedGenres: [String]
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     
     var filteredBooks: [Book] {
-        if userPreferredGenres.isEmpty {
+        if memberSelectedGenres.isEmpty {
             return books
         }
         return books.filter { book in
-            userPreferredGenres.contains(book.genre ?? "")
+            memberSelectedGenres.contains(book.genre ?? "")
         }
     }
     
@@ -41,18 +41,13 @@ struct BookSectionsView: View {
     @Binding var selectedGenreFromCard: String?
     @Binding var selectedFilter: String?
     let userPreferredGenres: [String]
-    @State private var showingForYouGrid = false
-    @State private var showingPopularGrid = false
     @ObservedObject var viewModel: BookSearchViewModel
-    
-    var filteredForYouBooks: [Book] {
-        if userPreferredGenres.isEmpty {
-            return forYouBooks
-        }
-        return forYouBooks.filter { book in
-            userPreferredGenres.contains(book.genre ?? "")
-        }
-    }
+    @State private var selectedBook: Book?
+    @State private var showingBookDetail = false
+    @State private var selectedSectionBooks: [Book] = []
+    @State private var selectedIndex: Int = 0
+    @State private var cardOffset: CGFloat = 0
+    @State private var dragDirection: CGFloat = 0
     
     var body: some View {
         VStack(spacing: 20) {
@@ -65,9 +60,9 @@ struct BookSectionsView: View {
                     
                     Spacer()
                     
-                    if !filteredForYouBooks.isEmpty {
+                    if !viewModel.allPreferredBooks.isEmpty {
                         NavigationLink {
-                            ForYouGridView(books: viewModel.books, userPreferredGenres: userPreferredGenres)
+                            ForYouGridView(books: viewModel.allPreferredBooks, memberSelectedGenres: viewModel.memberSelectedGenres)
                         } label: {
                             HStack(spacing: 4) {
                                 Text("See All")
@@ -81,19 +76,21 @@ struct BookSectionsView: View {
                 }
                 .padding(.horizontal)
                 
-                if filteredForYouBooks.isEmpty {
+                if viewModel.allPreferredBooks.isEmpty {
                     Text("Select your favorite genres to get personalized recommendations")
                         .foregroundColor(.secondary)
                         .padding()
                 } else {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
-                            ForEach(filteredForYouBooks) { book in
-                                NavigationLink {
-                                    UserBookDetailView(book: book)
-                                } label: {
-                                    BookCard(book: book)
-                                        .frame(width: 180)
+                            ForEach(viewModel.allPreferredBooks) { book in
+                                BookCardView(book: book) {
+                                    selectedBook = book
+                                    selectedSectionBooks = viewModel.allPreferredBooks
+                                    if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
+                                        selectedIndex = index
+                                    }
+                                    showingBookDetail = true
                                 }
                             }
                         }
@@ -116,12 +113,13 @@ struct BookSectionsView: View {
                         ScrollView {
                             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
                                 ForEach(popularBooks) { book in
-                                    NavigationLink {
-                                        UserBookDetailView(book: book)
-                                    } label: {
-                                        BookCard(book: book)
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 280)
+                                    BookCardView(book: book) {
+                                        selectedBook = book
+                                        selectedSectionBooks = popularBooks
+                                        if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
+                                            selectedIndex = index
+                                        }
+                                        showingBookDetail = true
                                     }
                                 }
                             }
@@ -143,11 +141,13 @@ struct BookSectionsView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(popularBooks) { book in
-                            NavigationLink {
-                                UserBookDetailView(book: book)
-                            } label: {
-                                BookCard(book: book)
-                                    .frame(width: 180)
+                            BookCardView(book: book) {
+                                selectedBook = book
+                                selectedSectionBooks = popularBooks
+                                if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
+                                    selectedIndex = index
+                                }
+                                showingBookDetail = true
                             }
                         }
                     }
@@ -156,7 +156,7 @@ struct BookSectionsView: View {
             }
             .padding(.vertical, 8)
             
-            // Books by Genre Section
+            // Browse by Genre Section
             VStack(alignment: .leading) {
                 Text("Browse by Genre")
                     .font(.title2)
@@ -193,6 +193,93 @@ struct BookSectionsView: View {
                         }
                     }
                     .padding(.horizontal)
+                }
+            }
+        }
+        .sheet(isPresented: $showingBookDetail) {
+            if let book = selectedBook {
+                NavigationView {
+                    GeometryReader { geometry in
+                        ZStack {
+                            // Previous book (preloaded)
+                            if selectedIndex > 0 {
+                                BookDetailCard(
+                                    book: selectedSectionBooks[selectedIndex - 1],
+                                    isPresented: $showingBookDetail
+                                )
+                                .offset(x: -geometry.size.width + cardOffset)
+                            }
+                            
+                            // Current book
+                            BookDetailCard(book: book, isPresented: $showingBookDetail)
+                                .offset(x: cardOffset)
+                            
+                            // Next book (preloaded)
+                            if selectedIndex < selectedSectionBooks.count - 1 {
+                                BookDetailCard(
+                                    book: selectedSectionBooks[selectedIndex + 1],
+                                    isPresented: $showingBookDetail
+                                )
+                                .offset(x: geometry.size.width + cardOffset)
+                            }
+                        }
+                    }
+                    .navigationBarHidden(true)
+                }
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            dragDirection = value.translation.width
+                            withAnimation(.interactiveSpring()) {
+                                cardOffset = value.translation.width
+                            }
+                        }
+                        .onEnded { value in
+                            let threshold: CGFloat = 50
+                            if value.translation.width > threshold && selectedIndex > 0 {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectedIndex -= 1
+                                }
+                            } else if value.translation.width < -threshold && selectedIndex < selectedSectionBooks.count - 1 {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectedIndex += 1
+                                }
+                            }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                cardOffset = 0
+                            }
+                        }
+                )
+                .interactiveDismissDisabled()
+            }
+        }
+        .onChange(of: selectedIndex) { oldValue, newValue in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                selectedBook = selectedSectionBooks[newValue]
+                cardOffset = 0
+            }
+        }
+    }
+}
+
+struct BookCardView: View {
+    let book: Book
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 8) {
+                if let imageURL = book.imageURL,
+                   let url = URL(string: imageURL) {
+                    CachedAsyncImage(url: url)
+                        .frame(width: 180, height: 280)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .shadow(radius: 4)
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 180, height: 280)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
