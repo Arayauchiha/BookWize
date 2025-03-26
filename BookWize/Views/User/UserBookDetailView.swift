@@ -94,12 +94,15 @@ import SwiftUI
 struct UserBookDetailView: View {
     let book: Book
     @Environment(\.dismiss) private var dismiss
+    @State private var isReserving = false
     
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 bookCoverImage
                 bookDetailsSection
+                reserveButton
+                descriptionSection
             }
         }
         .background(Color(UIColor.systemBackground))
@@ -145,7 +148,6 @@ struct UserBookDetailView: View {
             availabilityView
         }
         .padding(.horizontal)
-        .padding(.bottom, 32)
     }
     
     // Further breakdown of components
@@ -196,5 +198,47 @@ struct UserBookDetailView: View {
         .padding(.horizontal, 24)
         .background(book.isAvailable ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
         .cornerRadius(25)
+    }
+    
+    private var descriptionSection: some View {
+        Group {
+            if let description = book.description {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Description")
+                        .font(.headline)
+                        .padding(.horizontal)
+                    
+                    Text(description)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                }
+                .padding(.vertical, 16)
+            }
+        }
+    }
+    
+    private var reserveButton: some View {
+        Button(action: {
+            // Do nothing for now as requested
+        }) {
+            HStack {
+                if isReserving {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Image(systemName: "bookmark.fill")
+                    Text("Reserve Book")
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(book.isAvailable ? Color.blue : Color.gray)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+        }
+        .disabled(!book.isAvailable || isReserving)
+        .padding(.horizontal)
+        .padding(.bottom, 32)
     }
 }

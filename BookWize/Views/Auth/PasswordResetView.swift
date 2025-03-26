@@ -14,6 +14,15 @@ struct PasswordResetView: View {
     let onSave: () -> Void
     let onCancel: () -> Void
     
+    // Password validation state
+    @State private var passwordValidation = ValidationUtils.PasswordValidation(
+        hasMinLength: false,
+        hasUppercase: false,
+        hasLowercase: false,
+        hasNumber: false,
+        hasSpecialChar: false
+    )
+    
     private enum Field {
         case newPassword
         case confirmPassword
@@ -48,22 +57,21 @@ struct PasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
+                                        .onChange(of: newPassword) { newValue in
+                                            passwordValidation = ValidationUtils.validatePassword(newValue)
+                                        }
                                 } else {
                                     SecureField("Enter new password", text: $newPassword)
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
+                                        .onChange(of: newPassword) { newValue in
+                                            passwordValidation = ValidationUtils.validatePassword(newValue)
+                                        }
                                 }
                             }
                             
-                            
-                            Button(action: { isNewPasswordVisible.toggle()
-                                Task{
-                                    
-                                }
-                                
-                            })
-                            {
+                            Button(action: { isNewPasswordVisible.toggle() }) {
                                 Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                     .foregroundStyle(Color.customButton.opacity(Color.secondaryIconOpacity))
                             }
@@ -72,6 +80,55 @@ struct PasswordResetView: View {
                         .background(Color.customInputBackground)
                         .cornerRadius(8)
                     }
+                    .padding(.bottom, 8)
+
+                    // Password requirements
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Password Requirements")
+                            .font(.caption)
+                            .foregroundStyle(Color.customText.opacity(0.7))
+                        
+                        HStack {
+                            Image(systemName: passwordValidation.hasMinLength ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(passwordValidation.hasMinLength ? .green : .gray)
+                            Text("At least 8 characters")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                        
+                        HStack {
+                            Image(systemName: passwordValidation.hasUppercase ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(passwordValidation.hasUppercase ? .green : .gray)
+                            Text("One uppercase letter")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                        
+                        HStack {
+                            Image(systemName: passwordValidation.hasLowercase ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(passwordValidation.hasLowercase ? .green : .gray)
+                            Text("One lowercase letter")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                        
+                        HStack {
+                            Image(systemName: passwordValidation.hasNumber ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(passwordValidation.hasNumber ? .green : .gray)
+                            Text("One number")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                        
+                        HStack {
+                            Image(systemName: passwordValidation.hasSpecialChar ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(passwordValidation.hasSpecialChar ? .green : .gray)
+                            Text("One special character (@$!%*?&)")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                    }
+                    .padding(.leading, 4)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Confirm Password")
@@ -96,12 +153,17 @@ struct PasswordResetView: View {
                         .padding()
                         .background(Color.customInputBackground)
                         .cornerRadius(8)
+                        
+                        // Password matching validation
+                        HStack {
+                            Image(systemName: !confirmPassword.isEmpty && newPassword == confirmPassword ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(!confirmPassword.isEmpty && newPassword == confirmPassword ? .green : .gray)
+                            Text("Passwords match")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                        .padding(.leading, 4)
                     }
-
-                    Text("Password must be at least 8 characters long")
-                        .font(.caption)
-                        .foregroundStyle(Color.customText.opacity(0.5))
-                        .padding(.top, 4)
                     
                     Button(action: {
                         onSave()
@@ -124,8 +186,8 @@ struct PasswordResetView: View {
                             .fill(Color.customButton)
                     )
                     .padding(.top, 16)
-                    .disabled(newPassword.isEmpty || confirmPassword.isEmpty)
-                    .opacity(newPassword.isEmpty || confirmPassword.isEmpty ? 0.7 : 1)
+                    .disabled(newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword)
+                    .opacity(newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword ? 0.7 : 1)
                 }
                 .padding(.horizontal, 24)
                 

@@ -9,7 +9,7 @@ struct ValidationUtils {
     
     static func isValidPassword(_ password: String) -> Bool {
         let passwordRegex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$"
-            return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
+        return NSPredicate(format: "SELF MATCHES %@", passwordRegex).evaluate(with: password)
     }
     
     static func getEmailError(_ email: String) -> String? {
@@ -20,6 +20,29 @@ struct ValidationUtils {
             return "Please enter a valid email address"
         }
         return nil
+    }
+    
+    // Password validation states
+    struct PasswordValidation {
+        var hasMinLength: Bool
+        var hasUppercase: Bool
+        var hasLowercase: Bool
+        var hasNumber: Bool
+        var hasSpecialChar: Bool
+        
+        var isValid: Bool {
+            hasMinLength && hasUppercase && hasLowercase && hasNumber && hasSpecialChar
+        }
+    }
+    
+    static func validatePassword(_ password: String) -> PasswordValidation {
+        return PasswordValidation(
+            hasMinLength: password.count >= 8,
+            hasUppercase: password.contains(where: { $0.isUppercase }),
+            hasLowercase: password.contains(where: { $0.isLowercase }),
+            hasNumber: password.contains(where: { $0.isNumber }),
+            hasSpecialChar: password.contains(where: { "@$!%*?&".contains($0) })
+        )
     }
     
     static func getPasswordError(_ password: String) -> String? {
@@ -44,5 +67,4 @@ struct ValidationUtils {
         }
         return nil // Password is valid
     }
-
 }
