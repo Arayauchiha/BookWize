@@ -9,6 +9,9 @@ struct OTPVerificationView: View {
     @FocusState private var isOTPFieldFocused: Bool
     @State private var errorMessage = ""
     @State private var isResending = false
+    @State private var timeRemaining = 60
+    @State private var timer: Timer?
+    @State private var canResend = false
     
     // Reference to the email service
     private let emailService = EmailService.shared
@@ -79,18 +82,20 @@ struct OTPVerificationView: View {
                 .opacity(otp.count != 6 ? 0.7 : 1)
 
                 Button(action: {
-                    resendCode()
+                    if canResend {
+                        resendCode()
+                    }
                 }) {
                     if isResending {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle())
                     } else {
-                        Text("Resend Code")
+                        Text(canResend ? "Resend Code" : "Resend Code (\(timeRemaining)s)")
                     }
                 }
-                .foregroundColor(Color.customButton)
+                .foregroundColor(canResend ? Color.customButton : Color.gray)
                 .padding(.top, 8)
-                .disabled(isResending)
+                .disabled(isResending || !canResend)
 
                 Spacer()
             }
@@ -105,7 +110,28 @@ struct OTPVerificationView: View {
                         .foregroundStyle(Color.customButton)
                 }
             }
-            .onAppear { isOTPFieldFocused = true }
+            .onAppear { 
+                isOTPFieldFocused = true
+                startTimer()
+            }
+            .onDisappear {
+                timer?.invalidate()
+                timer = nil
+            }
+        }
+    }
+    
+    private func startTimer() {
+        timeRemaining = 60
+        canResend = false
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if timeRemaining > 0 {
+                timeRemaining -= 1
+            } else {
+                canResend = true
+                timer?.invalidate()
+            }
         }
     }
     
@@ -126,6 +152,7 @@ struct OTPVerificationView: View {
                 } else {
                     errorMessage = ""
                     isOTPFieldFocused = true
+                    startTimer() // Restart the timer after successful resend
                 }
             }
         }
