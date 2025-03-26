@@ -1,22 +1,20 @@
-//
-//  BookRequest.swift
-//  BookWize
-//
-//  Created by Abcom on 26/03/25.
-//
-
-
 import Foundation
-struct BookRequest: Codable {
+
+struct BookRequest: Codable, Identifiable, Hashable {
     let Request_id: UUID
-    let author: String  // Changed from type to author
+    let author: String
     let title: String
     let quantity: Int
     let reason: String
     let Request_status: R_status
     let createdAt: Date
     
-    enum R_status : String, Codable, CaseIterable{
+    // Conform to Identifiable
+    var id: UUID {
+        return Request_id
+    }
+    
+    enum R_status: String, Codable, CaseIterable, Hashable {
         case pending
         case approved
         case rejected
@@ -24,11 +22,11 @@ struct BookRequest: Codable {
     
     enum CodingKeys: String, CodingKey {
         case Request_id
-        case author  // Changed from type to author
+        case author
         case title
         case quantity
         case reason
-        case Request_status 
+        case Request_status
         case createdAt = "created_at"
     }
 }
