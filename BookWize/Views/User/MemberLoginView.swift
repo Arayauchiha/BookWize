@@ -357,6 +357,11 @@ struct MemberLoginView: View {
             // OTP verified
             EmailService.shared.clearOTP(for: email)
             showingOTPView = false
+            
+            // Save email in UserDefaults
+            UserDefaults.standard.set(email, forKey: "userEmail")
+            print("Saved email to UserDefaults: \(email)")
+            
             isMemberLoggedIn = true
         } else {
             errorMessage = "Invalid verification code"
