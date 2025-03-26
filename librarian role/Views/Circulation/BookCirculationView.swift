@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct BookCirculationView: View {
-    @StateObject private var circulationManager = CirculationManager(
+        @StateObject private var circulationManager = CirculationManager(
         userManager: UserManager(),
         inventoryManager: InventoryManager(),
         fineManager: FineManager()

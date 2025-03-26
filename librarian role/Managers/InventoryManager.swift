@@ -17,24 +17,64 @@ class InventoryManager: ObservableObject {
     
     // MARK: - Book Management
     
+//    func addBook(_ book: Book) {
+//        if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
+//            // Update existing book
+//            books[index].quantity += book.quantity
+//            books[index].availableQuantity += book.quantity
+//            books[index].lastModified = Date()
+//        } else {
+//            // Add new book
+//            books.append(book)
+//        }
+//        Task {
+//            try! await SupabaseManager.shared.client
+//                .from("Books")
+//                .insert(book)
+//                .execute()
+//        }
+//        saveBooks()
+//    }
+    
     func addBook(_ book: Book) {
         if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
-            // Update existing book
+            // Update existing book locally
             books[index].quantity += book.quantity
             books[index].availableQuantity += book.quantity
             books[index].lastModified = Date()
+            
+            // Update in Supabase
+            Task {
+                do {
+                    try await SupabaseManager.shared.client
+                        .from("Books")
+                        .update(books[index])
+                        .eq("isbn", value: book.isbn)
+                        .execute()
+                    saveBooks()
+                } catch {
+                    print("Error updating book in Supabase: \(error)")
+                }
+            }
         } else {
             // Add new book
             books.append(book)
+            
+            // Insert in Supabase
+            Task {
+                do {
+                    try await SupabaseManager.shared.client
+                        .from("Books")
+                        .insert(book)
+                        .execute()
+                    saveBooks()
+                } catch {
+                    print("Error inserting book in Supabase: \(error)")
+                }
+            }
         }
-        Task {
-            try! await SupabaseManager.shared.client
-                .from("Books")
-                .insert(book)
-                .execute()
-        }
-        saveBooks()
     }
+    
     
     func removeBook(isbn: String) {
         books.removeAll { $0.isbn == isbn }
