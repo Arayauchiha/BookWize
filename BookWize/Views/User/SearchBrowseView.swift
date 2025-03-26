@@ -29,9 +29,6 @@ struct SearchBrowseView: View {
     // Add these states for book detail presentation
     @State private var selectedBook: Book?
     @State private var showingBookDetail = false
-    @State private var selectedSectionBooks: [Book] = []
-    @State private var selectedIndex: Int = 0
-    @State private var cardOffset: CGFloat = 0
     
     let genres = [
         "Fiction", "Non-Fiction", "Science", "History", "Technology", 
@@ -63,49 +60,13 @@ struct SearchBrowseView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !viewModel.searchText.isEmpty {
-                        // Categories Picker
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 20) {
-                                ForEach(SearchCategory.allCases, id: \.self) { category in
-                                    Button(action: {
-                                        selectedCategory = category
-                                    }) {
-                                        Text(category.rawValue)
-                                            .font(.headline)
-                                            .foregroundColor(selectedCategory == category ? .white : .primary)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(selectedCategory == category ? Color.blue : Color.clear)
-                                            .cornerRadius(20)
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        .padding(.vertical, 8)
+                        // Categories Picker - simplified
+                        categoriesPicker
                         
-                        if viewModel.isLoading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                        } else if let error = viewModel.errorMessage {
-                            Text(error)
-                                .foregroundColor(.red)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                        } else {
-                            switch selectedCategory {
-                            case .topResults:
-                                searchResultsGrid
-                            case .available:
-                                availableBooksGrid
-                            case .authors:
-                                booksByAuthorGrid
-                            case .genres:
-                                genresGrid
-                            }
-                        }
+                        // Search results content - simplified
+                        searchResultsContent
                     } else {
+                        // Main browse content when no search
                         BookSectionsView(
                             forYouBooks: viewModel.forYouBooks,
                             popularBooks: viewModel.popularBooks,
@@ -118,6 +79,15 @@ struct SearchBrowseView: View {
                     }
                 }
                 .onAppear {
+                    initialBooksByGenre = viewModel.booksByGenre
+                    
+                    if initialBooksByGenre.isEmpty {
+                        Task {
+                            await viewModel.refreshData()
+                        }
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("BookDataUpdated"))) { _ in
                     initialBooksByGenre = viewModel.booksByGenre
                 }
             }
@@ -133,77 +103,77 @@ struct SearchBrowseView: View {
                 isSearchFocused = false
                 showingSuggestions = false
             }
-            .sheet(isPresented: $showingBookDetail) {
-                if let book = selectedBook {
-                    NavigationView {
-                        GeometryReader { geometry in
-                            ZStack {
-                                // Current book (always show)
-                                BookDetailCard(book: book, isPresented: $showingBookDetail)
-                                    .offset(x: cardOffset)
-                                
-                                // Only show previous/next for multiple books
-                                if selectedSectionBooks.count > 1 {
-                                    // Previous book (preloaded)
-                                    if selectedIndex > 0 {
-                                        BookDetailCard(
-                                            book: selectedSectionBooks[selectedIndex - 1],
-                                            isPresented: $showingBookDetail
-                                        )
-                                        .offset(x: -geometry.size.width + cardOffset)
-                                    }
-                                    
-                                    // Next book (preloaded)
-                                    if selectedIndex < selectedSectionBooks.count - 1 {
-                                        BookDetailCard(
-                                            book: selectedSectionBooks[selectedIndex + 1],
-                                            isPresented: $showingBookDetail
-                                        )
-                                        .offset(x: geometry.size.width + cardOffset)
-                                    }
-                                }
-                            }
-                        }
+            .sheet(item: $selectedBook) { book in
+                NavigationView {
+                    BookDetailCard(book: book, isPresented: $showingBookDetail)
                         .navigationBarHidden(true)
-                    }
-                    .gesture(
-                        // Only enable swiping gesture for multiple books
-                        selectedSectionBooks.count > 1 ?
-                        DragGesture()
-                            .onChanged { value in
-                                withAnimation(.interactiveSpring()) {
-                                    cardOffset = value.translation.width
-                                }
-                            }
-                            .onEnded { value in
-                                let threshold: CGFloat = 50
-                                if value.translation.width > threshold && selectedIndex > 0 {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        selectedIndex -= 1
-                                    }
-                                } else if value.translation.width < -threshold && selectedIndex < selectedSectionBooks.count - 1 {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        selectedIndex += 1
-                                    }
-                                }
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    cardOffset = 0
-                                }
-                            } : nil
-                    )
-                    .interactiveDismissDisabled()
                 }
+                .interactiveDismissDisabled()
             }
-            .onChange(of: selectedIndex) { oldValue, newValue in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    selectedBook = selectedSectionBooks[newValue]
-                    cardOffset = 0
-                }
-            }
+
         }
         .tabItem {
             Image(systemName: "safari")
             Text("Explore")
+        }
+    }
+    
+    // MARK: - Extracted Views
+    private var categoriesPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 20) {
+                ForEach(SearchCategory.allCases, id: \.self) { category in
+                    categoryButton(for: category)
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 8)
+    }
+    
+    private func categoryButton(for category: SearchCategory) -> some View {
+        Button(action: {
+            selectedCategory = category
+        }) {
+            Text(category.rawValue)
+                .font(.headline)
+                .foregroundColor(selectedCategory == category ? .white : .primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(selectedCategory == category ? Color.blue : Color.clear)
+                .cornerRadius(20)
+        }
+    }
+    
+    private var searchResultsContent: some View {
+        Group {
+            if viewModel.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding()
+            } else if let error = viewModel.errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+            } else {
+                searchCategoryContent
+            }
+        }
+    }
+    
+    private var searchCategoryContent: some View {
+        Group {
+            switch selectedCategory {
+            case .topResults:
+                searchResultsGrid
+            case .available:
+                availableBooksGrid
+            case .authors:
+                booksByAuthorGrid
+            case .genres:
+                genresGrid
+            }
         }
     }
     
@@ -212,10 +182,6 @@ struct SearchBrowseView: View {
             ForEach(viewModel.searchResults) { book in
                 BookCardView(book: book) {
                     selectedBook = book
-                    selectedSectionBooks = viewModel.searchResults
-                    if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
-                        selectedIndex = index
-                    }
                     showingBookDetail = true
                 }
             }
@@ -230,10 +196,6 @@ struct SearchBrowseView: View {
             ForEach(availableBooks) { book in
                 BookCardView(book: book) {
                     selectedBook = book
-                    selectedSectionBooks = availableBooks
-                    if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
-                        selectedIndex = index
-                    }
                     showingBookDetail = true
                 }
             }
@@ -256,10 +218,6 @@ struct SearchBrowseView: View {
                         ForEach(groupedBooks[author] ?? []) { book in
                             BookCardView(book: book) {
                                 selectedBook = book
-                                selectedSectionBooks = groupedBooks[author] ?? []
-                                if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
-                                    selectedIndex = index
-                                }
                                 showingBookDetail = true
                             }
                         }

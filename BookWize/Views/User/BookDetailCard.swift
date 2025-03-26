@@ -5,7 +5,6 @@ private struct BookCoverView: View {
     let imageURL: String
     let scrollOffset: CGFloat
     let isFullScreen: Bool
-    @Binding var isImageLoaded: Bool
     
     var body: some View {
         if let url = URL(string: imageURL) {
@@ -16,25 +15,15 @@ private struct BookCoverView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .onAppear {
-                                isImageLoaded = true
-                            }
                     case .failure(_):
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
-                            .onAppear {
-                                isImageLoaded = true
-                            }
                     case .empty:
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
-                            .overlay(ProgressView())
                     @unknown default:
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
-                            .onAppear {
-                                isImageLoaded = true
-                            }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -79,7 +68,7 @@ private struct ActionButtonsView: View {
     var body: some View {
         VStack(spacing: 12) {
             Button(action: {
-                // Do nothing for now as requested
+                // Reservation logic removed as requested
             }) {
                 HStack {
                     if isReserving {
@@ -139,90 +128,70 @@ struct BookDetailCard: View {
                             BookCoverView(
                                 imageURL: imageURL,
                                 scrollOffset: scrollOffset,
-                                isFullScreen: isFullScreen,
-                                isImageLoaded: $isImageLoaded
+                                isFullScreen: isFullScreen
                             )
-                        } else {
-                            // Placeholder if no cover image
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 400)
-                                .cornerRadius(8)
-                                .onAppear {
-                                    isImageLoaded = true
-                                }
                         }
                         
-                        // Only show the rest of the content when image is loaded
-                        if isImageLoaded {
-                            // Book Info
-                            BookInfoView(book: book)
-                            
-                            // Availability Status
-                            HStack {
-                                Image(systemName: book.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .foregroundColor(book.isAvailable ? .green : .red)
-                                Text(book.isAvailable ? "Available" : "Unavailable")
-                                    .foregroundColor(book.isAvailable ? .green : .red)
+                        // Book Info
+                        BookInfoView(book: book)
+                        
+                        // Availability Status
+                        HStack {
+                            Image(systemName: book.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundColor(book.isAvailable ? .green : .red)
+                            Text(book.isAvailable ? "Available" : "Unavailable")
+                                .foregroundColor(book.isAvailable ? .green : .red)
+                        }
+                        
+                        // Action Buttons
+                        ActionButtonsView(
+                            book: book,
+                            isReserving: $isReserving,
+                            addedToWishlist: $addedToWishlist
+                        )
+                        
+                        // Book Description
+                        if let description = book.description {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Description")
+                                    .font(.headline)
+                                Text(description)
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
                             }
-                            
-                            // Action Buttons
-                            ActionButtonsView(
-                                book: book,
-                                isReserving: $isReserving,
-                                addedToWishlist: $addedToWishlist
+                            .padding(.horizontal)
+                        }
+                        
+                        // Book Details Grid
+                        HStack(spacing: 0) {
+                            BookDetailItem(
+                                icon: "book.closed",
+                                title: "Genre",
+                                value: book.genre ?? "Unknown"
                             )
                             
-                            // Book Description
-                            if let description = book.description {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Description")
-                                        .font(.headline)
-                                    Text(description)
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.horizontal)
-                            }
+                            Divider()
+                                .frame(height: 40)
                             
-                            // Book Details Grid
-                            HStack(spacing: 0) {
-                                BookDetailItem(
-                                    icon: "book.closed",
-                                    title: "Genre",
-                                    value: book.genre ?? "Unknown"
-                                )
-                                
-                                Divider()
-                                    .frame(height: 40)
-                                
-                                BookDetailItem(
-                                    icon: "calendar",
-                                    title: "Released",
-                                    value: book.publishedDate ?? "Unknown"
-                                )
-                                
-                                Divider()
-                                    .frame(height: 40)
-                                
-                                BookDetailItem(
-                                    icon: "text.justify",
-                                    title: "Length",
-                                    value: "\(book.pageCount ?? 0) pages"
-                                )
-                            }
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-                            .padding(.horizontal)
-                        } else {
-                            // Loading indicator while content is loading
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                                .frame(maxWidth: .infinity)
-                                .padding()
+                            BookDetailItem(
+                                icon: "calendar",
+                                title: "Released",
+                                value: book.publishedDate ?? "Unknown"
+                            )
+                            
+                            Divider()
+                                .frame(height: 40)
+                            
+                            BookDetailItem(
+                                icon: "text.justify",
+                                title: "Length",
+                                value: "\(book.pageCount ?? 0) pages"
+                            )
                         }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
                     }
                     .padding(.bottom, 30)
                     .background(GeometryReader { proxy in
@@ -271,14 +240,6 @@ struct BookDetailCard: View {
                 }
         )
         .offset(y: dragOffset)
-        .onAppear {
-            // Force image load status to true after a delay if it doesn't load
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                if !isImageLoaded {
-                    isImageLoaded = true
-                }
-            }
-        }
     }
 }
 

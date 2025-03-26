@@ -9,9 +9,6 @@ struct GenreBooksView: View {
     ]
     @State private var selectedBook: Book?
     @State private var showingBookDetail = false
-    @State private var selectedSectionBooks: [Book] = []
-    @State private var selectedIndex: Int = 0
-    @State private var cardOffset: CGFloat = 0
     
     var body: some View {
         ScrollView {
@@ -25,10 +22,6 @@ struct GenreBooksView: View {
                     ForEach(books) { book in
                         BookCardView(book: book) {
                             selectedBook = book
-                            selectedSectionBooks = books
-                            if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
-                                selectedIndex = index
-                            }
                             showingBookDetail = true
                         }
                     }
@@ -38,72 +31,13 @@ struct GenreBooksView: View {
             .padding(.vertical)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingBookDetail) {
-            if let book = selectedBook {
-                NavigationView {
-                    GeometryReader { geometry in
-                        ZStack {
-                            // Current book (always show)
-                            BookDetailCard(book: book, isPresented: $showingBookDetail)
-                                .offset(x: cardOffset)
-                            
-                            // Only show previous/next for multiple books
-                            if selectedSectionBooks.count > 1 {
-                                // Previous book (preloaded)
-                                if selectedIndex > 0 {
-                                    BookDetailCard(
-                                        book: selectedSectionBooks[selectedIndex - 1],
-                                        isPresented: $showingBookDetail
-                                    )
-                                    .offset(x: -geometry.size.width + cardOffset)
-                                }
-                                
-                                // Next book (preloaded)
-                                if selectedIndex < selectedSectionBooks.count - 1 {
-                                    BookDetailCard(
-                                        book: selectedSectionBooks[selectedIndex + 1],
-                                        isPresented: $showingBookDetail
-                                    )
-                                    .offset(x: geometry.size.width + cardOffset)
-                                }
-                            }
-                        }
-                    }
+        .sheet(item: $selectedBook) { book in
+            NavigationView {
+                BookDetailCard(book: book, isPresented: $showingBookDetail)
                     .navigationBarHidden(true)
-                }
-                .gesture(
-                    // Only enable swiping gesture for multiple books
-                    selectedSectionBooks.count > 1 ?
-                    DragGesture()
-                        .onChanged { value in
-                            withAnimation(.interactiveSpring()) {
-                                cardOffset = value.translation.width
-                            }
-                        }
-                        .onEnded { value in
-                            let threshold: CGFloat = 50
-                            if value.translation.width > threshold && selectedIndex > 0 {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    selectedIndex -= 1
-                                }
-                            } else if value.translation.width < -threshold && selectedIndex < selectedSectionBooks.count - 1 {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    selectedIndex += 1
-                                }
-                            }
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                cardOffset = 0
-                            }
-                        } : nil
-                )
-                .interactiveDismissDisabled()
             }
+            .interactiveDismissDisabled()
         }
-        .onChange(of: selectedIndex) { oldValue, newValue in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                selectedBook = selectedSectionBooks[newValue]
-                cardOffset = 0
-            }
-        }
+
     }
 } 

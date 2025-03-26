@@ -59,6 +59,9 @@ class BookSearchViewModel: ObservableObject {
                     if let selectedGenres = user?.selectedGenres {
                         self.memberSelectedGenres = selectedGenres
                         self.setupInitialData() // Update the sections with the fetched genres
+                        
+                        // Post notification that data was updated
+                        NotificationCenter.default.post(name: Notification.Name("BookDataUpdated"), object: nil)
                     }
                 }
             }
@@ -68,6 +71,10 @@ class BookSearchViewModel: ObservableObject {
     }
     
     private func fetchBooks() async {
+        DispatchQueue.main.async {
+            self.isLoading = true
+        }
+        
         do {
             let readableBooks: [Book]? = try await SupabaseManager.shared.client
                 .from("Books")
@@ -76,19 +83,35 @@ class BookSearchViewModel: ObservableObject {
                 .value
             
             DispatchQueue.main.async {
+                self.isLoading = false
+                
                 guard let readableBooks else {
+                    print("No books found")
                     return
                 }
                 
                 self.books = readableBooks
                 self.setupInitialData()
+                
+                // Post notification that book data was updated
+                NotificationCenter.default.post(name: Notification.Name("BookDataUpdated"), object: nil)
             }
         } catch {
-            print("Error fetching books: \(error)")
+            DispatchQueue.main.async {
+                self.isLoading = false
+                print("Error fetching books: \(error)")
+                self.errorMessage = "Failed to load books. Please try again."
+            }
         }
     }
     
     private func setupInitialData() {
+        // Don't setup data if we don't have any books yet
+        guard !books.isEmpty else {
+            print("No books available yet to setup initial data")
+            return
+        }
+        
         // Setup For You section with books from member's selected genres
         if memberSelectedGenres.isEmpty {
             forYouBooks = Array(books.shuffled().prefix(6))
@@ -122,6 +145,11 @@ class BookSearchViewModel: ObservableObject {
                 self?.searchTextSubject.send(text)
             }
             .store(in: &cancellables)
+        
+        print("Initial data setup complete with \(books.count) books and \(booksByGenre.count) genres")
+        
+        // Post notification that data was updated
+        NotificationCenter.default.post(name: Notification.Name("BookDataUpdated"), object: nil)
     }
     
     private func searchBooks() {
@@ -176,5 +204,11 @@ class BookSearchViewModel: ObservableObject {
         searchResults = filteredBooks
         isLoading = false
         errorMessage = nil
+    }
+    
+    // Add a new public method for explicit data refreshing
+    public func refreshData() async {
+        await fetchBooks()
+        await fetchMemberGenres()
     }
 }
