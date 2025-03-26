@@ -7,6 +7,13 @@
 
 import SwiftUI
 
+enum SearchCategory: String, CaseIterable {
+    case topResults = "Top Results"
+    case available = "Available"
+    case authors = "By Author"
+    case genres = "Genres"
+}
+
 struct SearchBrowseView: View {
     @StateObject private var viewModel: BookSearchViewModel
     @State private var selectedFilter: String? = nil
@@ -16,6 +23,7 @@ struct SearchBrowseView: View {
     @State private var initialBooksByGenre: [String: [Book]] = [:]
     @FocusState private var isSearchFocused: Bool
     @State private var scrollOffset: CGFloat = 0
+    @State private var selectedCategory: SearchCategory = .topResults
     let userPreferredGenres: [String]
     
     let genres = [
@@ -48,6 +56,27 @@ struct SearchBrowseView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !viewModel.searchText.isEmpty {
+                        // Categories Picker
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 20) {
+                                ForEach(SearchCategory.allCases, id: \.self) { category in
+                                    Button(action: {
+                                        selectedCategory = category
+                                    }) {
+                                        Text(category.rawValue)
+                                            .font(.headline)
+                                            .foregroundColor(selectedCategory == category ? .white : .primary)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(selectedCategory == category ? Color.blue : Color.clear)
+                                            .cornerRadius(20)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        .padding(.vertical, 8)
+                        
                         if viewModel.isLoading {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
@@ -57,24 +86,17 @@ struct SearchBrowseView: View {
                                 .foregroundColor(.red)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                        } else if viewModel.searchResults.isEmpty {
-                            Text("No books found")
-                                .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding()
                         } else {
-                            LazyVGrid(columns: columns, spacing: 16) {
-                                ForEach(Array(viewModel.searchResults.prefix(8))) { book in
-                                    NavigationLink {
-                                        UserBookDetailView(book: book)
-                                    } label: {
-                                        BookCard(book: book)
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 280)
-                                    }
-                                }
+                            switch selectedCategory {
+                            case .topResults:
+                                searchResultsGrid
+                            case .available:
+                                availableBooksGrid
+                            case .authors:
+                                booksByAuthorGrid
+                            case .genres:
+                                genresGrid
                             }
-                            .padding(.horizontal)
                         }
                     } else {
                         BookSectionsView(
@@ -110,11 +132,114 @@ struct SearchBrowseView: View {
             Text("Explore")
         }
     }
+    
+    private var searchResultsGrid: some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(viewModel.searchResults) { book in
+                NavigationLink {
+                    UserBookDetailView(book: book)
+                } label: {
+                    BookCard(book: book)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 280)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var availableBooksGrid: some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(viewModel.searchResults.filter { $0.isAvailable }) { book in
+                NavigationLink {
+                    UserBookDetailView(book: book)
+                } label: {
+                    BookCard(book: book)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 280)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var booksByAuthorGrid: some View {
+        let groupedBooks = Dictionary(grouping: viewModel.searchResults) { $0.author }
+        
+        return ForEach(groupedBooks.keys.sorted(), id: \.self) { author in
+            VStack(alignment: .leading) {
+                Text(author)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.horizontal)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(groupedBooks[author] ?? []) { book in
+                            NavigationLink {
+                                UserBookDetailView(book: book)
+                            } label: {
+                                BookCard(book: book)
+                                    .frame(width: 180)
+                                    .frame(height: 280)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+    }
+    
+    private var genresGrid: some View {
+        let uniqueGenres = Array(Set(viewModel.searchResults.compactMap { $0.genre })).sorted()
+        
+        return LazyVGrid(columns: columns, spacing: 16) {
+            ForEach(uniqueGenres, id: \.self) { genre in
+                NavigationLink {
+                    GenreBooksView(
+                        genre: genre,
+                        books: viewModel.searchResults.filter { $0.genre == genre }
+                    )
+                } label: {
+                    GenreCard(genre: genre, books: viewModel.searchResults.filter { $0.genre == genre })
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
 }
 
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+struct GenreCard: View {
+    let genre: String
+    let books: [Book]
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            if let firstBook = books.first,
+               let imageURL = firstBook.imageURL,
+               let url = URL(string: imageURL) {
+                CachedAsyncImage(url: url)
+                    .frame(width: 120, height: 120)
+                    .clipped()
+                    .cornerRadius(10)
+            }
+            
+            Text(genre)
+                .font(.headline)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .padding(.top, 4)
+            
+            Text("\(books.count) books")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(Color.white)
+        .cornerRadius(10)
+        .shadow(radius: 2)
     }
 }
