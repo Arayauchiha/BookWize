@@ -94,8 +94,6 @@ import SwiftUI
 struct UserBookDetailView: View {
     let book: Book
     @Environment(\.dismiss) private var dismiss
-    @State private var showingReserveAlert = false
-    @State private var reserveAlertMessage = ""
     @State private var isReserving = false
     
     var body: some View {
@@ -108,11 +106,6 @@ struct UserBookDetailView: View {
             }
         }
         .background(Color(UIColor.systemBackground))
-        .alert("Reserve Book", isPresented: $showingReserveAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(reserveAlertMessage)
-        }
     }
     
     // Break down the image view into a separate computed property
@@ -227,9 +220,7 @@ struct UserBookDetailView: View {
     
     private var reserveButton: some View {
         Button(action: {
-            Task {
-                await reserveBook()
-            }
+            // Do nothing for now as requested
         }) {
             HStack {
                 if isReserving {
@@ -249,48 +240,5 @@ struct UserBookDetailView: View {
         .disabled(!book.isAvailable || isReserving)
         .padding(.horizontal)
         .padding(.bottom, 32)
-    }
-    
-    private func reserveBook() async {
-        guard book.isAvailable else { return }
-        
-        isReserving = true
-        
-        do {
-            // Get the current user's ID from Supabase auth
-            if let userId = try? await SupabaseManager.shared.client.auth.session.user.id {
-                // Create a reservation record
-                let reservation = Reservation(
-                    bookId: book.id,
-                    memberId: userId,
-                    reservationDate: ISO8601DateFormatter().string(from: Date()),
-                    status: .pending
-                )
-                
-                try await SupabaseManager.shared.client
-                    .from("Reservations")
-                    .insert(reservation)
-                    .execute()
-                
-                // Update book availability
-                try await SupabaseManager.shared.client
-                    .from("Books")
-                    .update(["available_quantity": book.availableQuantity - 1])
-                    .eq("id", value: book.id)
-                    .execute()
-                
-                DispatchQueue.main.async {
-                    reserveAlertMessage = "Book reserved successfully! You can pick it up from the library."
-                    showingReserveAlert = true
-                    isReserving = false
-                }
-            }
-        } catch {
-            DispatchQueue.main.async {
-                reserveAlertMessage = "Failed to reserve book. Please try again."
-                showingReserveAlert = true
-                isReserving = false
-            }
-        }
     }
 }

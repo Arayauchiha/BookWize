@@ -5,6 +5,7 @@ private struct BookCoverView: View {
     let imageURL: String
     let scrollOffset: CGFloat
     let isFullScreen: Bool
+    @Binding var isImageLoaded: Bool
     
     var body: some View {
         if let url = URL(string: imageURL) {
@@ -15,15 +16,25 @@ private struct BookCoverView: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fit)
+                            .onAppear {
+                                isImageLoaded = true
+                            }
                     case .failure(_):
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
+                            .onAppear {
+                                isImageLoaded = true
+                            }
                     case .empty:
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
+                            .overlay(ProgressView())
                     @unknown default:
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
+                            .onAppear {
+                                isImageLoaded = true
+                            }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -64,11 +75,12 @@ private struct ActionButtonsView: View {
     let book: Book
     @Binding var isReserving: Bool
     @Binding var addedToWishlist: Bool
-    let onReserve: () -> Void
     
     var body: some View {
         VStack(spacing: 12) {
-            Button(action: onReserve) {
+            Button(action: {
+                // Do nothing for now as requested
+            }) {
                 HStack {
                     if isReserving {
                         ProgressView()
@@ -112,11 +124,10 @@ struct BookDetailCard: View {
     @State private var scrollOffset: CGFloat = 0
     @GestureState private var dragOffset: CGFloat = 0
     @Environment(\.dismiss) private var dismiss
-    @State private var showingReserveAlert = false
-    @State private var reserveAlertMessage = ""
     @State private var isReserving = false
     @State private var addedToWishlist = false
     @State private var isFullScreen = false
+    @State private var isImageLoaded = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -128,74 +139,90 @@ struct BookDetailCard: View {
                             BookCoverView(
                                 imageURL: imageURL,
                                 scrollOffset: scrollOffset,
-                                isFullScreen: isFullScreen
+                                isFullScreen: isFullScreen,
+                                isImageLoaded: $isImageLoaded
                             )
+                        } else {
+                            // Placeholder if no cover image
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 400)
+                                .cornerRadius(8)
+                                .onAppear {
+                                    isImageLoaded = true
+                                }
                         }
                         
-                        // Book Info
-                        BookInfoView(book: book)
-                        
-                        // Availability Status
-                        HStack {
-                            Image(systemName: book.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundColor(book.isAvailable ? .green : .red)
-                            Text(book.isAvailable ? "Available" : "Unavailable")
-                                .foregroundColor(book.isAvailable ? .green : .red)
-                        }
-                        
-                        // Action Buttons
-                        ActionButtonsView(
-                            book: book,
-                            isReserving: $isReserving,
-                            addedToWishlist: $addedToWishlist
-                        ) {
-                            Task {
-                                await reserveBook()
+                        // Only show the rest of the content when image is loaded
+                        if isImageLoaded {
+                            // Book Info
+                            BookInfoView(book: book)
+                            
+                            // Availability Status
+                            HStack {
+                                Image(systemName: book.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundColor(book.isAvailable ? .green : .red)
+                                Text(book.isAvailable ? "Available" : "Unavailable")
+                                    .foregroundColor(book.isAvailable ? .green : .red)
                             }
-                        }
-                        
-                        // Book Description
-                        if let description = book.description {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Description")
-                                    .font(.headline)
-                                Text(description)
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
+                            
+                            // Action Buttons
+                            ActionButtonsView(
+                                book: book,
+                                isReserving: $isReserving,
+                                addedToWishlist: $addedToWishlist
+                            )
+                            
+                            // Book Description
+                            if let description = book.description {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Description")
+                                        .font(.headline)
+                                    Text(description)
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal)
                             }
+                            
+                            // Book Details Grid
+                            HStack(spacing: 0) {
+                                BookDetailItem(
+                                    icon: "book.closed",
+                                    title: "Genre",
+                                    value: book.genre ?? "Unknown"
+                                )
+                                
+                                Divider()
+                                    .frame(height: 40)
+                                
+                                BookDetailItem(
+                                    icon: "calendar",
+                                    title: "Released",
+                                    value: book.publishedDate ?? "Unknown"
+                                )
+                                
+                                Divider()
+                                    .frame(height: 40)
+                                
+                                BookDetailItem(
+                                    icon: "text.justify",
+                                    title: "Length",
+                                    value: "\(book.pageCount ?? 0) pages"
+                                )
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
                             .padding(.horizontal)
+                        } else {
+                            // Loading indicator while content is loading
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .frame(maxWidth: .infinity)
+                                .padding()
                         }
-                        
-                        // Book Details Grid
-                        HStack(spacing: 0) {
-                            BookDetailItem(
-                                icon: "book.closed",
-                                title: "Genre",
-                                value: book.genre ?? "Unknown"
-                            )
-                            
-                            Divider()
-                                .frame(height: 40)
-                            
-                            BookDetailItem(
-                                icon: "calendar",
-                                title: "Released",
-                                value: book.publishedDate ?? "Unknown"
-                            )
-                            
-                            Divider()
-                                .frame(height: 40)
-                            
-                            BookDetailItem(
-                                icon: "text.justify",
-                                title: "Length",
-                                value: "\(book.pageCount ?? 0) pages"
-                            )
-                        }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
                     }
                     .padding(.bottom, 30)
                     .background(GeometryReader { proxy in
@@ -244,49 +271,12 @@ struct BookDetailCard: View {
                 }
         )
         .offset(y: dragOffset)
-        .alert("Reserve Book", isPresented: $showingReserveAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(reserveAlertMessage)
-        }
-    }
-    
-    private func reserveBook() async {
-        guard book.isAvailable else { return }
-        
-        isReserving = true
-        
-        do {
-            if let userId = try? await SupabaseManager.shared.client.auth.session.user.id {
-                let reservation = Reservation(
-                    bookId: book.id,
-                    memberId: userId,
-                    reservationDate: ISO8601DateFormatter().string(from: Date()),
-                    status: .pending
-                )
-                
-                try await SupabaseManager.shared.client
-                    .from("Reservations")
-                    .insert(reservation)
-                    .execute()
-                
-                try await SupabaseManager.shared.client
-                    .from("Books")
-                    .update(["available_quantity": book.availableQuantity - 1])
-                    .eq("id", value: book.id)
-                    .execute()
-                
-                DispatchQueue.main.async {
-                    reserveAlertMessage = "Book reserved successfully! You can pick it up from the library."
-                    showingReserveAlert = true
-                    isReserving = false
+        .onAppear {
+            // Force image load status to true after a delay if it doesn't load
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if !isImageLoaded {
+                    isImageLoaded = true
                 }
-            }
-        } catch {
-            DispatchQueue.main.async {
-                reserveAlertMessage = "Failed to reserve book. Please try again."
-                showingReserveAlert = true
-                isReserving = false
             }
         }
     }
