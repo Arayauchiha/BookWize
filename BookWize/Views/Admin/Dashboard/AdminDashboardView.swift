@@ -37,14 +37,11 @@ struct AdminDashboardView: View {
                 .tag(2)
                 
                 // Finance Tab
-                NavigationStack {
-                    FinanceView()
-                        .navigationTitle("Finance")
-                }
-                .tabItem {
-                    Label("Finance", systemImage: "dollarsign.circle.fill")
-                }
-                .tag(3)
+                FinanceView()
+                    .tabItem {
+                        Label("Finance", systemImage: "dollarsign.circle.fill")
+                    }
+                    .tag(3)
             }
             .navigationTitle(tabTitle)
             .toolbar {
