@@ -1,4 +1,20 @@
 import SwiftUI
+import Supabase
+
+// Add these near the top of the file, after the imports
+private struct SupabaseClientKey: EnvironmentKey {
+    static let defaultValue: SupabaseClient = SupabaseClient(
+        supabaseURL: URL(string: "https://qjhfnprghpszprfhjzdl.supabase.coL")!,
+        supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqaGZucHJnaHBzenByZmhqemRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNzE5NTAsImV4cCI6MjA1Nzk0Nzk1MH0.Bny2_LBt2fFjohwmzwCclnFNmrC_LZl3s3PVx-SOeNc"
+    )
+}
+
+extension EnvironmentValues {
+    var supabaseClient: SupabaseClient {
+        get { self[SupabaseClientKey.self] }
+        set { self[SupabaseClientKey.self] = newValue }
+    }
+}
 
 // MARK: - Book Cover View
 private struct BookCoverView: View {
@@ -70,16 +86,106 @@ private struct BookInfoView: View {
     }
 }
 
-// MARK: - Action Buttons View
+// Add this class
+class BookReservationViewModel: ObservableObject {
+    private let supabase: SupabaseClient
+    
+    @Published var isReserving = false
+    
+    init(supabase: SupabaseClient) {
+        self.supabase = supabase
+    }
+    
+    func reserveBook(book: Book) async throws {
+        isReserving = true
+        defer { isReserving = false }
+        
+        let reservation = BookReservation(
+            id: UUID(),
+            created_at: Date(),
+            member_id: try await supabase.auth.session.user.id,
+            book_id: book.id
+        )
+        
+        let response: BookReservation = try await supabase.database
+            .from("BookReservation")
+            .insert(reservation)
+            .single()
+            .execute()
+            .value
+        
+        try await supabase
+            .from("Books")
+            .update(["availableQuantity": book.availableQuantity - 1])
+            .eq("id", value: book.id)
+            .execute()
+    }
+}
+
+// Modify ActionButtonsView to use the view model
 private struct ActionButtonsView: View {
     let book: Book
+    let supabase: SupabaseClient
     @Binding var isReserving: Bool
     @Binding var addedToWishlist: Bool
+    @State private var showError = false
+    @State private var errorMessage = ""
+    
+    private func reserveBook() async {
+        isReserving = true
+        
+        do {
+            // First get a valid member ID from the database
+            let members: [MemberID] = try await supabase.database
+                .from("Members")
+                .select("id")
+                .limit(1)
+                .execute()
+                .value
+            
+            guard let member = members.first else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No members found in the system"])
+            }
+            
+            let reservation = BookReservation(
+                id: UUID(),
+                created_at: Date(),
+                member_id: member.id,
+                book_id: book.id
+            )
+            
+            // Insert the reservation
+            try await supabase.database
+                .from("BookReservation")
+                .insert(reservation)
+                .execute()
+            
+            // Update book's available quantity
+            if book.availableQuantity > 0 {
+                try await supabase.database
+                    .from("Books")
+                    .update(["availableQuantity": book.availableQuantity - 1])
+                    .eq("id", value: book.id)
+                    .execute()
+            }
+            
+            print("Book reserved successfully!")
+            
+        } catch {
+            print("Error reserving book: \(error)")
+            errorMessage = "Failed to reserve book. Please try again."
+            showError = true
+        }
+        
+        isReserving = false
+    }
     
     var body: some View {
         VStack(spacing: 12) {
             Button(action: {
-                // Do nothing for now as requested
+                Task {
+                    await reserveBook()
+                }
             }) {
                 HStack {
                     if isReserving {
@@ -97,6 +203,11 @@ private struct ActionButtonsView: View {
                 .cornerRadius(8)
             }
             .disabled(!book.isAvailable || isReserving)
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
             
             Button(action: {
                 addedToWishlist.toggle()
@@ -116,8 +227,21 @@ private struct ActionButtonsView: View {
     }
 }
 
+struct BookReservation: Codable {
+    let id: UUID
+    let created_at: Date
+    let member_id: UUID
+    let book_id: UUID
+}
+
+// Add a simple struct for member ID
+private struct MemberID: Codable {
+    let id: UUID
+}
+
 struct BookDetailCard: View {
     let book: Book
+    let supabase: SupabaseClient
     @Binding var isPresented: Bool
     @State private var cardOffset: CGFloat = 0
     @State private var isDragging = false
@@ -170,6 +294,7 @@ struct BookDetailCard: View {
                             // Action Buttons
                             ActionButtonsView(
                                 book: book,
+                                supabase: supabase,
                                 isReserving: $isReserving,
                                 addedToWishlist: $addedToWishlist
                             )

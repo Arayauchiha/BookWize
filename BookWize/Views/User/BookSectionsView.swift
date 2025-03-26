@@ -1,8 +1,10 @@
 import SwiftUI
+import Supabase
 
 struct ForYouGridView: View {
     let books: [Book]
     let memberSelectedGenres: [String]
+    let supabase: SupabaseClient
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     @State private var selectedBook: Book?
     @State private var showingBookDetail = false
@@ -43,8 +45,11 @@ struct ForYouGridView: View {
                     GeometryReader { geometry in
                         ZStack {
                             // Current book (always show)
-                            BookDetailCard(book: book, isPresented: $showingBookDetail)
-                                .offset(x: cardOffset)
+                            BookDetailCard(
+                                book: book,
+                                supabase: supabase, isPresented: $showingBookDetail
+                            )
+                            .offset(x: cardOffset)
                             
                             // Only show previous/next for multiple books
                             if selectedSectionBooks.count > 1 {
@@ -52,7 +57,7 @@ struct ForYouGridView: View {
                                 if selectedIndex > 0 {
                                     BookDetailCard(
                                         book: selectedSectionBooks[selectedIndex - 1],
-                                        isPresented: $showingBookDetail
+                                        supabase: supabase, isPresented: $showingBookDetail
                                     )
                                     .offset(x: -geometry.size.width + cardOffset)
                                 }
@@ -61,7 +66,7 @@ struct ForYouGridView: View {
                                 if selectedIndex < selectedSectionBooks.count - 1 {
                                     BookDetailCard(
                                         book: selectedSectionBooks[selectedIndex + 1],
-                                        isPresented: $showingBookDetail
+                                        supabase: supabase, isPresented: $showingBookDetail
                                     )
                                     .offset(x: geometry.size.width + cardOffset)
                                 }
@@ -111,6 +116,7 @@ struct BookSectionsView: View {
     let forYouBooks: [Book]
     let popularBooks: [Book]
     let booksByGenre: [String: [Book]]
+    let supabase: SupabaseClient
     @Binding var selectedGenreFromCard: String?
     @Binding var selectedFilter: String?
     let userPreferredGenres: [String]
@@ -135,7 +141,11 @@ struct BookSectionsView: View {
                     
                     if !viewModel.allPreferredBooks.isEmpty {
                         NavigationLink {
-                            ForYouGridView(books: viewModel.allPreferredBooks, memberSelectedGenres: viewModel.memberSelectedGenres)
+                            ForYouGridView(
+                                books: viewModel.allPreferredBooks,
+                                memberSelectedGenres: viewModel.memberSelectedGenres,
+                                supabase: supabase
+                            )
                         } label: {
                             HStack(spacing: 4) {
                                 Text("See All")
@@ -240,7 +250,11 @@ struct BookSectionsView: View {
                     HStack(spacing: 16) {
                         ForEach(Array(booksByGenre.keys.sorted()), id: \.self) { genre in
                             NavigationLink {
-                                GenreBooksView(genre: genre, books: booksByGenre[genre] ?? [])
+                                GenreBooksView(
+                                    genre: genre,
+                                    books: booksByGenre[genre] ?? [],
+                                    supabase: supabase
+                                )
                             } label: {
                                 if let firstBook = booksByGenre[genre]?.first {
                                     VStack(alignment: .center, spacing: 8) {
@@ -284,8 +298,11 @@ struct BookSectionsView: View {
                     GeometryReader { geometry in
                         ZStack {
                             // Current book (always show)
-                            BookDetailCard(book: book, isPresented: $showingBookDetail)
-                                .offset(x: cardOffset)
+                            BookDetailCard(
+                                book: book,
+                                supabase: supabase, isPresented: $showingBookDetail
+                            )
+                            .offset(x: cardOffset)
                             
                             // Only show previous/next for multiple books
                             if selectedSectionBooks.count > 1 {
@@ -293,7 +310,7 @@ struct BookSectionsView: View {
                                 if selectedIndex > 0 {
                                     BookDetailCard(
                                         book: selectedSectionBooks[selectedIndex - 1],
-                                        isPresented: $showingBookDetail
+                                        supabase: supabase, isPresented: $showingBookDetail
                                     )
                                     .offset(x: -geometry.size.width + cardOffset)
                                 }
@@ -302,7 +319,7 @@ struct BookSectionsView: View {
                                 if selectedIndex < selectedSectionBooks.count - 1 {
                                     BookDetailCard(
                                         book: selectedSectionBooks[selectedIndex + 1],
-                                        isPresented: $showingBookDetail
+                                        supabase: supabase, isPresented: $showingBookDetail
                                     )
                                     .offset(x: geometry.size.width + cardOffset)
                                 }

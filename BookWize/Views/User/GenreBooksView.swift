@@ -1,8 +1,10 @@
 import SwiftUI
+import Supabase
 
 struct GenreBooksView: View {
     let genre: String
     let books: [Book]
+    let supabase: SupabaseClient
     let columns = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16)
@@ -44,8 +46,11 @@ struct GenreBooksView: View {
                     GeometryReader { geometry in
                         ZStack {
                             // Current book (always show)
-                            BookDetailCard(book: book, isPresented: $showingBookDetail)
-                                .offset(x: cardOffset)
+                            BookDetailCard(
+                                book: book,
+                                supabase: supabase, isPresented: $showingBookDetail
+                            )
+                            .offset(x: cardOffset)
                             
                             // Only show previous/next for multiple books
                             if selectedSectionBooks.count > 1 {
@@ -53,7 +58,7 @@ struct GenreBooksView: View {
                                 if selectedIndex > 0 {
                                     BookDetailCard(
                                         book: selectedSectionBooks[selectedIndex - 1],
-                                        isPresented: $showingBookDetail
+                                        supabase: supabase, isPresented: $showingBookDetail
                                     )
                                     .offset(x: -geometry.size.width + cardOffset)
                                 }
@@ -62,7 +67,7 @@ struct GenreBooksView: View {
                                 if selectedIndex < selectedSectionBooks.count - 1 {
                                     BookDetailCard(
                                         book: selectedSectionBooks[selectedIndex + 1],
-                                        isPresented: $showingBookDetail
+                                        supabase: supabase, isPresented: $showingBookDetail
                                     )
                                     .offset(x: geometry.size.width + cardOffset)
                                 }
