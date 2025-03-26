@@ -1,10 +1,14 @@
-
 import SwiftUI
 
 struct ForYouGridView: View {
     let books: [Book]
     let memberSelectedGenres: [String]
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
+    @State private var selectedBook: Book?
+    @State private var showingBookDetail = false
+    @State private var selectedSectionBooks: [Book] = []
+    @State private var selectedIndex: Int = 0
+    @State private var cardOffset: CGFloat = 0
     
     var filteredBooks: [Book] {
         if memberSelectedGenres.isEmpty {
@@ -19,18 +23,87 @@ struct ForYouGridView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(filteredBooks) { book in
-                    NavigationLink {
-                        UserBookDetailView(book: book)
-                    } label: {
-                        BookCard(book: book)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 280)
+                    BookCardView(book: book) {
+                        selectedBook = book
+                        selectedSectionBooks = filteredBooks
+                        if let index = selectedSectionBooks.firstIndex(where: { $0.id == book.id }) {
+                            selectedIndex = index
+                        }
+                        showingBookDetail = true
                     }
+                    .frame(maxWidth: .infinity)
                 }
             }
             .padding()
         }
         .navigationTitle("For You")
+        .sheet(isPresented: $showingBookDetail) {
+            if let book = selectedBook {
+                NavigationView {
+                    GeometryReader { geometry in
+                        ZStack {
+                            // Current book (always show)
+                            BookDetailCard(book: book, isPresented: $showingBookDetail)
+                                .offset(x: cardOffset)
+                            
+                            // Only show previous/next for multiple books
+                            if selectedSectionBooks.count > 1 {
+                                // Previous book (preloaded)
+                                if selectedIndex > 0 {
+                                    BookDetailCard(
+                                        book: selectedSectionBooks[selectedIndex - 1],
+                                        isPresented: $showingBookDetail
+                                    )
+                                    .offset(x: -geometry.size.width + cardOffset)
+                                }
+                                
+                                // Next book (preloaded)
+                                if selectedIndex < selectedSectionBooks.count - 1 {
+                                    BookDetailCard(
+                                        book: selectedSectionBooks[selectedIndex + 1],
+                                        isPresented: $showingBookDetail
+                                    )
+                                    .offset(x: geometry.size.width + cardOffset)
+                                }
+                            }
+                        }
+                    }
+                    .navigationBarHidden(true)
+                }
+                .gesture(
+                    // Only enable swiping gesture for multiple books
+                    selectedSectionBooks.count > 1 ?
+                    DragGesture()
+                        .onChanged { value in
+                            withAnimation(.interactiveSpring()) {
+                                cardOffset = value.translation.width
+                            }
+                        }
+                        .onEnded { value in
+                            let threshold: CGFloat = 50
+                            if value.translation.width > threshold && selectedIndex > 0 {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectedIndex -= 1
+                                }
+                            } else if value.translation.width < -threshold && selectedIndex < selectedSectionBooks.count - 1 {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectedIndex += 1
+                                }
+                            }
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                cardOffset = 0
+                            }
+                        } : nil
+                )
+                .interactiveDismissDisabled()
+            }
+        }
+        .onChange(of: selectedIndex) { oldValue, newValue in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                selectedBook = selectedSectionBooks[newValue]
+                cardOffset = 0
+            }
+        }
     }
 }
 
@@ -164,31 +237,40 @@ struct BookSectionsView: View {
                     .padding(.horizontal)
                 
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 16) {
                         ForEach(Array(booksByGenre.keys.sorted()), id: \.self) { genre in
                             NavigationLink {
                                 GenreBooksView(genre: genre, books: booksByGenre[genre] ?? [])
                             } label: {
-                                VStack(spacing: 6) {
-                                    if let firstBook = booksByGenre[genre]?.first,
-                                       let imageURL = firstBook.imageURL,
-                                       let url = URL(string: imageURL) {
-                                        CachedAsyncImage(url: url)
-                                            .frame(width: 120, height: 120)
-                                            .clipped()
-                                            .cornerRadius(10)
+                                if let firstBook = booksByGenre[genre]?.first {
+                                    VStack(alignment: .center, spacing: 8) {
+                                        if let imageURL = firstBook.imageURL,
+                                           let url = URL(string: imageURL) {
+                                            CachedAsyncImage(url: url)
+                                                .frame(width: 180, height: 240)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                .shadow(radius: 4)
+                                        } else {
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.2))
+                                                .frame(width: 180, height: 240)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        }
+                                        
+                                        VStack(spacing: 2) {
+                                            Text(genre)
+                                                .font(.headline)
+                                                .foregroundColor(.primary)
+                                                .lineLimit(1)
+                                            
+                                            Text("\(booksByGenre[genre]?.count ?? 0) books")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(.top, 4)
                                     }
-                                    
-                                    Text(genre)
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
-                                        .lineLimit(1)
+                                    .frame(width: 180)
                                 }
-                                .frame(width: 120)
-                                .padding(.vertical, 6)
-                                .background(Color.white)
-                                .cornerRadius(10)
-                                .shadow(radius: 2)
                             }
                         }
                     }
@@ -201,35 +283,39 @@ struct BookSectionsView: View {
                 NavigationView {
                     GeometryReader { geometry in
                         ZStack {
-                            // Previous book (preloaded)
-                            if selectedIndex > 0 {
-                                BookDetailCard(
-                                    book: selectedSectionBooks[selectedIndex - 1],
-                                    isPresented: $showingBookDetail
-                                )
-                                .offset(x: -geometry.size.width + cardOffset)
-                            }
-                            
-                            // Current book
+                            // Current book (always show)
                             BookDetailCard(book: book, isPresented: $showingBookDetail)
                                 .offset(x: cardOffset)
                             
-                            // Next book (preloaded)
-                            if selectedIndex < selectedSectionBooks.count - 1 {
-                                BookDetailCard(
-                                    book: selectedSectionBooks[selectedIndex + 1],
-                                    isPresented: $showingBookDetail
-                                )
-                                .offset(x: geometry.size.width + cardOffset)
+                            // Only show previous/next for multiple books
+                            if selectedSectionBooks.count > 1 {
+                                // Previous book (preloaded)
+                                if selectedIndex > 0 {
+                                    BookDetailCard(
+                                        book: selectedSectionBooks[selectedIndex - 1],
+                                        isPresented: $showingBookDetail
+                                    )
+                                    .offset(x: -geometry.size.width + cardOffset)
+                                }
+                                
+                                // Next book (preloaded)
+                                if selectedIndex < selectedSectionBooks.count - 1 {
+                                    BookDetailCard(
+                                        book: selectedSectionBooks[selectedIndex + 1],
+                                        isPresented: $showingBookDetail
+                                    )
+                                    .offset(x: geometry.size.width + cardOffset)
+                                }
                             }
                         }
                     }
                     .navigationBarHidden(true)
                 }
                 .gesture(
+                    // Only enable swiping gesture for multiple books
+                    selectedSectionBooks.count > 1 ?
                     DragGesture()
                         .onChanged { value in
-                            dragDirection = value.translation.width
                             withAnimation(.interactiveSpring()) {
                                 cardOffset = value.translation.width
                             }
@@ -248,7 +334,7 @@ struct BookSectionsView: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 cardOffset = 0
                             }
-                        }
+                        } : nil
                 )
                 .interactiveDismissDisabled()
             }
@@ -265,9 +351,15 @@ struct BookSectionsView: View {
 struct BookCardView: View {
     let book: Book
     let action: () -> Void
+    @State private var isImageLoaded = false
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            // Only trigger action if image is loaded
+            if isImageLoaded || book.imageURL == nil {
+                action()
+            }
+        }) {
             VStack(alignment: .leading, spacing: 8) {
                 if let imageURL = book.imageURL,
                    let url = URL(string: imageURL) {
@@ -275,11 +367,20 @@ struct BookCardView: View {
                         .frame(width: 180, height: 280)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .shadow(radius: 4)
+                        .onAppear {
+                            // Slight delay to ensure image is fetched
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                isImageLoaded = true
+                            }
+                        }
                 } else {
                     Rectangle()
                         .fill(Color.gray.opacity(0.2))
                         .frame(width: 180, height: 280)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .onAppear {
+                            isImageLoaded = true
+                        }
                 }
             }
         }
