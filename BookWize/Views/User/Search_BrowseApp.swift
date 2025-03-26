@@ -1,21 +1,115 @@
-//
-//  Search_BrowseApp.swift
-//  Search&Browse
-//
-//  Created by Devashish Upadhyay on 19/03/25.
-//
-
+// Add this new view for Membership Details
 import SwiftUI
+import Foundation
+import Combine
+struct MembershipDetailsView: View {
+    let user: User
+    @State private var qrCodeImage: UIImage?
+    @State private var isLoading = false
+    
+    var body: some View {
+        ScrollView {
+            VStack {
+                if let qrCodeImage = qrCodeImage {
+                    DigitalLibraryCard(
+                        userName: user.name,
+                        userEmail: user.email,
+                        libraryName: user.selectedLibrary,
+                        qrCodeImage: qrCodeImage
+                    )
+                } else {
+                    if isLoading {
+                        ProgressView("Generating your library card...")
+                    } else {
+                        Button("Show My Library Card") {
+                            generateQRCode()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("Membership Details")
+        .onAppear {
+            // Generate QR code automatically when view appears
+            generateQRCode()
+        }
+    }
+    
+    private func generateQRCode() {
+        isLoading = true
+        
+        let userData = [
+            "name": user.name,
+            "email": user.email,
+            "library": user.selectedLibrary,
+            "membershipType": "Annual",
+            "memberId": user.id.uuidString
+        ]
+        
+        if let jsonData = try? JSONSerialization.data(withJSONObject: userData, options: .prettyPrinted),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let apiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=\(jsonString)"
+            if let url = URL(string: apiUrl.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!) {
+                fetchQRCode(from: url)
+            }
+        }
+    }
+    
+    private func fetchQRCode(from url: URL) {
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            DispatchQueue.main.async {
+                self.isLoading = false
+                if let data = data, let image = UIImage(data: data) {
+                    self.qrCodeImage = image
+                }
+            }
+        }.resume()
+    }
+}
 
+// Then modify the Account section in Search_BrowseApp:
 struct Search_BrowseApp: View {
-    @State private var selectedTab = 1  // Start on explore tab (index 1)
+    @State private var selectedTab = 1
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     let userPreferredGenres: [String]
+    @State private var user: User?
     
     init(userPreferredGenres: [String] = []) {
         self.userPreferredGenres = userPreferredGenres
     }
-        
+    
+    private func fetchMember() async {
+        do {
+            // Get email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "userEmail") else {
+                print("No email found in UserDefaults")
+                return
+            }
+            
+            print("Fetching member with email: \(userEmail)")
+            
+            let response: [User] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("*")
+                .eq("email", value: userEmail)  // Use email instead of id
+                .execute()
+                .value
+            
+            DispatchQueue.main.async {
+                if let fetchedUser = response.first {
+                    self.user = fetchedUser
+                    print("Successfully fetched user: \(fetchedUser.name)")
+                } else {
+                    print("No user found with email: \(userEmail)")
+                }
+            }
+        } catch {
+            print("Error fetching member: \(error)")
+        }
+    }
+    
     var body: some View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
@@ -55,7 +149,7 @@ struct Search_BrowseApp: View {
             }
             .tag(3)
             
-            // Account Tab
+            // Account Tab - Modified to include Membership Details
             NavigationView {
                 List {
                     Section {
@@ -65,9 +159,9 @@ struct Search_BrowseApp: View {
                                 .foregroundStyle(.gray)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Member")
+                                Text(user?.name ?? "Member")
                                     .font(.headline)
-                                Text("member@example.com")
+                                Text(user?.email ?? "member@example.com")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -76,6 +170,14 @@ struct Search_BrowseApp: View {
                     }
                     
                     Section {
+                        if let user = user {
+                            NavigationLink {
+                                MembershipDetailsView(user: user)
+                            } label: {
+                                Label("Library Card", systemImage: "creditcard.fill")
+                            }
+                        }
+                        
                         Button(role: .destructive) {
                             isMemberLoggedIn = false
                             NavigationUtil.popToRootView()
@@ -97,19 +199,27 @@ struct Search_BrowseApp: View {
                     }
                 }
                 .navigationTitle("Account")
+                .onAppear {
+                    Task {
+                        await fetchMember()
+                    }
+                }
             }
             .tabItem {
                 Label("Account", systemImage: "person.circle")
             }
             .tag(4)
-        }
-        .accentColor(.blue)
-        .onAppear {
-            // Set the tab bar appearance
-            let appearance = UITabBarAppearance()
-            appearance.configureWithDefaultBackground()
-            UITabBar.appearance().scrollEdgeAppearance = appearance
-            UITabBar.appearance().standardAppearance = appearance
+            
+            .accentColor(.blue)
+            .onAppear {
+                Task {
+                    await fetchMember()
+                }
+                let appearance = UITabBarAppearance()
+                appearance.configureWithDefaultBackground()
+                UITabBar.appearance().scrollEdgeAppearance = appearance
+                UITabBar.appearance().standardAppearance = appearance
+            }
         }
     }
 }
