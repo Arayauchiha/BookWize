@@ -14,15 +14,12 @@ struct AdminLoginView: View {
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var verificationCode = ""
-    @State private var emailError: String?
-    @State private var passwordError: String?
     @FocusState private var focusedField: Field?
     
     @State private var showPasswordChange = false
     @State private var showVerification = false
     
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
-    
     
     private enum Field {
         case email, password
@@ -50,7 +47,7 @@ struct AdminLoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    TextField("Email", text: $email)
+                    TextField("Enter your email", text: $email)
                         .textFieldStyle(CustomTextFieldStyle())
                         .textInputAutocapitalization(.never)
                         .keyboardType(.emailAddress)
@@ -59,15 +56,6 @@ struct AdminLoginView: View {
                         .onSubmit {
                             focusedField = .password
                         }
-                        .onChange(of: email) { newValue in
-                            emailError = ValidationUtils.getEmailError(newValue)
-                        }
-                    
-                    if let error = emailError {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -75,22 +63,13 @@ struct AdminLoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    SecureField("Password", text: $password)
+                    SecureField("Enter your password", text: $password)
                         .textFieldStyle(CustomTextFieldStyle())
                         .focused($focusedField, equals: .password)
                         .submitLabel(.done)
                         .onSubmit {
                             login()
                         }
-                        .onChange(of: password) { newValue in
-                            passwordError = ValidationUtils.getPasswordError(newValue)
-                        }
-                    
-                    if let error = passwordError {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
                 }
 
                 if !errorMessage.isEmpty {
@@ -114,10 +93,10 @@ struct AdminLoginView: View {
                     }
                 }
                 .padding(.vertical, 15)
-                .background(isFormValid ? Color.customButton : Color.gray)
+                .background(!email.isEmpty && !password.isEmpty ? Color.customButton : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || !isFormValid)
+                .disabled(isLoading || email.isEmpty || password.isEmpty)
                 .padding(.top, 8)
             }
             .padding(.horizontal, 24)
@@ -180,25 +159,12 @@ struct AdminLoginView: View {
     }
     
     private var isFormValid: Bool {
-        !email.isEmpty &&
-        !password.isEmpty &&
-        ValidationUtils.isValidEmail(email) &&
-        ValidationUtils.isValidPassword(password) &&
-        emailError == nil &&
-        passwordError == nil
+        !email.isEmpty && !password.isEmpty
     }
     
     func login() {
         Task {
             isLoading = true
-            emailError = ValidationUtils.getEmailError(email)
-            passwordError = ValidationUtils.getPasswordError(password)
-            
-            if emailError != nil || passwordError != nil {
-                isLoading = false
-                errorMessage = "Please fix the validation errors"
-                return
-            }
             
             do {
                 let data: [FetchData] = try await SupabaseManager.shared.client
@@ -212,7 +178,7 @@ struct AdminLoginView: View {
                 DispatchQueue.main.async {
                     if data.isEmpty {
                         isLoading = false
-                        errorMessage = "Invalid credentials"
+                        errorMessage = "Invalid email or password"
                     } else {
                         let fetchedData = data[0]
                         if !fetchedData.vis {
@@ -225,6 +191,10 @@ struct AdminLoginView: View {
                 }
             } catch {
                 print(error)
+                DispatchQueue.main.async {
+                    isLoading = false
+                    errorMessage = "Invalid email or password"
+                }
             }
         }
     }
