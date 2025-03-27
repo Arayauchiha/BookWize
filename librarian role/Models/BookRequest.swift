@@ -1,4 +1,6 @@
 import Foundation
+import SwiftUICore
+import UIKit
 
 struct BookRequest: Codable, Identifiable, Hashable {
     let Request_id: UUID
@@ -18,6 +20,14 @@ struct BookRequest: Codable, Identifiable, Hashable {
         case pending
         case approved
         case rejected
+        
+        var background : Color{
+            switch self{
+            case .pending : return .orange
+            case .approved : return .green
+            case .rejected : return .red
+            }
+        }
     }
     
     enum CodingKeys: String, CodingKey {

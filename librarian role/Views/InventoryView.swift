@@ -890,7 +890,8 @@ struct InventoryView: View {
                                     .font(.caption)
                                 Text("Status: \(request.Request_status.rawValue.capitalized)")
                                     .font(.caption)
-                                    .foregroundColor(request.Request_status == .pending ? .orange : .green)
+                                    //.foregroundColor(request.Request_status == .accepted ? .orange : .green)
+                                    .foregroundColor(request.Request_status .background)
                             }
                             .padding(.vertical, 4)
                         }
@@ -981,6 +982,9 @@ struct InventoryView: View {
             }
         }
     }
+    
+    
+
     
     private func fetchRequests() {
         isFetchingRequests = true
