@@ -29,6 +29,7 @@ struct OTPVerificationView: View {
                     Text("Verification Code")
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.6))
+                        .padding(.horizontal, 20)
 
                     TextField("Enter 6-digit code", text: $otp)
                         .keyboardType(.numberPad)
@@ -41,16 +42,18 @@ struct OTPVerificationView: View {
                             }
                             // Remove non-numeric characters
                             otp = newValue.filter { $0.isNumber }
+                            // Clear error when user types
+                            errorMessage = ""
                         }
                         .textFieldStyle(CustomTextFieldStyle())
                         .padding(.horizontal, 20)
-                }
-                .padding(.horizontal, 20)
-                
-                if !errorMessage.isEmpty {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
+                    
+                    if !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                            .padding(.horizontal, 20)
+                    }
                 }
 
                 Button(action: {
@@ -60,12 +63,12 @@ struct OTPVerificationView: View {
                         return
                     }
                     
-                    errorMessage = ""
-                    // Call the onVerify callback which should handle all verification logic
-                    onVerify()
-                    
-                    // Important: Do NOT dismiss here - let the parent view determine
-                    // when to dismiss based on successful verification
+                    if emailService.verifyOTP(email: email, code: otp) {
+                        errorMessage = ""
+                        onVerify()
+                    } else {
+                        errorMessage = "Invalid verification code"
+                    }
                 }) {
                     Text("Verify")
                         .font(.system(size: 17, weight: .semibold))

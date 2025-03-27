@@ -11,6 +11,7 @@ struct MemberLoginView: View {
     @State private var resetEmail = ""
     @State private var showPasswordReset = false
     @State private var passwordResetOTP = ""
+    @State private var isPasswordVisible = false
     @FocusState private var focusedField: Field?
     
     // For password reset
@@ -69,13 +70,25 @@ struct MemberLoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    SecureField("Enter your password", text: $password)
-                        .textFieldStyle(CustomTextFieldStyle())
-                        .focused($focusedField, equals: .password)
-                        .submitLabel(.done)
-                        .onSubmit {
-                            attemptLogin()
+                    HStack {
+                        if isPasswordVisible {
+                            TextField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        } else {
+                            SecureField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
                         }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                .foregroundColor(Color.gray)
+                        }
+                        .padding(.trailing, 8)
+                    }
+                    .background(Color.customInputBackground)
+                    .cornerRadius(10)
                 }
                 
                 // Error message if any
@@ -197,9 +210,7 @@ struct MemberLoginView: View {
                     // Update password in Supabase
                     Task {
                         do {
-                            let client = SupabaseManager.shared.client
-                            
-                            let response = try await client.database
+                            try await SupabaseManager.shared.client
                                 .from("Members")
                                 .update(["password": newPassword])
                                 .eq("email", value: resetEmail)
@@ -243,7 +254,7 @@ struct MemberLoginView: View {
             do {
                 let client = SupabaseManager.shared.client
                 
-                let response = try await client.database
+                let response = try await client
                     .from("Members")
                     .select()
                     .eq("email", value: email)
@@ -327,7 +338,7 @@ struct MemberLoginView: View {
             Task {
                 do {
                     // Get the member's ID from the Members table
-                    let response = try await SupabaseManager.shared.client.database
+                    let response = try await SupabaseManager.shared.client
                         .from("Members")
                         .select("id")
                         .eq("email", value: email)

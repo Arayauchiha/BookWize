@@ -22,6 +22,7 @@ struct LoginView: View {
     @State private var otpCode = ""
     @State private var errorMessage = ""
     @State private var isLoading = false
+    @FocusState private var focusedField: Field?
     
     // For first-time librarian login
     @State private var isFirstLogin = false
@@ -32,14 +33,19 @@ struct LoginView: View {
     
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
+    private enum Field {
+        case email, password
+    }
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
+    
+    @State private var isPasswordVisible = false
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Header section with greeting
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("\(roleTitle) Login")
+                    Text("Hello, Librarian!")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(roleColor)
@@ -70,8 +76,25 @@ struct LoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    SecureField("Enter your password", text: $password)
-                        .textFieldStyle(CustomTextFieldStyle())
+                    HStack {
+                        if isPasswordVisible {
+                            TextField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        } else {
+                            SecureField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                .foregroundColor(Color.gray)
+                        }
+                        .padding(.trailing, 8)
+                    }
+                    .background(Color.customInputBackground)
+                    .cornerRadius(10)
                 }
                 
                 if !errorMessage.isEmpty {
@@ -102,27 +125,27 @@ struct LoginView: View {
                 .disabled(isLoading || email.isEmpty || password.isEmpty)
                 .padding(.top, 8)
                 
-                if userRole == .member {
-                    HStack {
-                        NavigationLink("Create Account") {
-                            SignUp()
-                        }
-                        .foregroundColor(Color.customButton)
-                        
-                        Spacer()
-                        
-                        Button("Forgot Password?") {
-                            // Handle password reset
-                            if !email.isEmpty {
-                                sendVerificationOTP()
-                            } else {
-                                errorMessage = "Please enter your email first"
-                            }
-                        }
-                        .foregroundColor(Color.customButton)
-                    }
-                    .padding(.top, 12)
-                }
+                //                if userRole == .member {
+                //                    HStack {
+                //                        NavigationLink("Create Account") {
+                //                            SignUp()
+                //                        }
+                //                        .foregroundColor(Color.customButton)
+                //
+                //                        Spacer()
+                //
+                //                        Button("Forgot Password?") {
+                //                            // Handle password reset
+                //                            if !email.isEmpty {
+                //                                sendVerificationOTP()
+                //                            } else {
+                //                                errorMessage = "Please enter your email first"
+                //                            }
+                //                        }
+                //                        .foregroundColor(Color.customButton)
+                //                    }
+                //                    .padding(.top, 12)
+                //                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 60)
@@ -137,20 +160,21 @@ struct LoginView: View {
                     .frame(height: 30)
             }
         }
+        //        .background(Color.customBackground)
+        //        .sheet(isPresented: $showingOTPView) {
+        //            // Use the consistent OTP verification view
+        //            OTPVerificationView(
+        //                email: email,
+        //                otp: $otpCode,
+        //                onVerify: {
+        //                    verifyOTP()
+        //                },
+        //                onCancel: {
+        //                    showingOTPView = false
+        //                }
+        //            )
+        //        }
         .background(Color.customBackground)
-        .sheet(isPresented: $showingOTPView) {
-            // Use the consistent OTP verification view
-            OTPVerificationView(
-                email: email,
-                otp: $otpCode,
-                onVerify: {
-                    verifyOTP()
-                },
-                onCancel: {
-                    showingOTPView = false
-                }
-            )
-        }
         .sheet(isPresented: $showingPasswordChangeView) {
             // Password change sheet for librarian first login
             PasswordResetView(
@@ -183,6 +207,21 @@ struct LoginView: View {
                     showingPasswordChangeView = false
                 }
             )
+        }
+        .sheet(isPresented: $showingOTPView) {
+            OTPVerificationView(
+                email: email,
+                otp: $otpCode,
+                onVerify: {
+                    verifyOTP()
+                },
+                onCancel: {
+                    showingOTPView = false
+                }
+            )
+        }
+        .onAppear {
+            focusedField = .email
         }
     }
     
@@ -222,29 +261,37 @@ struct LoginView: View {
                 errorMessage = "Please enter both email and password"
                 return
             }
-            
-            let data: [FetchData] = try! await SupabaseManager.shared.client
-                .from("Users")
-                .select("*")
-                .eq("email", value: email)
-                .eq("password", value: password)
-                .execute()
-                .value
-            
-            if !data.isEmpty {
-                let fetchedData = data[0]
-                if fetchedData.vis {
-                    sendVerificationOTP()
-                } else {
-                    showingPasswordChangeView = true
+            do {
+                let data: [FetchData] = try await SupabaseManager.shared.client
+                    .from("Users")
+                    .select("*")
+                    .eq("email", value: email)
+                    .eq("password", value: password)
+                    .eq("roleFetched", value: "librarian")
+                    .execute()
+                    .value
+                
+                DispatchQueue.main.async {
+                    if data.isEmpty {
+                        isLoading = false
+                        errorMessage = "Invalid email or password"
+                    } else {
+                        let fetchedData = data[0]
+                        if !fetchedData.vis {
+                            isLoading = false
+                            showingPasswordChangeView = true
+                        } else {
+                            sendVerificationOTP()
+                        }
+                    }
                 }
-            } else {
-                isLoading = false
-                errorMessage = "Invalid email or password"
-                return
+            } catch {
+                print(error)
+                DispatchQueue.main.async {
+                    isLoading = false
+                    errorMessage = "Invalid email or password"
+                }
             }
-            
-            isLoading = false
         }
     }
     
@@ -269,6 +316,7 @@ struct LoginView: View {
         if EmailService.shared.verifyOTP(email: email, code: otpCode) {
             // OTP verified
             EmailService.shared.clearOTP(for: email)
+            isLibrarianLoggedIn = true
             showingOTPView = false
             
             // Set login state based on role
@@ -287,14 +335,12 @@ struct LoginView: View {
             case .member:
                 isMemberLoggedIn = true
             }
-        } else {
-            errorMessage = "Invalid verification code"
         }
     }
 }
 
 struct LoginView_Previews: PreviewProvider {
     static var previews: some View {
-        LoginView(userRole: .member)
+        LoginView(userRole: .librarian)
     }
 }
