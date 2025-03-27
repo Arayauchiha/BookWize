@@ -74,7 +74,7 @@ struct SearchBrowseView: View {
                             forYouBooks: viewModel.forYouBooks,
                             popularBooks: viewModel.popularBooks,
                             booksByGenre: initialBooksByGenre,
-                            supabse: supabase,
+                            supabase: supabase,
                             selectedGenreFromCard: $selectedGenreFromCard,
                             selectedFilter: $selectedFilter,
                             userPreferredGenres: userPreferredGenres,
@@ -109,7 +109,7 @@ struct SearchBrowseView: View {
             }
             .sheet(item: $selectedBook) { book in
                 NavigationView {
-                    BookDetailCard(book: book, isPresented: $showingBookDetail)
+                    BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
                         .navigationBarHidden(true)
                 }
                 .interactiveDismissDisabled()
@@ -240,7 +240,7 @@ struct SearchBrowseView: View {
                     NavigationLink {
                         GenreBooksView(
                             genre: genre,
-                            books: viewModel.searchResults.filter { $0.genre == genre }
+                            books: viewModel.searchResults.filter { $0.genre == genre }, supabase: supabase
                         )
                     } label: {
                         let filteredBooks = viewModel.searchResults.filter { $0.genre == genre }
