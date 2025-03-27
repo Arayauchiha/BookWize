@@ -10,10 +10,10 @@ struct CollectFineView: View {
     @State private var paymentMethod: PaymentMethod = .cash
     @State private var showingConfirmation = false
     
-    private var calculatedFine: Double {
-        let daysOverdue = Calendar.current.dateComponents([.day], from: record.dueDate, to: Date()).day ?? 0
-        return Double(daysOverdue) * FineConstants.dailyOverdueFine
-    }
+//    private var calculatedFine: Double {
+//        let daysOverdue = Calendar.current.dateComponents([.day], from: record.dueDate, to: Date()).day ?? 0
+//        return Double(daysOverdue) * FineConstants.dailyOverdueFine
+//    }
     
     var body: some View {
         NavigationView {
@@ -26,7 +26,7 @@ struct CollectFineView: View {
                 Section(header: Text("Fine Details")) {
                     LabeledContent("Due Date", value: record.dueDate.formatted(date: .abbreviated, time: .omitted))
                     LabeledContent("Days Overdue", value: "\(Calendar.current.dateComponents([.day], from: record.dueDate, to: Date()).day ?? 0)")
-                    LabeledContent("Calculated Fine", value: "$\(calculatedFine)")
+//                    LabeledContent("Calculated Fine", value: "$\(calculatedFine)")
                 }
                 
                 Section(header: Text("Payment Details")) {

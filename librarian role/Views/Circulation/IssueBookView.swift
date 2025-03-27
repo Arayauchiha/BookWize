@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct IssueBookView: View {
-    let circulationManager: CirculationManager
+    @StateObject private var circulationManager = CirculationManager.shared
     @State private var searchText = ""
     @State private var showingIssueForm = false
     @State private var loans: [BookCirculation] = []
@@ -113,6 +113,7 @@ struct LoanCard: View {
 
 struct IssueBookFormView: View {
     @Environment(\.presentationMode) var presentationMode
+    @StateObject private var circulationManager = CirculationManager.shared
     @State private var isbn = ""
     @State private var smartCardID = ""
     @State private var bookName = ""
@@ -245,7 +246,7 @@ struct IssueBookFormView: View {
         errorMessage = nil
         
         do {
-            let book = try await CirculationManager.shared.fetchBookByISBN(isbn)
+            let book = try await circulationManager.fetchBookByISBN(isbn)
             await MainActor.run {
                 bookName = book.title
                 authorName = book.author
@@ -265,34 +266,34 @@ struct IssueBookFormView: View {
         smartCardID = "1234567890"
     }
 
-    func issueBook(isbn: String, memberID: UUID, completion: @escaping (Bool) -> Void) {
-        let issuedBook = BookCirculation(
-            id: UUID(), // Generate a new unique ID
-            isbn: isbn,
-            memberID: memberID,
-            startDate: Date(), // Current date as issue date
-            endDate: nil, // No end date initially
-            status: .issued // Initial status
-        )
-
+    func issueBook() {
+        isLoading = true
+        errorMessage = nil
+        
         Task {
-            do {
-                try await SupabaseManager.shared.client
-                    .from("bookcirculation")
-                    .insert(issuedBook)
-                    .execute()
-                
+            let newLoan = BookCirculation(
+                id: UUID(),
+                isbn: isbn,
+                memberID: UUID(uuidString: smartCardID) ?? UUID(),
+                startDate: issueDate,
+                endDate: returnDate,
+                status: .issued
+            )
+            
+            circulationManager.issueBook(newLoan) { success in
                 DispatchQueue.main.async {
-                    completion(true)
-                }
-            } catch {
-                print("Error issuing book:", error)
-                DispatchQueue.main.async {
-                    completion(false)
+                    isLoading = false
+                    if success {
+                        onIssue(newLoan)
+                        presentationMode.wrappedValue.dismiss()
+                    } else {
+                        errorMessage = "Failed to issue book. Please try again."
+                    }
                 }
             }
         }
     }
+
 
 }
 

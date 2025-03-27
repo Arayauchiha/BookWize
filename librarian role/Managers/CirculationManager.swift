@@ -1,7 +1,7 @@
 import Supabase
 import Foundation
 
-class CirculationManager {
+class CirculationManager: ObservableObject {
     static let shared = CirculationManager()
     
     func fetchBookByISBN(_ isbn: String) async throws -> Book {
