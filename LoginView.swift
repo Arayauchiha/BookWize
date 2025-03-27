@@ -22,8 +22,6 @@ struct LoginView: View {
     @State private var otpCode = ""
     @State private var errorMessage = ""
     @State private var isLoading = false
-    @State private var emailError: String?
-    @State private var passwordError: String?
     
     // For first-time librarian login
     @State private var isFirstLogin = false
@@ -37,97 +35,109 @@ struct LoginView: View {
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("\(roleTitle) Login")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(roleColor)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Email")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.customText.opacity(0.7))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Header section with greeting
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(roleTitle) Login")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(roleColor)
+                    
+                    Text("Sign in to manage your library system")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.customText.opacity(0.7))
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 20)
                 
-                TextField("Email", text: $email)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                    .autocapitalization(.none)
-                    .onChange(of: email) { newValue in
-                        emailError = ValidationUtils.getEmailError(newValue)
-                    }
+                // Email field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Email")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.customText.opacity(0.7))
+                    
+                    TextField("Enter your email", text: $email)
+                        .textFieldStyle(CustomTextFieldStyle())
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .disableAutocorrection(true)
+                }
                 
-                if let error = emailError {
-                    Text(error)
+                // Password field
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Password")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.customText.opacity(0.7))
+                    
+                    SecureField("Enter your password", text: $password)
+                        .textFieldStyle(CustomTextFieldStyle())
+                }
+                
+                if !errorMessage.isEmpty {
+                    Text(errorMessage)
                         .foregroundColor(.red)
                         .font(.caption)
                 }
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Password")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.customText.opacity(0.7))
                 
-                SecureField("Password", text: $password)
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                    .onChange(of: password) { newValue in
-                        passwordError = ValidationUtils.getPasswordError(newValue)
-                    }
-                
-                if let error = passwordError {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-            }
-            
-            if !errorMessage.isEmpty {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-                    .font(.caption)
-            }
-            
-            Button(action: {
-                login()
-            }) {
-                if isLoading {
-                    ProgressView()
-                } else {
-                    Text("Login")
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .padding()
-            .background(isFormValid ? Color.customButton : Color.gray)
-            .foregroundColor(.white)
-            .cornerRadius(10)
-            .disabled(isLoading || !isFormValid)
-            
-            if userRole == .member {
-                HStack {
-                    NavigationLink("Create Account") {
-                        SignUp()
-                    }
-                    .foregroundColor(Color.customButton)
-                    
-                    Spacer()
-                    
-                    Button("Forgot Password?") {
-                        // Handle password reset
-                        if !email.isEmpty {
-                            sendVerificationOTP()
-                        } else {
-                            errorMessage = "Please enter your email first"
+                // Sign In Button
+                Button(action: login) {
+                    if isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            Spacer()
                         }
+                    } else {
+                        Text("Sign In")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
                     }
-                    .foregroundColor(Color.customButton)
                 }
+                .padding(.vertical, 15)
+                .background(!email.isEmpty && !password.isEmpty ? Color.customButton : Color.gray)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+                .disabled(isLoading || email.isEmpty || password.isEmpty)
+                .padding(.top, 8)
+                
+                if userRole == .member {
+                    HStack {
+                        NavigationLink("Create Account") {
+                            SignUp()
+                        }
+                        .foregroundColor(Color.customButton)
+                        
+                        Spacer()
+                        
+                        Button("Forgot Password?") {
+                            // Handle password reset
+                            if !email.isEmpty {
+                                sendVerificationOTP()
+                            } else {
+                                errorMessage = "Please enter your email first"
+                            }
+                        }
+                        .foregroundColor(Color.customButton)
+                    }
+                    .padding(.top, 12)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 60)
+            .padding(.bottom, 40)
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Image("library_logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 30)
             }
         }
-        .padding()
+        .background(Color.customBackground)
         .sheet(isPresented: $showingOTPView) {
             // Use the consistent OTP verification view
             OTPVerificationView(
@@ -199,27 +209,12 @@ struct LoginView: View {
     }
     
     private var isFormValid: Bool {
-        !email.isEmpty &&
-        !password.isEmpty &&
-        ValidationUtils.isValidEmail(email) &&
-        ValidationUtils.isValidPassword(password) &&
-        emailError == nil &&
-        passwordError == nil
+        !email.isEmpty && !password.isEmpty
     }
     
     func login() {
         Task {
             isLoading = true
-            
-            // Validate email and password
-            emailError = ValidationUtils.getEmailError(email)
-            passwordError = ValidationUtils.getPasswordError(password)
-            
-            if emailError != nil || passwordError != nil {
-                isLoading = false
-                errorMessage = "Please fix the validation errors"
-                return
-            }
             
             // Simple validation
             if email.isEmpty || password.isEmpty {
@@ -227,44 +222,6 @@ struct LoginView: View {
                 errorMessage = "Please enter both email and password"
                 return
             }
-            
-            if password.count < 8 {
-                isLoading = false
-                errorMessage = "Password must be 8 characters long & alphanumeric"
-                return
-            }
-            
-            
-            
-            // For demo, we'll use simple logic
-            //        switch userRole {
-            //        case .admin:
-            //            // Redirect to AdminLoginView
-            //            if email == "ss0854850@gmail.com" && password == "admin@12345" {
-            //                isAdminLoggedIn = true
-            //            } else {
-            //                errorMessage = "Invalid admin credentials"
-            //            }
-            //
-            //        case .librarian:
-            //            // Simulate checking if this is first login by checking for temp password pattern
-            //            isFirstLogin = (email == "librarian@example.com" && password == "temp123") ||
-            //                           password.hasPrefix("temp") ||
-            //                           password.count < 10 // Assuming temporary passwords are shorter
-            //
-            //            if isFirstLogin {
-            //                // Show password change view for first login
-            //                showingPasswordChangeView = true
-            //            } else {
-            //                // Regular login flow - send verification OTP
-            //                sendVerificationOTP()
-            //            }
-            //
-            //        case .member:
-            //            // For members, always send verification OTP
-            //            sendVerificationOTP()
-            //        }
-            
             
             let data: [FetchData] = try! await SupabaseManager.shared.client
                 .from("Users")
@@ -280,11 +237,10 @@ struct LoginView: View {
                     sendVerificationOTP()
                 } else {
                     showingPasswordChangeView = true
-                    
                 }
             } else {
                 isLoading = false
-                errorMessage = "Invalid credentials"
+                errorMessage = "Invalid email or password"
                 return
             }
             

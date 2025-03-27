@@ -11,8 +11,6 @@ struct MemberLoginView: View {
     @State private var resetEmail = ""
     @State private var showPasswordReset = false
     @State private var passwordResetOTP = ""
-    @State private var emailError: String?
-    @State private var passwordError: String?
     @FocusState private var focusedField: Field?
     
     // For password reset
@@ -53,7 +51,7 @@ struct MemberLoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    TextField("your.email@example.com", text: $email)
+                    TextField("Enter your email", text: $email)
                         .textFieldStyle(CustomTextFieldStyle())
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
@@ -63,15 +61,6 @@ struct MemberLoginView: View {
                         .onSubmit {
                             focusedField = .password
                         }
-                        .onChange(of: email) { newValue in
-                            emailError = ValidationUtils.getEmailError(newValue)
-                        }
-                    
-                    if let error = emailError {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
                 }
                 
                 // Password field
@@ -87,15 +76,6 @@ struct MemberLoginView: View {
                         .onSubmit {
                             attemptLogin()
                         }
-                        .onChange(of: password) { newValue in
-                            passwordError = ValidationUtils.getPasswordError(newValue)
-                        }
-                    
-                    if let error = passwordError {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
                 }
                 
                 // Error message if any
@@ -121,10 +101,10 @@ struct MemberLoginView: View {
                     }
                 }
                 .padding(.vertical, 15)
-                .background(isFormValid ? Color.customButton : Color.gray)
+                .background(!email.isEmpty && !password.isEmpty ? Color.customButton : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || !isFormValid)
+                .disabled(isLoading || email.isEmpty || password.isEmpty)
                 .padding(.top, 8)
                 
                 // Forgot password and sign up links
@@ -248,24 +228,10 @@ struct MemberLoginView: View {
     }
     
     private var isFormValid: Bool {
-        !email.isEmpty &&
-        !password.isEmpty &&
-        ValidationUtils.isValidEmail(email) &&
-        ValidationUtils.isValidPassword(password) &&
-        emailError == nil &&
-        passwordError == nil
+        !email.isEmpty && !password.isEmpty
     }
     
     private func attemptLogin() {
-        // Validate email and password
-        emailError = ValidationUtils.getEmailError(email)
-        passwordError = ValidationUtils.getPasswordError(password)
-        
-        if emailError != nil || passwordError != nil {
-            errorMessage = "Please fix the validation errors"
-            return
-        }
-        
         // Hide keyboard
         focusedField = nil
         
@@ -324,14 +290,14 @@ struct MemberLoginView: View {
                     print("Failed to convert response data to string")
                     DispatchQueue.main.async {
                         self.isLoading = false
-                        self.errorMessage = "No account found with this email"
+                        self.errorMessage = "Invalid email or password"
                     }
                 }
             } catch {
                 print("Login error: \(error)")
                 DispatchQueue.main.async {
                     self.isLoading = false
-                    self.errorMessage = "Login failed: \(error.localizedDescription)"
+                    self.errorMessage = "Invalid email or password"
                 }
             }
         }
