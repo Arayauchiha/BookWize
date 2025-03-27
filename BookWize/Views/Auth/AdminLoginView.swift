@@ -14,6 +14,7 @@ struct AdminLoginView: View {
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var verificationCode = ""
+    @State private var isPasswordVisible = false
     @FocusState private var focusedField: Field?
     
     @State private var showPasswordChange = false
@@ -63,13 +64,25 @@ struct AdminLoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    SecureField("Enter your password", text: $password)
-                        .textFieldStyle(CustomTextFieldStyle())
-                        .focused($focusedField, equals: .password)
-                        .submitLabel(.done)
-                        .onSubmit {
-                            login()
+                    HStack {
+                        if isPasswordVisible {
+                            TextField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        } else {
+                            SecureField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
                         }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                .foregroundColor(Color.gray)
+                        }
+                        .padding(.trailing, 8)
+                    }
+                    .background(Color.customInputBackground)
+                    .cornerRadius(10)
                 }
 
                 if !errorMessage.isEmpty {

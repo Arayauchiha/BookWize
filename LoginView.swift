@@ -34,6 +34,8 @@ struct LoginView: View {
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     
+    @State private var isPasswordVisible = false
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -70,8 +72,25 @@ struct LoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    SecureField("Enter your password", text: $password)
-                        .textFieldStyle(CustomTextFieldStyle())
+                    HStack {
+                        if isPasswordVisible {
+                            TextField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        } else {
+                            SecureField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                .foregroundColor(Color.gray)
+                        }
+                        .padding(.trailing, 8)
+                    }
+                    .background(Color.customInputBackground)
+                    .cornerRadius(10)
                 }
                 
                 if !errorMessage.isEmpty {
