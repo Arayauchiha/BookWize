@@ -172,6 +172,7 @@ struct AdminLoginView: View {
                     .select("*")
                     .eq("email", value: email)
                     .eq("password", value: password)
+                    .eq("roleFetched", value: "admin")
                     .execute()
                     .value
                 

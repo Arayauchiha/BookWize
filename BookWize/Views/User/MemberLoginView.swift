@@ -197,9 +197,7 @@ struct MemberLoginView: View {
                     // Update password in Supabase
                     Task {
                         do {
-                            let client = SupabaseManager.shared.client
-                            
-                            let response = try await client.database
+                            try await SupabaseManager.shared.client
                                 .from("Members")
                                 .update(["password": newPassword])
                                 .eq("email", value: resetEmail)
@@ -243,7 +241,7 @@ struct MemberLoginView: View {
             do {
                 let client = SupabaseManager.shared.client
                 
-                let response = try await client.database
+                let response = try await client
                     .from("Members")
                     .select()
                     .eq("email", value: email)
@@ -327,7 +325,7 @@ struct MemberLoginView: View {
             Task {
                 do {
                     // Get the member's ID from the Members table
-                    let response = try await SupabaseManager.shared.client.database
+                    let response = try await SupabaseManager.shared.client
                         .from("Members")
                         .select("id")
                         .eq("email", value: email)
