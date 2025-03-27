@@ -67,7 +67,7 @@ struct CustomSegmentedControl<T: Hashable>: View {
 //    let circulationManager: CirculationManager
 //    @State private var searchText = ""
 //    @State private var showingMemberSearch = false
-//    
+//
 //    var body: some View {
 //        VStack {
 //            if circulationManager.currentTransactions.isEmpty {
@@ -83,7 +83,7 @@ struct CustomSegmentedControl<T: Hashable>: View {
 //                    }
 //                }
 //            }
-//            
+//
 //            Button {
 //                showingMemberSearch = true
 //            } label: {
@@ -104,7 +104,7 @@ struct CustomSegmentedControl<T: Hashable>: View {
 //struct ReturnBookView: View {
 //    let circulationManager: CirculationManager
 //    @State private var searchText = ""
-//    
+//
 //    var body: some View {
 //        VStack {
 //            if circulationManager.currentTransactions.isEmpty {
@@ -136,7 +136,7 @@ struct CustomSegmentedControl<T: Hashable>: View {
 //struct RenewBookView: View {
 //    let circulationManager: CirculationManager
 //    @State private var searchText = ""
-//    
+//
 //    var body: some View {
 //        VStack {
 //            if circulationManager.currentTransactions.isEmpty {
@@ -167,7 +167,7 @@ struct CustomSegmentedControl<T: Hashable>: View {
 
 //struct CirculationRowView: View {
 //    let transaction: CirculationRecord
-//    
+//
 //    var body: some View {
 //        VStack(alignment: .leading, spacing: 8) {
 //            HStack {
@@ -176,11 +176,11 @@ struct CustomSegmentedControl<T: Hashable>: View {
 //                Spacer()
 //                StatusBadge(status: transaction.status)
 //            }
-//            
+//
 //            Text("Member ID: \(transaction.memberId.uuidString)")
 //                .font(.subheadline)
 //                .foregroundColor(.secondary)
-//            
+//
 //            HStack {
 //                Label(transaction.issueDate.formatted(date: .abbreviated, time: .omitted),
 //                      systemImage: "calendar")
@@ -197,7 +197,7 @@ struct CustomSegmentedControl<T: Hashable>: View {
 
 //struct StatusBadge: View {
 //    let status: CirculationStatus
-//    
+//
 //    var body: some View {
 //        Text(status.rawValue.capitalized)
 //            .font(.caption)
@@ -207,7 +207,7 @@ struct CustomSegmentedControl<T: Hashable>: View {
 //            .foregroundColor(.white)
 //            .cornerRadius(8)
 //    }
-//    
+//
 //    private var backgroundColor: Color {
 //        switch status {
 //        case .issued:

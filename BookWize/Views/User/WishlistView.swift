@@ -1,5 +1,5 @@
 import SwiftUI
-
+import Supabase
 // Track book database IDs without relying on Book model extensions
 class BookIdentifier {
     // Map to store book identifiers using ISBN as key (since it's unique)
@@ -18,7 +18,7 @@ struct WishlistView: View {
     @StateObject private var viewModel = WishlistViewModel()
     @State private var selectedBook: Book?
     @State private var showBookDetail = false
-    
+    let supabase = SupabaseConfig.client
     var body: some View {
         NavigationView {
             ZStack {
@@ -46,10 +46,12 @@ struct WishlistView: View {
                 // Load wishlist data every time the view appears
                 viewModel.loadWishlist()
             }
-            .sheet(isPresented: $showBookDetail) {
-                if let book = selectedBook {
-                    BookDetailCard(book: book, isPresented: $showBookDetail)
+            .sheet(item: $selectedBook) { book in
+                NavigationView {
+                    BookDetailCard(book: book, supabase: supabase, isPresented: $showBookDetail)
+                        .navigationBarHidden(true)
                 }
+                .interactiveDismissDisabled()
             }
             .alert("Remove from Wishlist", isPresented: $viewModel.showingRemoveAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -63,6 +65,7 @@ struct WishlistView: View {
                     Text("Are you sure you want to remove this book from your wishlist?")
                 }
             }
+
         }
     }
     
