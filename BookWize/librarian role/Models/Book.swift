@@ -44,4 +44,4 @@ struct Book: Identifiable, Codable, Sendable {
         self.addedDate = Date()
         self.lastModified = Date()
     }
-} 
+}

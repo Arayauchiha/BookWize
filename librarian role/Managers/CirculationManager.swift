@@ -1,149 +1,66 @@
+import Supabase
 import Foundation
 
-enum CirculationError: Error {
-    case inactiveMember
-    case bookUnavailable
-    case borrowingLimitExceeded
-    case recordNotFound
-    case renewalLimitExceeded
-    case invalidOperation
-}
-
-struct FineConstants {
-    static let dailyOverdueFine: Double = 1.0 // $1 per day
-    static let maxRenewals: Int = 2
-}
-
 class CirculationManager: ObservableObject {
-    @Published private(set) var currentTransactions: [CirculationRecord] = []
-    private let userManager: UserManager
-    private let inventoryManager: InventoryManager
-    private let fineManager: FineManager
-    private let saveKey = "library_circulation"
+    static let shared = CirculationManager()
     
-    init(userManager: UserManager, inventoryManager: InventoryManager, fineManager: FineManager) {
-        self.userManager = userManager
-        self.inventoryManager = inventoryManager
-        self.fineManager = fineManager
-        loadTransactions()
+    func fetchBookByISBN(_ isbn: String) async throws -> Book {
+        let response: [Book] = try await SupabaseManager.shared.client
+            .from("books")
+            .select()
+            .eq("isbn", value: isbn)
+            .execute()
+            .value
+        
+        guard let book = response.first else {
+            throw NSError(domain: "BookError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Book not found"])
+        }
+        
+        return book
     }
-    
-    func issueBook(bookId: UUID, memberId: UUID) throws {
-        // Validate member status
-        guard let member = userManager.getMember(memberId),
-              member.isActive else {
-            throw CirculationError.inactiveMember
-        }
-        
-        // Validate book availability
-        guard let book = inventoryManager.getBook(bookId),
-              book.isAvailable else {
-            throw CirculationError.bookUnavailable
-        }
-        
-        // Check member's borrowing limit
-        let activeLoans = currentTransactions.filter {
-            $0.memberId == memberId && $0.returnDate == nil
-        }
-        
-        if activeLoans.count >= member.membershipType.borrowingLimit {
-            throw CirculationError.borrowingLimitExceeded
-        }
-        
-        // Create circulation record
-        //let record1 = CirculationRecord(id: bookId, bookId: <#T##UUID#>, memberId: <#T##UUID#>, issueDate: <#T##Date#>, dueDate: <#T##Date#>, renewalCount: <#T##Int#>, status: <#T##CirculationStatus#>)
-        
-        let record = CirculationRecord(
-            id: UUID(uuidString: "1")!,
-            bookId: bookId,
-            memberId: memberId,
-            issueDate: Date(),
-            dueDate: Calendar.current.date(byAdding: .day,
-                                         value: member.membershipType.loanPeriod,
-                                         to: Date())!,
-            renewalCount: 14,
-            status: .issued
-        )
-        
-        currentTransactions.append(record)
-        inventoryManager.updateBookAvailability(bookId, issuedCopy: true)
-        saveTransactions()
-    }
-    
-    func returnBook(_ record: CirculationRecord) throws {
-        guard let index = currentTransactions.firstIndex(where: { $0.id == record.id }) else {
-            throw CirculationError.recordNotFound
-        }
-        
-        var updatedRecord = record
-        updatedRecord.returnDate = Date()
-        updatedRecord.status = .returned
-        
-        // Calculate and apply fines if overdue
-        if record.isOverdue {
-            let daysOverdue = Calendar.current.dateComponents([.day],
-                from: record.dueDate,
-                to: Date()).day ?? 0
-            
-            let fine = Double(daysOverdue) * FineConstants.dailyOverdueFine
-            fineManager.addFine(memberId: record.memberId,
-                              amount: fine,
-                              reason: .overdue)
-        }
-        
-        currentTransactions[index] = updatedRecord
-        inventoryManager.updateBookAvailability(record.bookId, issuedCopy: false)
-        saveTransactions()
-    }
-    
-    func renewBook(_ record: CirculationRecord) throws {
-        guard let index = currentTransactions.firstIndex(where: { $0.id == record.id }) else {
-            throw CirculationError.recordNotFound
-        }
-        
-        guard record.renewalCount < FineConstants.maxRenewals else {
-            throw CirculationError.renewalLimitExceeded
-        }
-        
-        var updatedRecord = record
-        updatedRecord.renewalCount += 1
-        updatedRecord.status = .renewed
-        
-        // Extend due date by the loan period
-        if let member = userManager.getMember(record.memberId) {
-            updatedRecord.dueDate = Calendar.current.date(byAdding: .day,
-                                                        value: member.membershipType.loanPeriod,
-                                                        to: record.dueDate)!
-        }
-        
-        currentTransactions[index] = updatedRecord
-        saveTransactions()
-    }
-    
-    // MARK: - Persistence
-    
-    private func saveTransactions() {
-        if let encoded = try? JSONEncoder().encode(currentTransactions) {
-            UserDefaults.standard.set(encoded, forKey: saveKey)
+
+    /// Issue a book and store in Supabase
+    func issueBook(_ bookCirculation: BookCirculation, completion: @escaping (Bool) -> Void) {
+        Task {
+            do {
+                try await SupabaseManager.shared.client
+                    .from("bookcirculation")
+                    .insert(bookCirculation)
+                    .execute()
+                
+                DispatchQueue.main.async {
+                    completion(true)
+                }
+            } catch {
+                print("Error issuing book:", error)
+                DispatchQueue.main.async {
+                    completion(false)
+                }
+            }
         }
     }
     
-    private func loadTransactions() {
-        if let data = UserDefaults.standard.data(forKey: saveKey),
-           let decoded = try? JSONDecoder().decode([CirculationRecord].self, from: data) {
-            currentTransactions = decoded
+    /// Fetch all issued books
+    func fetchIssuedBooks(completion: @escaping ([BookCirculation]) -> Void) {
+        Task {
+            do {
+                let loans: [BookCirculation] = try await SupabaseManager.shared.client
+                    .from("bookcirculation")
+                    .select()
+                    .eq("status", value: "issued")
+                    .execute()
+                    .value
+                
+                DispatchQueue.main.async {
+                    completion(loans)
+                }
+            } catch {
+                print("Error fetching issued books:", error)
+                DispatchQueue.main.async {
+                    completion([])
+                }
+            }
         }
     }
-    
-    // MARK: - Helper Methods
-    
-    func getActiveLoans(for memberId: UUID) -> [CirculationRecord] {
-        currentTransactions.filter {
-            $0.memberId == memberId && $0.returnDate == nil
-        }
-    }
-    
-    func getOverdueBooks() -> [CirculationRecord] {
-        currentTransactions.filter { $0.isOverdue }
-    }
-} 
+}
+
