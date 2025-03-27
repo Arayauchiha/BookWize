@@ -46,7 +46,7 @@ class BookSearchViewModel: ObservableObject {
     private func fetchMemberGenres() async {
             do {
                 // Get the current user's ID from Supabase auth
-                guard let userEmail = UserDefaults.standard.string(forKey: "userEmail") else {
+                guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
                     print("No email found in UserDefaults")
                     return
                 }

@@ -83,7 +83,7 @@ struct Search_BrowseApp: View {
     private func fetchMember() async {
         do {
             // Get email from UserDefaults
-            guard let userEmail = UserDefaults.standard.string(forKey: "userEmail") else {
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
                 print("No email found in UserDefaults")
                 return
             }
