@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct BookCirculationView: View {
-    @StateObject private var circulationManager = CirculationManager.shared
+    @StateObject private var circulationManager = IssuedBookManager.shared
     
     @State private var activeTab = CirculationTab.issue
     @State private var showingScanner = false
