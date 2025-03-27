@@ -51,6 +51,18 @@ struct WishlistView: View {
                     BookDetailCard(book: book, isPresented: $showBookDetail)
                 }
             }
+            .alert("Remove from Wishlist", isPresented: $viewModel.showingRemoveAlert) {
+                Button("Cancel", role: .cancel) {}
+                Button("Remove", role: .destructive) {
+                    viewModel.confirmRemoval()
+                }
+            } message: {
+                if let book = viewModel.bookToRemove {
+                    Text("Are you sure you want to remove '\(book.title)' from your wishlist?")
+                } else {
+                    Text("Are you sure you want to remove this book from your wishlist?")
+                }
+            }
         }
     }
     
@@ -74,12 +86,13 @@ struct WishlistView: View {
     
     private var wishlistContentView: some View {
         ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160))], spacing: 20) {
-                ForEach(viewModel.wishlistBooks) { book in
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 180))], spacing: 30) {
+                ForEach(self.viewModel.wishlistBooks) { book in
                     wishlistBookCard(for: book)
                 }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.vertical, 10)
         }
     }
     
@@ -88,54 +101,53 @@ struct WishlistView: View {
             selectedBook = book
             showBookDetail = true
         }) {
-            VStack(alignment: .leading, spacing: 8) {
-                if let imageURL = book.imageURL,
-                   let url = URL(string: imageURL) {
-                    AsyncImage(url: url) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
+            VStack(alignment: .leading, spacing: 10) {
+                // Fixed height container for image
+                ZStack {
+                    if let imageURL = book.imageURL,
+                       let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                        }
+                        .aspectRatio(contentMode: .fill)
+                    } else {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
                     }
-                    .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 220)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .frame(height: 200)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 
+                // Fixed height container for title
                 Text(book.title)
                     .font(.headline)
                     .lineLimit(2)
+                    .frame(height: 50, alignment: .topLeading)
                     .foregroundColor(.primary)
                 
-                Text(book.author)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                
+                // Remove button
                 Button(action: {
-                    viewModel.removeFromWishlist(book)
+                    viewModel.showRemoveAlert(for: book)
                 }) {
-                    HStack {
-                        Image(systemName: "heart.slash.fill")
-                        Text("Remove")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.red.opacity(0.1))
-                    .foregroundColor(.red)
-                    .cornerRadius(8)
+                    Text("Remove")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.1))
+                        .foregroundColor(.red)
+                        .cornerRadius(8)
                 }
             }
             .padding()
             .background(Color(.systemBackground))
             .cornerRadius(12)
             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+            .frame(height: 320) // Reduced card height
+            .frame(maxWidth: 170)
         }
     }
 }
@@ -143,6 +155,9 @@ struct WishlistView: View {
 class WishlistViewModel: ObservableObject {
     @Published var wishlistBooks: [Book] = []
     @Published var isLoading = false
+    @Published var showingRemoveAlert = false
+    @Published var bookToRemove: Book?
+    
     private var wishlistBookIds: [String] = []
     
     func loadWishlist() {
@@ -183,9 +198,36 @@ class WishlistViewModel: ObservableObject {
                     
                     if let wishlist = member.wishlist {
                         print("Fetched wishlist: \(wishlist)")
-                        self.wishlistBookIds = wishlist
                         
-                        if wishlist.isEmpty {
+                        // Check for duplicates
+                        let uniqueIds = Set(wishlist)
+                        if uniqueIds.count < wishlist.count {
+                            print("⚠️ Detected \(wishlist.count - uniqueIds.count) duplicate book IDs in wishlist")
+                            
+                            // Save unique IDs only
+                            let uniqueArray = Array(uniqueIds)
+                            print("Original wishlist: \(wishlist)")
+                            print("Deduplicated wishlist: \(uniqueArray)")
+                            
+                            // Update the database with deduplicated list
+                            let updateResponse = try await SupabaseManager.shared.client
+                                .from("Members")
+                                .update(["wishlist": uniqueArray])
+                                .eq("id", value: userId)
+                                .execute()
+                            
+                            if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
+                                print("✅ Successfully deduplicated wishlist in database")
+                                self.wishlistBookIds = uniqueArray
+                            } else {
+                                print("❌ Failed to deduplicate wishlist: Status code \(updateResponse.status)")
+                                self.wishlistBookIds = wishlist
+                            }
+                        } else {
+                            self.wishlistBookIds = wishlist
+                        }
+                        
+                        if self.wishlistBookIds.isEmpty {
                             await MainActor.run {
                                 self.wishlistBooks = []
                                 self.isLoading = false
@@ -193,7 +235,7 @@ class WishlistViewModel: ObservableObject {
                             }
                         } else {
                             // 3. Fetch book details for each book ID in the wishlist
-                            await fetchWishlistBooks(bookIds: wishlist)
+                            await fetchWishlistBooks(bookIds: self.wishlistBookIds)
                         }
                     } else {
                         // User has no wishlist items
@@ -396,18 +438,11 @@ class WishlistViewModel: ObservableObject {
     }
     
     func removeFromWishlist(_ book: Book) {
-        // Get the database ID using ISBN
-        guard let databaseId = BookIdentifier.getDatabaseId(for: book.isbn) else {
-            print("❌ Error: Cannot find database ID for book with ISBN: \(book.isbn)")
-            return
-        }
-        
-        print("Removing book with database ID: \(databaseId)")
+        let isbn = book.isbn
+        print("Removing book '\(book.title)' with ISBN: \(isbn)")
         
         // Remove from local array first for immediate UI update
-        if let index = wishlistBooks.firstIndex(where: { $0.isbn == book.isbn }) {
-            wishlistBooks.remove(at: index)
-        }
+        wishlistBooks.removeAll { $0.isbn == isbn }
         
         // Remove from Supabase
         Task {
@@ -418,7 +453,7 @@ class WishlistViewModel: ObservableObject {
                     return
                 }
                 
-                print("Removing book \(databaseId) from wishlist for user \(userId)")
+                print("Removing book with ISBN \(isbn) from wishlist for user \(userId)")
                 
                 // Get existing wishlist
                 let response = try await SupabaseManager.shared.client
@@ -440,10 +475,63 @@ class WishlistViewModel: ObservableObject {
                     if var wishlist = member.wishlist {
                         print("Current wishlist: \(wishlist)")
                         
-                        // Remove book ID from wishlist
-                        wishlist.removeAll { $0 == databaseId.uuidString }
+                        // Identify all book IDs in the wishlist that match our ISBN
+                        var bookIdsToRemove: [String] = []
+                        var bookIdMatches = 0
                         
-                        print("Updated wishlist: \(wishlist)")
+                        // First check if we have a stored ID for this ISBN
+                        if let storedId = BookIdentifier.getDatabaseId(for: isbn) {
+                            let storedIdString = storedId.uuidString
+                            print("Using stored database ID: \(storedIdString) for ISBN: \(isbn)")
+                            bookIdsToRemove.append(storedIdString)
+                            bookIdMatches += wishlist.filter { $0 == storedIdString }.count
+                        }
+                        
+                        // If we didn't find a match or not all instances were removed, scan the database
+                        if bookIdMatches == 0 {
+                            print("No stored ID found or no matches in wishlist, scanning database for ISBN matches...")
+                            
+                            // Check all books in the wishlist to find matching ISBN
+                            for dbBookId in wishlist {
+                                do {
+                                    let bookResponse = try await SupabaseManager.shared.client
+                                        .from("Books")
+                                        .select("isbn")
+                                        .eq("id", value: dbBookId)
+                                        .single()
+                                        .execute()
+                                    
+                                    struct BookIsbnResponse: Codable {
+                                        let isbn: String
+                                    }
+                                    
+                                    if let bookData = try? decoder.decode(BookIsbnResponse.self, from: bookResponse.data) {
+                                        if bookData.isbn == isbn {
+                                            print("Found book in wishlist with ID \(dbBookId) matching ISBN \(isbn)")
+                                            bookIdsToRemove.append(dbBookId)
+                                        }
+                                    }
+                                } catch {
+                                    print("Error checking book \(dbBookId): \(error)")
+                                }
+                            }
+                        }
+                        
+                        // Add the current book ID as a fallback if no other matches found
+                        if bookIdsToRemove.isEmpty {
+                            print("No matching books found by ISBN, this is unexpected since we're in the wishlist view")
+                            bookIdsToRemove.append(book.id.uuidString)
+                        }
+                        
+                        // Remove all occurrences of book IDs that match our criteria
+                        let originalCount = wishlist.count
+                        for idToRemove in bookIdsToRemove {
+                            wishlist.removeAll { $0 == idToRemove }
+                        }
+                        
+                        let removedCount = originalCount - wishlist.count
+                        print("Removed \(removedCount) book entries from wishlist")
+                        print("Updated wishlist after removal: \(wishlist)")
                         
                         // Store the updated wishlist back in our model
                         wishlistBookIds = wishlist
@@ -457,6 +545,11 @@ class WishlistViewModel: ObservableObject {
                         
                         if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
                             print("✅ Successfully updated wishlist in Supabase")
+                            
+                            // Check if we removed multiple entries
+                            if removedCount > 1 {
+                                print("⚠️ Removed \(removedCount) duplicate entries of the same book")
+                            }
                             
                             // Refresh the list to ensure UI is in sync with database
                             await MainActor.run {
@@ -488,6 +581,17 @@ class WishlistViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    func showRemoveAlert(for book: Book) {
+        bookToRemove = book
+        showingRemoveAlert = true
+    }
+    
+    func confirmRemoval() {
+        guard let book = bookToRemove else { return }
+        removeFromWishlist(book)
+        bookToRemove = nil
     }
 }
 
