@@ -1,4 +1,9 @@
-// Add this new view for Membership Details
+//  Search_BrowseApp.swift
+//  Search&Browse
+//
+//  Created by Devashish Upadhyay on 19/03/25.
+//
+import Supabase
 import SwiftUI
 import Foundation
 import Combine
@@ -75,6 +80,7 @@ struct Search_BrowseApp: View {
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     let userPreferredGenres: [String]
     @State private var user: User?
+    private let supabase = SupabaseConfig.client
     
     init(userPreferredGenres: [String] = []) {
         self.userPreferredGenres = userPreferredGenres
@@ -123,11 +129,14 @@ struct Search_BrowseApp: View {
             .tag(0)
             
             // Explore Tab (Default)
-            SearchBrowseView(userPreferredGenres: userPreferredGenres)
-                .tabItem {
-                    Label("Explore", systemImage: "safari")
-                }
-                .tag(1)
+            SearchBrowseView(
+                userPreferredGenres: userPreferredGenres,
+                supabase: supabase
+            )
+            .tabItem {
+                Label("Explore", systemImage: "safari")
+            }
+            .tag(1)
             
             // Wishlist Tab - Updated to use our new WishlistView
             WishlistView()
