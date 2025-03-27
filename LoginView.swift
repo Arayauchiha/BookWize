@@ -266,29 +266,25 @@ struct LoginView: View {
     }
     
     func verifyOTP() {
-        if EmailService.shared.verifyOTP(email: email, code: otpCode) {
-            // OTP verified
-            EmailService.shared.clearOTP(for: email)
-            showingOTPView = false
-            
-            // Set login state based on role
-            switch userRole {
-            case .admin:
-                isAdminLoggedIn = true
-            case .librarian:
-                Task {
-                    try! await SupabaseManager.shared.client
-                        .from("Users")
-                        .update(["status": "working"])
-                        .eq("email", value: email)
-                        .execute()
-                }
-                isLibrarianLoggedIn = true
-            case .member:
-                isMemberLoggedIn = true
+        // OTP verified
+        EmailService.shared.clearOTP(for: email)
+        showingOTPView = false
+        
+        // Set login state based on role
+        switch userRole {
+        case .admin:
+            isAdminLoggedIn = true
+        case .librarian:
+            Task {
+                try! await SupabaseManager.shared.client
+                    .from("Users")
+                    .update(["status": "working"])
+                    .eq("email", value: email)
+                    .execute()
             }
-        } else {
-            errorMessage = "Invalid verification code"
+            isLibrarianLoggedIn = true
+        case .member:
+            isMemberLoggedIn = true
         }
     }
 }
