@@ -20,27 +20,47 @@ struct GenreBooksView: View {
                     .fontWeight(.bold)
                     .padding(.horizontal)
             
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(books) { book in
-                        BookCardView(book: book) {
-                            selectedBook = book
-                            showingBookDetail = true
+                if books.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No books found")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        
+                        Text("There are currently no books available in the \(genre) genre")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 40)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(books) { book in
+                            BookCardView(book: book) {
+                                selectedBook = book
+                                showingBookDetail = true
+                            }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding(.horizontal)
             }
             .padding(.vertical)
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarTitleDisplayMode(.inline)
-                .sheet(item: $selectedBook) { book in
-                    NavigationView {
-                        BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
-                            .navigationBarHidden(true)
-                    }
-                    .interactiveDismissDisabled()
-                }
-
+        .sheet(item: $selectedBook) { book in
+            NavigationView {
+                BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
+                    .navigationBarHidden(true)
             }
+            .interactiveDismissDisabled()
         }
+
+    }
+}

@@ -77,7 +77,6 @@ struct SearchBrowseView: View {
                             supabase: supabase,
                             selectedGenreFromCard: $selectedGenreFromCard,
                             selectedFilter: $selectedFilter,
-                            userPreferredGenres: userPreferredGenres,
                             viewModel: viewModel
                         )
                     }
@@ -114,6 +113,7 @@ struct SearchBrowseView: View {
                 }
                 .interactiveDismissDisabled()
             }
+
         }
         .tabItem {
             Image(systemName: "safari")
@@ -159,6 +159,23 @@ struct SearchBrowseView: View {
                         .foregroundColor(.red)
                         .frame(maxWidth: .infinity)
                         .padding()
+                } else if viewModel.searchResults.isEmpty && !viewModel.searchText.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No results found")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        
+                        Text("We couldn't find any books matching '\(viewModel.searchText)'")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 60)
+                    .frame(maxWidth: .infinity)
                 } else {
                     searchCategoryContent
                 }
@@ -181,103 +198,195 @@ struct SearchBrowseView: View {
         }
         
         private var searchResultsGrid: some View {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(viewModel.searchResults) { book in
-                    BookCardView(book: book) {
-                        selectedBook = book
-                        showingBookDetail = true
+            if viewModel.searchResults.isEmpty {
+                return AnyView(
+                    VStack(spacing: 16) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No results found")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        
+                        Text("We couldn't find any books matching '\(viewModel.searchText)'")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 40)
+                    .frame(maxWidth: .infinity)
+                )
+            }
+            
+            return AnyView(
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(viewModel.searchResults) { book in
+                        BookCardView(book: book) {
+                            selectedBook = book
+                            showingBookDetail = true
+                        }
                     }
                 }
-            }
-            .padding(.horizontal)
+                .padding(.horizontal)
+            )
         }
         
         private var availableBooksGrid: some View {
             let availableBooks = viewModel.searchResults.filter { $0.isAvailable }
             
-            return LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(availableBooks) { book in
-                    BookCardView(book: book) {
-                        selectedBook = book
-                        showingBookDetail = true
+            if availableBooks.isEmpty {
+                return AnyView(
+                    VStack(spacing: 16) {
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No available books found")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        
+                        Text("We couldn't find any available books matching '\(viewModel.searchText)'")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 40)
+                    .frame(maxWidth: .infinity)
+                )
+            }
+            
+            return AnyView(
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(availableBooks) { book in
+                        BookCardView(book: book) {
+                            selectedBook = book
+                            showingBookDetail = true
+                        }
                     }
                 }
-            }
-            .padding(.horizontal)
+                .padding(.horizontal)
+            )
         }
         
         private var booksByAuthorGrid: some View {
             let groupedBooks = Dictionary(grouping: viewModel.searchResults) { $0.author }
             
-            return ForEach(groupedBooks.keys.sorted(), id: \.self) { author in
-                VStack(alignment: .leading) {
-                    Text(author)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(groupedBooks[author] ?? []) { book in
-                                BookCardView(book: book) {
-                                    selectedBook = book
-                                    showingBookDetail = true
+            if groupedBooks.isEmpty {
+                return AnyView(
+                    VStack(spacing: 16) {
+                        Image(systemName: "person")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No authors found")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        
+                        Text("We couldn't find any authors matching '\(viewModel.searchText)'")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 40)
+                    .frame(maxWidth: .infinity)
+                )
+            }
+            
+            return AnyView(
+                ForEach(groupedBooks.keys.sorted(), id: \.self) { author in
+                    VStack(alignment: .leading) {
+                        Text(author)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 16) {
+                                ForEach(groupedBooks[author] ?? []) { book in
+                                    BookCardView(book: book) {
+                                        selectedBook = book
+                                        showingBookDetail = true
+                                    }
                                 }
                             }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
+                    .padding(.vertical, 8)
                 }
-                .padding(.vertical, 8)
-            }
+            )
         }
         
         private var genresGrid: some View {
             let uniqueGenres = Array(Set(viewModel.searchResults.compactMap { $0.genre })).sorted()
             
-            return LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(uniqueGenres, id: \.self) { genre in
-                    NavigationLink {
-                        GenreBooksView(
-                            genre: genre,
-                            books: viewModel.searchResults.filter { $0.genre == genre }, supabase: supabase
-                        )
-                    } label: {
-                        let filteredBooks = viewModel.searchResults.filter { $0.genre == genre }
-                        if let firstBook = filteredBooks.first {
-                            VStack(alignment: .center, spacing: 8) {
-                                if let imageURL = firstBook.imageURL,
-                                   let url = URL(string: imageURL) {
-                                    CachedAsyncImage(url: url)
-                                        .frame(width: 180, height: 240)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        .shadow(radius: 4)
-                                } else {
-                                    Rectangle()
-                                        .fill(Color.gray.opacity(0.2))
-                                        .frame(width: 180, height: 240)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                }
-                                
-                                // Genre name text below the card
-                                VStack(spacing: 2) {
-                                    Text(genre)
-                                        .font(.headline)
-                                        .foregroundColor(.primary)
-                                        .lineLimit(1)
+            if uniqueGenres.isEmpty {
+                return AnyView(
+                    VStack(spacing: 16) {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No genres found")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                        
+                        Text("We couldn't find any genres matching '\(viewModel.searchText)'")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 40)
+                    .frame(maxWidth: .infinity)
+                )
+            }
+            
+            return AnyView(
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(uniqueGenres, id: \.self) { genre in
+                        NavigationLink {
+                            GenreBooksView(
+                                genre: genre,
+                                books: viewModel.searchResults.filter { $0.genre == genre }, supabase: supabase
+                            )
+                        } label: {
+                            let filteredBooks = viewModel.searchResults.filter { $0.genre == genre }
+                            if let firstBook = filteredBooks.first {
+                                VStack(alignment: .center, spacing: 8) {
+                                    if let imageURL = firstBook.imageURL,
+                                       let url = URL(string: imageURL) {
+                                        CachedAsyncImage(url: url)
+                                            .frame(width: 180, height: 240)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            .shadow(radius: 4)
+                                    } else {
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(width: 180, height: 240)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
                                     
-                                    Text("\(filteredBooks.count) books")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                    // Genre name text below the card
+                                    VStack(spacing: 2) {
+                                        Text(genre)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+                                            .lineLimit(1)
+                                        
+                                        Text("\(filteredBooks.count) books")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.top, 4)
                                 }
-                                .padding(.top, 4)
+                                .frame(width: 180)
                             }
-                            .frame(width: 180)
                         }
                     }
                 }
-            }
-            .padding(.horizontal)
+                .padding(.horizontal)
+            )
         }
     }
 

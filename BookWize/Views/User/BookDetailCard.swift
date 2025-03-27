@@ -381,13 +381,6 @@ struct BookDetailCard: View {
                                 title: "Genre",
                                 value: book.genre ?? "Unknown"
                             )
-                            // Action Buttons
-                            ActionButtonsView(
-                                book: book,
-                                supabase: supabase,
-                                isReserving: $isReserving,
-                                addedToWishlist: $addedToWishlist
-                            )
                             
                             Divider()
                                 .frame(height: 40)

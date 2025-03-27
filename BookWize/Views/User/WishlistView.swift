@@ -46,11 +46,14 @@ struct WishlistView: View {
                 // Load wishlist data every time the view appears
                 viewModel.loadWishlist()
             }
-            .sheet(isPresented: $showBookDetail) {
-                if let book = selectedBook {
+            .sheet(item: $selectedBook) { book in
+                NavigationView {
                     BookDetailCard(book: book, supabase: supabase, isPresented: $showBookDetail)
+                        .navigationBarHidden(true)
                 }
+                .interactiveDismissDisabled()
             }
+
         }
     }
     
