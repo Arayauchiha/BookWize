@@ -129,15 +129,12 @@ struct Search_BrowseApp: View {
                 }
                 .tag(1)
             
-            // Wishlist Tab
-            NavigationView {
-                Text("Wishlist Coming Soon")
-                    .navigationTitle("Wishlist")
-            }
-            .tabItem {
-                Label("Wishlist", systemImage: "heart")
-            }
-            .tag(2)
+            // Wishlist Tab - Updated to use our new WishlistView
+            WishlistView()
+                .tabItem {
+                    Label("Wishlist", systemImage: "heart")
+                }
+                .tag(2)
             
             // Book Club Tab
             NavigationView {
@@ -179,6 +176,11 @@ struct Search_BrowseApp: View {
                         }
                         
                         Button(role: .destructive) {
+                            // Clear stored user data
+                            UserDefaults.standard.removeObject(forKey: "currentMemberId")
+                            UserDefaults.standard.removeObject(forKey: "currentMemberEmail")
+                            
+                            // Update UI
                             isMemberLoggedIn = false
                             NavigationUtil.popToRootView()
                             let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
