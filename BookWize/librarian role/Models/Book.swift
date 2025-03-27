@@ -16,7 +16,6 @@ struct Book: Identifiable, Codable, Sendable {
     var imageURL: String?
     var quantity: Int
     var availableQuantity: Int
-    var location: String?
     var addedDate: Date
     var lastModified: Date
     
