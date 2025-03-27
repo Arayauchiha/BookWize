@@ -75,6 +75,9 @@ private struct ActionButtonsView: View {
     let book: Book
     @Binding var isReserving: Bool
     @Binding var addedToWishlist: Bool
+    @State private var isAddingToWishlist = false
+    @State private var showWishlistAlert = false
+    @State private var wishlistAlertMessage = ""
     
     var body: some View {
         VStack(spacing: 12) {
@@ -99,11 +102,16 @@ private struct ActionButtonsView: View {
             .disabled(!book.isAvailable || isReserving)
             
             Button(action: {
-                addedToWishlist.toggle()
+                addBookToWishlist()
             }) {
                 HStack {
-                    Image(systemName: addedToWishlist ? "heart.fill" : "heart")
-                    Text("Add to Wishlist")
+                    if isAddingToWishlist {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: addedToWishlist ? "heart.fill" : "heart")
+                        Text("Add to Wishlist")
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -111,8 +119,88 @@ private struct ActionButtonsView: View {
                 .foregroundColor(.primary)
                 .cornerRadius(8)
             }
+            .disabled(isAddingToWishlist || addedToWishlist)
         }
         .padding(.horizontal)
+        .alert(wishlistAlertMessage, isPresented: $showWishlistAlert) {
+            Button("OK", role: .cancel) {}
+        }
+    }
+    
+    private func addBookToWishlist() {
+        isAddingToWishlist = true
+        
+        Task {
+            do {
+                // Get current user ID from UserDefaults
+                guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
+                    await showAlert("You need to be logged in to add to wishlist")
+                    return
+                }
+                
+                // Get existing wishlist for the user
+                let response = try await SupabaseManager.shared.client
+                    .from("Members")
+                    .select("wishlist")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                
+                // Parse the response to get current wishlist
+                struct MemberResponse: Codable {
+                    let wishlist: [String]?
+                }
+                
+                do {
+                    let decoder = JSONDecoder()
+                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                    
+                    // Update the wishlist with the new book ID
+                    var updatedWishlist = member.wishlist ?? []
+                    
+                    // Check if book is already in wishlist
+                    let bookId = book.id.uuidString
+                    if updatedWishlist.contains(bookId) {
+                        await showAlert("This book is already in your wishlist")
+                        return
+                    }
+                    
+                    // Add book to wishlist
+                    updatedWishlist.append(bookId)
+                    
+                    // Update the user's wishlist in Supabase
+                    let updateResponse = try await SupabaseManager.shared.client
+                        .from("Members")
+                        .update(["wishlist": updatedWishlist])
+                        .eq("id", value: userId)
+                        .execute()
+                    
+                    if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
+                        // Success
+                        await MainActor.run {
+                            addedToWishlist = true
+                            wishlistAlertMessage = "Book added to your wishlist"
+                            showWishlistAlert = true
+                            isAddingToWishlist = false
+                        }
+                    } else {
+                        await showAlert("Failed to update wishlist")
+                    }
+                } catch {
+                    await showAlert("Failed to retrieve your wishlist: \(error.localizedDescription)")
+                }
+            } catch {
+                await showAlert("Error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func showAlert(_ message: String) async {
+        await MainActor.run {
+            wishlistAlertMessage = message
+            showWishlistAlert = true
+            isAddingToWishlist = false
+        }
     }
 }
 

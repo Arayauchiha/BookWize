@@ -356,8 +356,56 @@ struct MemberLoginView: View {
         if EmailService.shared.verifyOTP(email: email, code: otpCode) {
             // OTP verified
             EmailService.shared.clearOTP(for: email)
-            showingOTPView = false
-            isMemberLoggedIn = true
+            
+            // Set the login state without using Supabase auth
+            Task {
+                do {
+                    // Get the member's ID from the Members table
+                    let response = try await SupabaseManager.shared.client.database
+                        .from("Members")
+                        .select("id")
+                        .eq("email", value: email)
+                        .single()
+                        .execute()
+                    
+                    if let jsonString = String(data: response.data, encoding: .utf8),
+                       let jsonData = jsonString.data(using: .utf8) {
+                        
+                        struct MemberID: Codable {
+                            let id: String
+                        }
+                        
+                        if let memberId = try? JSONDecoder().decode(MemberID.self, from: jsonData) {
+                            print("Successfully retrieved member ID: \(memberId.id)")
+                            
+                            // Store the member ID locally for future reference
+                            UserDefaults.standard.set(memberId.id, forKey: "currentMemberId")
+                            UserDefaults.standard.set(email, forKey: "currentMemberEmail")
+                            
+                            DispatchQueue.main.async {
+                                self.showingOTPView = false
+                                self.isMemberLoggedIn = true
+                            }
+                        } else {
+                            DispatchQueue.main.async {
+                                self.errorMessage = "Failed to retrieve member ID"
+                                self.showingOTPView = false
+                            }
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            self.errorMessage = "Failed to process member data"
+                            self.showingOTPView = false
+                        }
+                    }
+                } catch {
+                    print("Error retrieving member ID: \(error)")
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Authentication failed: \(error.localizedDescription)"
+                        self.showingOTPView = false
+                    }
+                }
+            }
         } else {
             errorMessage = "Invalid verification code"
         }
