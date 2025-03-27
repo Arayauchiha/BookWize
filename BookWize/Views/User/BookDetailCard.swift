@@ -65,8 +65,10 @@ private struct ActionButtonsView: View {
     @Binding var isReserving: Bool
     @Binding var addedToWishlist: Bool
     @State private var isAddingToWishlist = false
+    @State private var isRemovingFromWishlist = false
     @State private var showWishlistAlert = false
     @State private var wishlistAlertMessage = ""
+    @State private var showRemoveConfirmation = false
     
     var body: some View {
         VStack(spacing: 12) {
@@ -91,28 +93,133 @@ private struct ActionButtonsView: View {
             .disabled(!book.isAvailable || isReserving)
             
             Button(action: {
-                addBookToWishlist()
+                if addedToWishlist {
+                    // Show confirmation alert instead of removing immediately
+                    showRemoveConfirmation = true
+                } else {
+                    addBookToWishlist()
+                }
             }) {
                 HStack {
-                    if isAddingToWishlist {
+                    if isAddingToWishlist || isRemovingFromWishlist {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
                         Image(systemName: addedToWishlist ? "heart.fill" : "heart")
-                        Text("Add to Wishlist")
+                        Text(addedToWishlist ? "Remove from Wishlist" : "Add to Wishlist")
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color(.systemGray6))
-                .foregroundColor(.primary)
+                .foregroundColor(addedToWishlist ? .red : .primary)
                 .cornerRadius(8)
             }
-            .disabled(isAddingToWishlist || addedToWishlist)
+            .disabled(isAddingToWishlist || isRemovingFromWishlist)
         }
         .padding(.horizontal)
         .alert(wishlistAlertMessage, isPresented: $showWishlistAlert) {
             Button("OK", role: .cancel) {}
+        }
+        .alert("Remove from Wishlist", isPresented: $showRemoveConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                removeBookFromWishlist()
+            }
+        } message: {
+            Text("Are you sure you want to remove '\(book.title)' from your wishlist?")
+        }
+        .onAppear {
+            checkIfBookInWishlist()
+        }
+    }
+    
+    private func checkIfBookInWishlist() {
+        Task {
+            do {
+                // Get current user ID from UserDefaults
+                guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
+                    return
+                }
+                
+                print("Checking wishlist for book: \(book.title) with ID: \(book.id.uuidString), ISBN: \(book.isbn)")
+                
+                // Get existing wishlist for the user
+                let response = try await SupabaseManager.shared.client
+                    .from("Members")
+                    .select("wishlist")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                
+                // Parse the response to get current wishlist
+                struct MemberResponse: Codable {
+                    let wishlist: [String]?
+                }
+                
+                do {
+                    let decoder = JSONDecoder()
+                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                    
+                    // Check if book is in wishlist
+                    if let wishlist = member.wishlist {
+                        print("Current wishlist: \(wishlist)")
+                        
+                        // Now we need to check if any of the book IDs in the wishlist match our book
+                        let bookId = book.id.uuidString
+                        var inWishlist = wishlist.contains(bookId)
+                        
+                        // If not found by direct ID, check each book in the database to find our ISBN
+                        if !inWishlist && !wishlist.isEmpty {
+                            print("Book not found by ID, checking by ISBN...")
+                            
+                            // Check if any books in the wishlist have the same ISBN
+                            for dbBookId in wishlist {
+                                do {
+                                    let bookResponse = try await SupabaseManager.shared.client
+                                        .from("Books")
+                                        .select("isbn")
+                                        .eq("id", value: dbBookId)
+                                        .single()
+                                        .execute()
+                                    
+                                    struct BookIsbnResponse: Codable {
+                                        let isbn: String
+                                    }
+                                    
+                                    if let bookData = try? decoder.decode(BookIsbnResponse.self, from: bookResponse.data) {
+                                        if bookData.isbn == book.isbn {
+                                            print("Found book in wishlist by ISBN match: \(book.isbn)")
+                                            inWishlist = true
+                                            
+                                            // Store this ID to use for later operations
+                                            BookIdentifier.setDatabaseId(UUID(uuidString: dbBookId) ?? book.id, for: book.isbn)
+                                            break
+                                        }
+                                    }
+                                } catch {
+                                    print("Error checking book \(dbBookId): \(error)")
+                                }
+                            }
+                        }
+                        
+                        print("Book \(book.title) is \(inWishlist ? "in" : "not in") wishlist")
+                        
+                        await MainActor.run {
+                            addedToWishlist = inWishlist
+                        }
+                    } else {
+                        print("User has no wishlist")
+                        await MainActor.run {
+                            addedToWishlist = false
+                        }
+                    }
+                } catch {
+                    print("Error checking wishlist status: \(error)")
+                }
+            } catch {
+                print("Error fetching wishlist: \(error)")
+            }
         }
     }
     
@@ -125,6 +232,44 @@ private struct ActionButtonsView: View {
                 guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
                     await showAlert("You need to be logged in to add to wishlist")
                     return
+                }
+                
+                let bookId = book.id.uuidString
+                let isbn = book.isbn
+                print("Adding book to wishlist: \(book.title) with ID: \(bookId), ISBN: \(isbn)")
+                
+                // First, verify that this book exists in the database with this exact ID
+                // This prevents inconsistencies where the same book might have different IDs
+                let verifyResponse = try await SupabaseManager.shared.client
+                    .from("Books")
+                    .select("id, isbn")
+                    .eq("isbn", value: isbn)
+                    .execute()
+                
+                var dbBookId = bookId
+                
+                // If we get a response, use the ID from the database
+                struct BookIdResponse: Codable {
+                    let id: String
+                    let isbn: String
+                }
+                
+                // Use a safer approach to handle the data
+                do {
+                    let books = try JSONDecoder().decode([BookIdResponse].self, from: verifyResponse.data)
+                    if let firstBook = books.first {
+                        // Use the ID from the database, which is the canonical ID for this ISBN
+                        dbBookId = firstBook.id
+                        print("Using database ID \(dbBookId) instead of local ID \(bookId) for ISBN \(isbn)")
+                        
+                        // Update our BookIdentifier map
+                        if let uuid = UUID(uuidString: dbBookId) {
+                            BookIdentifier.setDatabaseId(uuid, for: isbn)
+                        }
+                    }
+                } catch {
+                    print("Error decoding book data from database: \(error)")
+                    // Continue using the local book ID
                 }
                 
                 // Get existing wishlist for the user
@@ -147,15 +292,47 @@ private struct ActionButtonsView: View {
                     // Update the wishlist with the new book ID
                     var updatedWishlist = member.wishlist ?? []
                     
-                    // Check if book is already in wishlist
-                    let bookId = book.id.uuidString
-                    if updatedWishlist.contains(bookId) {
+                    print("Current wishlist before addition: \(updatedWishlist)")
+                    
+                    // Check if book is already in wishlist by ID or ISBN
+                    if updatedWishlist.contains(dbBookId) {
+                        print("⚠️ Book is already in wishlist with matching ID, not adding duplicate")
                         await showAlert("This book is already in your wishlist")
                         return
                     }
                     
-                    // Add book to wishlist
-                    updatedWishlist.append(bookId)
+                    // Check if any books in the wishlist have the same ISBN
+                    var alreadyInWishlist = false
+                    for existingBookId in updatedWishlist {
+                        let bookResponse = try await SupabaseManager.shared.client
+                            .from("Books")
+                            .select("isbn")
+                            .eq("id", value: existingBookId)
+                            .single()
+                            .execute()
+                        
+                        struct BookIsbnResponse: Codable {
+                            let isbn: String
+                        }
+                        
+                        if let bookData = try? decoder.decode(BookIsbnResponse.self, from: bookResponse.data) {
+                            if bookData.isbn == isbn {
+                                print("⚠️ Book with ISBN \(isbn) is already in wishlist with ID \(existingBookId), not adding duplicate")
+                                alreadyInWishlist = true
+                                break
+                            }
+                        }
+                    }
+                    
+                    if alreadyInWishlist {
+                        await showAlert("This book is already in your wishlist")
+                        return
+                    }
+                    
+                    // Add book to wishlist using the database ID
+                    updatedWishlist.append(dbBookId)
+                    
+                    print("Updated wishlist after addition: \(updatedWishlist)")
                     
                     // Update the user's wishlist in Supabase
                     let updateResponse = try await SupabaseManager.shared.client
@@ -166,6 +343,7 @@ private struct ActionButtonsView: View {
                     
                     if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
                         // Success
+                        print("✅ Successfully added book to wishlist in Supabase")
                         await MainActor.run {
                             addedToWishlist = true
                             wishlistAlertMessage = "Book added to your wishlist"
@@ -173,12 +351,143 @@ private struct ActionButtonsView: View {
                             isAddingToWishlist = false
                         }
                     } else {
+                        print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
                         await showAlert("Failed to update wishlist")
                     }
                 } catch {
+                    print("Error decoding wishlist: \(error)")
                     await showAlert("Failed to retrieve your wishlist: \(error.localizedDescription)")
                 }
             } catch {
+                print("Error adding to wishlist: \(error)")
+                await showAlert("Error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func removeBookFromWishlist() {
+        isRemovingFromWishlist = true
+        
+        Task {
+            do {
+                // Get current user ID from UserDefaults
+                guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
+                    await showAlert("You need to be logged in to manage your wishlist")
+                    return
+                }
+                
+                let isbn = book.isbn
+                print("Removing book from wishlist: \(book.title) with ISBN: \(isbn)")
+                
+                // Get existing wishlist for the user
+                let response = try await SupabaseManager.shared.client
+                    .from("Members")
+                    .select("wishlist")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                
+                // Parse the response to get current wishlist
+                struct MemberResponse: Codable {
+                    let wishlist: [String]?
+                }
+                
+                do {
+                    let decoder = JSONDecoder()
+                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                    
+                    if var wishlist = member.wishlist {
+                        print("Current wishlist before removal: \(wishlist)")
+                        
+                        // Identify all book IDs in the wishlist that match our ISBN
+                        var bookIdsToRemove: [String] = []
+                        var bookIdMatches = 0
+                        
+                        // First check if we have a stored ID for this ISBN
+                        if let storedId = BookIdentifier.getDatabaseId(for: isbn) {
+                            let storedIdString = storedId.uuidString
+                            print("Using stored database ID: \(storedIdString) for ISBN: \(isbn)")
+                            bookIdsToRemove.append(storedIdString)
+                            bookIdMatches += wishlist.filter { $0 == storedIdString }.count
+                        }
+                        
+                        // If we didn't find a match or not all instances were removed, scan the database
+                        if bookIdMatches == 0 {
+                            print("No stored ID found or no matches in wishlist, scanning database for ISBN matches...")
+                            
+                            // Check all books in the wishlist to find matching ISBN
+                            for dbBookId in wishlist {
+                                do {
+                                    let bookResponse = try await SupabaseManager.shared.client
+                                        .from("Books")
+                                        .select("isbn")
+                                        .eq("id", value: dbBookId)
+                                        .single()
+                                        .execute()
+                                    
+                                    struct BookIsbnResponse: Codable {
+                                        let isbn: String
+                                    }
+                                    
+                                    if let bookData = try? decoder.decode(BookIsbnResponse.self, from: bookResponse.data) {
+                                        if bookData.isbn == isbn {
+                                            print("Found book in wishlist with ID \(dbBookId) matching ISBN \(isbn)")
+                                            bookIdsToRemove.append(dbBookId)
+                                        }
+                                    }
+                                } catch {
+                                    print("Error checking book \(dbBookId): \(error)")
+                                }
+                            }
+                        }
+                        
+                        // Add the current book ID as a fallback if no other matches found
+                        if bookIdsToRemove.isEmpty {
+                            let bookId = book.id.uuidString
+                            print("No matching books found by ISBN, using current book ID: \(bookId)")
+                            bookIdsToRemove.append(bookId)
+                        }
+                        
+                        // Remove all occurrences of book IDs that match our criteria
+                        let originalCount = wishlist.count
+                        for idToRemove in bookIdsToRemove {
+                            wishlist.removeAll { $0 == idToRemove }
+                        }
+                        
+                        let removedCount = originalCount - wishlist.count
+                        print("Removed \(removedCount) book entries from wishlist")
+                        print("Updated wishlist after removal: \(wishlist)")
+                        
+                        // Update the wishlist in Supabase
+                        let updateResponse = try await SupabaseManager.shared.client
+                            .from("Members")
+                            .update(["wishlist": wishlist])
+                            .eq("id", value: userId)
+                            .execute()
+                        
+                        if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
+                            // Success
+                            print("✅ Successfully removed book from wishlist in Supabase")
+                            await MainActor.run {
+                                addedToWishlist = false
+                                wishlistAlertMessage = "Book removed from your wishlist"
+                                showWishlistAlert = true
+                                isRemovingFromWishlist = false
+                            }
+                        } else {
+                            print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
+                            await showAlert("Failed to update wishlist")
+                        }
+                    } else {
+                        print("Wishlist is nil for user \(userId)")
+                        await showAlert("Wishlist not found")
+                    }
+                } catch {
+                    print("Error decoding wishlist: \(error)")
+                    await showAlert("Failed to retrieve your wishlist: \(error.localizedDescription)")
+                }
+            } catch {
+                print("Error removing from wishlist: \(error)")
                 await showAlert("Error: \(error.localizedDescription)")
             }
         }
@@ -189,6 +498,7 @@ private struct ActionButtonsView: View {
             wishlistAlertMessage = message
             showWishlistAlert = true
             isAddingToWishlist = false
+            isRemovingFromWishlist = false
         }
     }
 }
