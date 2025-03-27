@@ -1,8 +1,10 @@
 import SwiftUI
+import Supabase
 
 struct ForYouGridView: View {
     let books: [Book]
     let memberSelectedGenres: [String]
+    let supabase: SupabaseClient
     let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     @State private var selectedBook: Book?
     @State private var showingBookDetail = false
@@ -32,7 +34,7 @@ struct ForYouGridView: View {
         .navigationTitle("For You")
         .sheet(item: $selectedBook) { book in
             NavigationView {
-                BookDetailCard(book: book, isPresented: $showingBookDetail)
+                BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
                     .navigationBarHidden(true)
             }
             .interactiveDismissDisabled()
@@ -45,6 +47,7 @@ struct BookSectionsView: View {
     let forYouBooks: [Book]
     let popularBooks: [Book]
     let booksByGenre: [String: [Book]]
+    let supabase: SupabaseClient
     @Binding var selectedGenreFromCard: String?
     @Binding var selectedFilter: String?
     let userPreferredGenres: [String]
@@ -65,7 +68,11 @@ struct BookSectionsView: View {
                     
                     if !viewModel.allPreferredBooks.isEmpty {
                         NavigationLink {
-                            ForYouGridView(books: viewModel.allPreferredBooks, memberSelectedGenres: viewModel.memberSelectedGenres)
+                            ForYouGridView(
+                                books: viewModel.allPreferredBooks,
+                                memberSelectedGenres: viewModel.memberSelectedGenres,
+                                supabase: supabase
+                            )
                         } label: {
                             HStack(spacing: 4) {
                                 Text("See All")
@@ -188,39 +195,38 @@ struct BookSectionsView: View {
                                                     .frame(width: 180, height: 240)
                                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                                             }
-                                            
                                             VStack(spacing: 2) {
-                                                Text(genre)
-                                                    .font(.headline)
-                                                    .foregroundColor(.primary)
-                                                    .lineLimit(1)
-                                                
-                                                Text("\(booksByGenre[genre]?.count ?? 0) books")
-                                                    .font(.caption)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                            .padding(.top, 4)
-                                        }
-                                        .frame(width: 180)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-            }
-        }
+                                                                                            Text(genre)
+                                                                                                .font(.headline)
+                                                                                                .foregroundColor(.primary)
+                                                                                                .lineLimit(1)
+                                                                                            
+                                                                                            Text("\(booksByGenre[genre]?.count ?? 0) books")
+                                                                                                .font(.caption)
+                                                                                                .foregroundColor(.secondary)
+                                                                                        }
+                                                                                        .padding(.top, 4)
+                                                                                    }
+                                                                                    .frame(width: 180)
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                                .padding(.horizontal)
+                                                            }
+                                                        }
+                                                    }
         .sheet(item: $selectedBook) { book in
-            NavigationView {
-                BookDetailCard(book: book, isPresented: $showingBookDetail)
-                    .navigationBarHidden(true)
-            }
-            .interactiveDismissDisabled()
-        }
+                    NavigationView {
+                        BookDetailCard(book: book, isPresented: $showingBookDetail)
+                            .navigationBarHidden(true)
+                    }
+                    .interactiveDismissDisabled()
+                }
 
-    }
-}
+            }
+        }
 
 struct BookCardView: View {
     let book: Book

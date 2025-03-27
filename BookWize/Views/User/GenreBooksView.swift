@@ -1,8 +1,10 @@
 import SwiftUI
+import Supabase
 
 struct GenreBooksView: View {
     let genre: String
     let books: [Book]
+    let supabase: SupabaseClient
     let columns = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16)
@@ -31,13 +33,14 @@ struct GenreBooksView: View {
             .padding(.vertical)
         }
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $selectedBook) { book in
-            NavigationView {
-                BookDetailCard(book: book, isPresented: $showingBookDetail)
-                    .navigationBarHidden(true)
-            }
-            .interactiveDismissDisabled()
-        }
+        .navigationBarTitleDisplayMode(.inline)
+                .sheet(item: $selectedBook) { book in
+                    NavigationView {
+                        BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
+                            .navigationBarHidden(true)
+                    }
+                    .interactiveDismissDisabled()
+                }
 
-    }
-} 
+            }
+        }
