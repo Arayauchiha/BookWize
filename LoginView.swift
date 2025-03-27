@@ -31,12 +31,14 @@ struct LoginView: View {
     @State private var showingPasswordChangeView = false
     @State private var isNewPasswordVisible = false
     
-    //    @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
-        @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
+    @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
+    @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
     private enum Field {
         case email, password
     }
-    //    @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
+    @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
+    
+    @State private var isPasswordVisible = false
     
     var body: some View {
         ScrollView {
@@ -74,8 +76,25 @@ struct LoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    SecureField("Enter your password", text: $password)
-                        .textFieldStyle(CustomTextFieldStyle())
+                    HStack {
+                        if isPasswordVisible {
+                            TextField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        } else {
+                            SecureField("Enter your password", text: $password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                        }
+                        
+                        Button(action: {
+                            isPasswordVisible.toggle()
+                        }) {
+                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                .foregroundColor(Color.gray)
+                        }
+                        .padding(.trailing, 8)
+                    }
+                    .background(Color.customInputBackground)
+                    .cornerRadius(10)
                 }
                 
                 if !errorMessage.isEmpty {
@@ -106,27 +125,27 @@ struct LoginView: View {
                 .disabled(isLoading || email.isEmpty || password.isEmpty)
                 .padding(.top, 8)
                 
-//                if userRole == .member {
-//                    HStack {
-//                        NavigationLink("Create Account") {
-//                            SignUp()
-//                        }
-//                        .foregroundColor(Color.customButton)
-//                        
-//                        Spacer()
-//                        
-//                        Button("Forgot Password?") {
-//                            // Handle password reset
-//                            if !email.isEmpty {
-//                                sendVerificationOTP()
-//                            } else {
-//                                errorMessage = "Please enter your email first"
-//                            }
-//                        }
-//                        .foregroundColor(Color.customButton)
-//                    }
-//                    .padding(.top, 12)
-//                }
+                //                if userRole == .member {
+                //                    HStack {
+                //                        NavigationLink("Create Account") {
+                //                            SignUp()
+                //                        }
+                //                        .foregroundColor(Color.customButton)
+                //
+                //                        Spacer()
+                //
+                //                        Button("Forgot Password?") {
+                //                            // Handle password reset
+                //                            if !email.isEmpty {
+                //                                sendVerificationOTP()
+                //                            } else {
+                //                                errorMessage = "Please enter your email first"
+                //                            }
+                //                        }
+                //                        .foregroundColor(Color.customButton)
+                //                    }
+                //                    .padding(.top, 12)
+                //                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 60)
@@ -141,20 +160,20 @@ struct LoginView: View {
                     .frame(height: 30)
             }
         }
-//        .background(Color.customBackground)
-//        .sheet(isPresented: $showingOTPView) {
-//            // Use the consistent OTP verification view
-//            OTPVerificationView(
-//                email: email,
-//                otp: $otpCode,
-//                onVerify: {
-//                    verifyOTP()
-//                },
-//                onCancel: {
-//                    showingOTPView = false
-//                }
-//            )
-//        }
+        //        .background(Color.customBackground)
+        //        .sheet(isPresented: $showingOTPView) {
+        //            // Use the consistent OTP verification view
+        //            OTPVerificationView(
+        //                email: email,
+        //                otp: $otpCode,
+        //                onVerify: {
+        //                    verifyOTP()
+        //                },
+        //                onCancel: {
+        //                    showingOTPView = false
+        //                }
+        //            )
+        //        }
         .background(Color.customBackground)
         .sheet(isPresented: $showingPasswordChangeView) {
             // Password change sheet for librarian first login
@@ -206,27 +225,27 @@ struct LoginView: View {
         }
     }
     
-        var roleColor: Color {
-            switch userRole {
-            case .admin:
-                return Color.adminColor
-            case .librarian:
-                return Color.librarianColor
-            case .member:
-                return Color.memberColor
-            }
+    var roleColor: Color {
+        switch userRole {
+        case .admin:
+            return Color.adminColor
+        case .librarian:
+            return Color.librarianColor
+        case .member:
+            return Color.memberColor
         }
+    }
     
-        var roleTitle: String {
-            switch userRole {
-            case .admin:
-                return "Admin"
-            case .librarian:
-                return "Librarian"
-            case .member:
-                return "Member"
-            }
+    var roleTitle: String {
+        switch userRole {
+        case .admin:
+            return "Admin"
+        case .librarian:
+            return "Librarian"
+        case .member:
+            return "Member"
         }
+    }
     
     private var isFormValid: Bool {
         !email.isEmpty && !password.isEmpty
@@ -299,15 +318,23 @@ struct LoginView: View {
             EmailService.shared.clearOTP(for: email)
             isLibrarianLoggedIn = true
             showingOTPView = false
-            Task {
-                try! await SupabaseManager.shared.client
-                    .from("Users")
-                    .update(["status": "working"])
-                    .eq("email", value: email)
-                    .execute()
+            
+            // Set login state based on role
+            switch userRole {
+            case .admin:
+                isAdminLoggedIn = true
+            case .librarian:
+                Task {
+                    try! await SupabaseManager.shared.client
+                        .from("Users")
+                        .update(["status": "working"])
+                        .eq("email", value: email)
+                        .execute()
+                }
+                isLibrarianLoggedIn = true
+            case .member:
+                isMemberLoggedIn = true
             }
-        } else {
-            errorMessage = "Invalid verification code"
         }
     }
 }

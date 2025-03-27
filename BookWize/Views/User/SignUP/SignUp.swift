@@ -10,6 +10,7 @@ struct SignupView: View {
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var selectedLibrary = "Good Reads Library"
+    @State private var isPasswordVisible = false
     
     // Verification
     @State private var showVerificationView = false
@@ -102,15 +103,37 @@ struct SignupView: View {
                         sectionTitle("Security")
                         
                         // Password
-                        inputField(title: "Password", error: nil) {
-                            SecureField("Enter password", text: $password)
-                                .onChange(of: password) { newValue in
-                                    passwordValidation = ValidationUtils.validatePassword(newValue)
-                                    
-                                    if !confirmPassword.isEmpty {
-                                        confirmPasswordError = confirmPassword != newValue ? "Passwords do not match" : nil
-                                    }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Password")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.customText)
+                            
+                            HStack {
+                                if isPasswordVisible {
+                                    TextField("Enter password", text: $password)
+                                        .textFieldStyle(CustomTextFieldStyle())
+                                } else {
+                                    SecureField("Enter password", text: $password)
+                                        .textFieldStyle(CustomTextFieldStyle())
                                 }
+                                
+                                Button(action: {
+                                    isPasswordVisible.toggle()
+                                }) {
+                                    Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                        .foregroundColor(Color.gray)
+                                }
+                                .padding(.trailing, 8)
+                            }
+                            .background(Color.customInputBackground)
+                            .cornerRadius(10)
+                            
+                            if let error = passwordError {
+                                Text(error)
+                                    .foregroundStyle(Color.red)
+                                    .font(.caption)
+                                    .padding(.leading, 4)
+                            }
                         }
                         
                         // Password requirements
@@ -162,19 +185,30 @@ struct SignupView: View {
                         .padding(.leading, 4)
                         
                         // Confirm Password
-                        inputField(title: "Confirm Password", error: nil) {
-                            SecureField("Confirm your password", text: $confirmPassword)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Confirm Password")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.customText)
+                            
+                            HStack {
+                                if isPasswordVisible {
+                                    TextField("Confirm your password", text: $confirmPassword)
+                                        .textFieldStyle(CustomTextFieldStyle())
+                                } else {
+                                    SecureField("Confirm your password", text: $confirmPassword)
+                                        .textFieldStyle(CustomTextFieldStyle())
+                                }
+                            }
+                            .background(Color.customInputBackground)
+                            .cornerRadius(10)
+                            
+                            if let error = confirmPasswordError {
+                                Text(error)
+                                    .foregroundStyle(Color.red)
+                                    .font(.caption)
+                                    .padding(.leading, 4)
+                            }
                         }
-                        
-                        // Password matching validation
-                        HStack {
-                            Image(systemName: !confirmPassword.isEmpty && password == confirmPassword ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(!confirmPassword.isEmpty && password == confirmPassword ? .green : .gray)
-                            Text("Passwords match")
-                                .font(.caption)
-                                .foregroundStyle(Color.customText.opacity(0.7))
-                        }
-                        .padding(.leading, 4)
                         
                         // Divider
                         Rectangle()
