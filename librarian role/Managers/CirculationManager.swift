@@ -50,8 +50,6 @@ class CirculationManager: ObservableObject {
             throw CirculationError.borrowingLimitExceeded
         }
         
-        // Create circulation record
-        //let record1 = CirculationRecord(id: bookId, bookId: <#T##UUID#>, memberId: <#T##UUID#>, issueDate: <#T##Date#>, dueDate: <#T##Date#>, renewalCount: <#T##Int#>, status: <#T##CirculationStatus#>)
         
         let record = CirculationRecord(
             id: UUID(uuidString: "1")!,
