@@ -89,10 +89,14 @@ class BookReservationViewModel: ObservableObject {
         isReserving = true
         defer { isReserving = false }
         
+        guard let memberIdString = UserDefaults.standard.string(forKey: "currentMemberId"),
+                  let memberId = UUID(uuidString: memberIdString) else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Member not logged in or invalid ID"])
+            }
         let reservation = BookReservation(
             id: UUID(),
             created_at: Date(),
-            member_id: try await supabase.auth.session.user.id,
+            member_id: memberId,
             book_id: book.id
         )
         

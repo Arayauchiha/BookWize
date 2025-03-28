@@ -238,7 +238,7 @@ struct AdminLoginView: View {
             EmailService.shared.clearOTP(for: email)
             
             isAdminLoggedIn = true
-            
+            UserDefaults.standard.set(email, forKey: "currentMemberEmail")
             // Close verification sheet
             showVerification = false
         } else {
