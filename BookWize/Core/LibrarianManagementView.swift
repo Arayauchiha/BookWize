@@ -4,8 +4,26 @@ struct LibrarianManagementView: View {
     @State private var showAddLibrarian = false
     @State private var librarians: [LibrarianData] = []
     @State private var selectedSegment = 0
-    
+    @State private var isloading = false
     private let segments = ["Librarians", "Fines & Fees"]
+    
+    func  fetchLibrarians(){
+        isloading = true
+        Task{
+            if let data = await fetchLibrarian(){
+                await MainActor.run{
+                    librarians = data
+                    isloading = false
+                }
+            }else{
+                    await MainActor.run{
+                        librarians = []
+                        isloading = false
+                    }
+                }
+            }
+        }
+    
     
     func fetchLibrarian() async -> [LibrarianData]? {
         let data: [LibrarianData]? = try? await SupabaseManager.shared.client
@@ -41,7 +59,9 @@ struct LibrarianManagementView: View {
                             } else {
                                 LazyVStack(spacing: 16) {
                                     ForEach(librarians, id: \.email) { librarian in
-                                        LibrarianCardView(librarian: librarian)
+                                        LibrarianCardView(librarian: librarian, onDelete: {
+                                            fetchLibrarians()
+                                        })
                                     }
                                 }
                                 .padding(.horizontal, 20)
