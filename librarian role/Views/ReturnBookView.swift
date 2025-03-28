@@ -71,16 +71,100 @@ struct ReturnBookView: View {
     }
 }
 
-enum BookCondition: String, CaseIterable, Codable {
-    case good = "Good"
-    case damaged = "Damaged"
-}
-
-struct ReturnBookUpdate: Encodable {
-    let returnDate: Date
-    let bookCondition: String
-    let fineAmount: Double?
-    let duesFine: Double
+struct LoanCard: View {
+    let issuedBooks: issueBooks
+    @State private var bookCoverURL: URL?
+    @State private var isLoadingCover = true
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 16) {
+                AsyncImage(url: bookCoverURL) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                            .overlay(
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            )
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                    case .failure:
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                            .overlay(
+                                Image(systemName: "book.closed")
+                                    .foregroundColor(.gray)
+                            )
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("ISBN: \(issuedBooks.isbn)", systemImage: "barcode")
+                            .font(.subheadline)
+                    }
+                    
+                    Text("Member Email: \(issuedBooks.memberEmail)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+            
+            Divider()
+            
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Issue Date")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(issuedBooks.issueDate, style: .date)
+                        .font(.subheadline)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing) {
+                    Text("Return Date")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if let returnDate = issuedBooks.returnDate {
+                        Text(returnDate, style: .date)
+                            .font(.subheadline)
+                    } else {
+                        Text("Not Returned")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 2)
+        .task {
+            await fetchBookCover()
+        }
+    }
+    
+    private func fetchBookCover() async {
+        let coverURL = "https://covers.openlibrary.org/b/isbn/\(issuedBooks.isbn)-M.jpg"
+        bookCoverURL = URL(string: coverURL)
+    }
 }
 
 struct ReturnBookFormView: View {
@@ -471,6 +555,18 @@ struct ReturnBookFormView: View {
             }
         }
     }
+}
+
+enum BookCondition: String, CaseIterable, Codable {
+    case good = "Good"
+    case damaged = "Damaged"
+}
+
+struct ReturnBookUpdate: Encodable {
+    let returnDate: Date
+    let bookCondition: String
+    let fineAmount: Double?
+    let duesFine: Double
 }
 
 #Preview {

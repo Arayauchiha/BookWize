@@ -28,7 +28,7 @@ struct IssueBookView: View {
                 } else {
                     LazyVStack(spacing: 16) {
                         ForEach(circulationManager.loans) { loan in
-                            LoanCard(issuedBooks: loan)
+                            EnhancedLoanCard(issuedBooks: loan)
                         }
                     }
                     .padding()
@@ -39,18 +39,16 @@ struct IssueBookView: View {
                 Button {
                     showingIssueForm = true
                 } label: {
-                    Label("Issue New Book", systemImage: "plus.circle.fill")
+                    Label("Issue Book", systemImage: "plus.circle.fill")
                         .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(AppTheme.primaryColor)
+                        .frame(height: 60)
+                        .frame(width: 370)
+                        .background(Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(12)
                 }
-                .padding()
+                .padding(.vertical, 8)
             }
-            .background(Color(.systemBackground))
-            .shadow(radius: 2)
         }
         .searchable(text: $searchText, prompt: "Search transactions...")
         .sheet(isPresented: $showingIssueForm) {
@@ -75,21 +73,64 @@ struct IssueBookView: View {
     }
 }
 
-struct LoanCard: View {
+// ADD: Enhanced loan card with book cover
+struct EnhancedLoanCard: View {
     let issuedBooks: issueBooks
+    @State private var bookCoverURL: URL?
+    @State private var isLoadingCover = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("ISBN: \(issuedBooks.isbn)", systemImage: "barcode")
+            HStack(spacing: 16) {
+                // Book Cover
+                AsyncImage(url: bookCoverURL) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                            .overlay(
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            )
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                    case .failure:
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                            .overlay(
+                                Image(systemName: "book.closed")
+                                    .foregroundColor(.gray)
+                            )
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                
+                // Book Details
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("ISBN: \(issuedBooks.isbn)", systemImage: "barcode")
+                            .font(.subheadline)
+                    }
+                    
+                    Text("Member Email: \(issuedBooks.memberEmail)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
                 Spacer()
-                Label("Member Email: \(issuedBooks.memberEmail)", systemImage: "person.circle.fill")
             }
-            .font(.subheadline)
-            .foregroundColor(.secondary)
-
+            
             Divider()
-
+            
             HStack {
                 VStack(alignment: .leading) {
                     Text("Issue Date")
@@ -98,9 +139,9 @@ struct LoanCard: View {
                     Text(issuedBooks.issueDate, style: .date)
                         .font(.subheadline)
                 }
-
+                
                 Spacer()
-
+                
                 VStack(alignment: .trailing) {
                     Text("Return Date")
                         .font(.caption)
@@ -109,7 +150,9 @@ struct LoanCard: View {
                         Text(returnDate, style: .date)
                             .font(.subheadline)
                     } else {
-                        Text("Not Returned").foregroundColor(.red)
+                        Text("Not Returned")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
                     }
                 }
             }
@@ -118,6 +161,16 @@ struct LoanCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(radius: 2)
+        .task {
+            await fetchBookCover()
+        }
+    }
+    
+    // Function to fetch book cover
+    private func fetchBookCover() async {
+        // Construct OpenLibrary API URL for book cover
+        let coverURL = "https://covers.openlibrary.org/b/isbn/\(issuedBooks.isbn)-M.jpg"
+        bookCoverURL = URL(string: coverURL)
     }
 }
 
@@ -343,43 +396,6 @@ struct IssueBookFormView: View {
         }
     }
     
-    //    func issueBook() {
-    //        circulationManager.isLoading = true
-    //        circulationManager.errorMessage = nil
-    //
-    //        Task {
-    //            let newIssue = issueBooks(
-    //                id: UUID(),
-    //                isbn: isbn,
-    //                memberEmail: smartCardID,  // Ensure this is the correct email
-    //                issueDate: issueDate,
-    //                returnDate: returnDate
-    //            )
-    //
-    //            do {
-    //                let response = try await SupabaseManager.shared.client
-    //                    .from("issuebooks")
-    //                    .insert(newIssue)
-    //                    .execute()
-    //
-    //                DispatchQueue.main.async {
-    //                    circulationManager.isLoading = false
-    //                    onIssue(newIssue)
-    //                    presentationMode.wrappedValue.dismiss()
-    //                }
-    //            } catch {
-    //                // Print the detailed error for debugging
-    //                print("Book Issue Error: \(error.localizedDescription)")
-    //
-    //                DispatchQueue.main.async {
-    //                    circulationManager.errorMessage = "Failed to issue book: \(error.localizedDescription)"
-    //                    circulationManager.isLoading = false
-    //                }
-    //            }
-    //        }
-    //    }
-    
-    
     func issueBook() {
         circulationManager.isLoading = true
         circulationManager.errorMessage = nil
@@ -443,4 +459,3 @@ struct IssueBookFormView: View {
         }
     }
 }
-
