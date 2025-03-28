@@ -31,7 +31,7 @@ struct LibrarianCardView: View {
                 // Contact info
                 VStack(alignment: .leading, spacing: 8) {
                     Label(librarian.email, systemImage: "envelope.fill")
-                    Label(String(librarian.phone ?? 0), systemImage: "phone.fill")
+                    Label(formatPhoneNumber(librarian.phone), systemImage: "phone.fill")
                 }
                 .font(.system(size: 15))
                 .foregroundStyle(Color.customText.opacity(0.6))
@@ -55,6 +55,12 @@ struct LibrarianCardView: View {
                 onDelete()
             })
         }
+    }
+    
+    private func formatPhoneNumber(_ phone: Int?) -> String {
+        guard let phone = phone else { return "N/A" }
+        // Use abs to ensure we don't have negative numbers with hyphens
+        return String(format: "%d", abs(phone)) // Format without commas and ensure positive
     }
 }
 
@@ -132,7 +138,7 @@ struct LibrarianDetailView: View {
                                 Label("Phone", systemImage: "phone")
                                     .frame(width: 100, alignment: .leading)
                                 
-                                Text("\(librarian.phone ?? 0)")
+                                Text(formatPhoneNumber(librarian.phone))
                                     .foregroundColor(.primary)
                                 
                                 Spacer()
@@ -259,6 +265,12 @@ struct LibrarianDetailView: View {
                 }
             }
         }
+    }
+    
+    private func formatPhoneNumber(_ phone: Int?) -> String {
+        guard let phone = phone else { return "N/A" }
+        // Use abs to ensure we don't have negative numbers with hyphens
+        return String(format: "%d", abs(phone)) // Format without commas and ensure positive
     }
 }
 
