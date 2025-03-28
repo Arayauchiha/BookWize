@@ -90,7 +90,7 @@ struct AdminDashboardView: View {
     private var tabTitle: String {
         switch selectedTab {
         case 0: return "Summary"
-        case 1: return "Librarians"
+        case 1: return "Managment"
         case 2: return "Catalogue"
         case 3: return "Finance"
         default: return ""
