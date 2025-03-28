@@ -97,6 +97,8 @@ struct MemberDetailsView: View {
             Label(member.email, systemImage: "envelope.fill")
             Label(member.gender.rawValue, systemImage: genderIcon)
             Label(member.selectedLibrary, systemImage: "books.vertical.fill")
+            Label("₹\(String(format: "%.2f", member.fine))", systemImage: "dollarsign.circle.fill")
+                .foregroundStyle(member.fine > 0 ? .red : .green)
         }
         .font(.system(size: 15))
         .foregroundStyle(Color.customText.opacity(0.6))
@@ -124,6 +126,9 @@ struct EditMemberSheet: View {
                 
                 Text(member.selectedLibrary)
                     .foregroundStyle(Color.customText.opacity(0.6))
+                
+                Text("₹\(String(format: "%.2f", member.fine))")
+                    .foregroundStyle(member.fine > 0 ? .red : .green)
             }
             .navigationTitle("Edit Member")
             .navigationBarTitleDisplayMode(.inline)
@@ -153,7 +158,8 @@ struct EditMemberSheet: View {
             gender: .male,
             password: "password123",
             selectedLibrary: "Central Library",
-            selectedGenres: []
+            selectedGenres: [],
+            fine: 50.0
         ))
         
         MemberCardView(member: User(
@@ -163,7 +169,8 @@ struct EditMemberSheet: View {
             gender: .female,
             password: "password123",
             selectedLibrary: "City Library",
-            selectedGenres: []
+            selectedGenres: [],
+            fine: 0.0
         ))
     }
     .padding()

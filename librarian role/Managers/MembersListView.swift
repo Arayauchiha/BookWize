@@ -7,14 +7,26 @@ struct MembersListView: View {
     
     func fetchMembers() async -> [User]? {
         print("Fetching members from Supabase...")
-        let data: [User]? = try? await SupabaseManager.shared.client
-            .from("Members")
-            .select("*")  // Select all columns to see the data structure
-            .execute()
-            .value
-        
-        print("Fetched data:", data ?? "nil")
-        return data
+        do {
+            let data: [User]? = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("*")  // Select all columns to see the data structure
+                .execute()
+                .value
+            
+            print("Fetched data:", data ?? "nil")
+            if let data = data {
+                print("Number of members fetched:", data.count)
+                if let firstMember = data.first {
+                    print("First member data:", firstMember)
+                }
+            }
+            return data
+        } catch {
+            print("Error fetching members:", error)
+            print("Error details:", error.localizedDescription)
+            return nil
+        }
     }
     
     var body: some View {
