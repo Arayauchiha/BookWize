@@ -240,28 +240,47 @@ struct ForYouSectionView: View {
 
         var body: some View {
             VStack(alignment: .center, spacing: 8) {
-                if let imageURL = firstBook.imageURL, let url = URL(string: imageURL) {
-                    CachedAsyncImage(url: url)
-                        .frame(width: 180, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .shadow(radius: 4)
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 180, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                ZStack(alignment: .bottom) {
+                    if let imageURL = firstBook.imageURL, let url = URL(string: imageURL) {
+                        CachedAsyncImage(url: url)
+                            .frame(width: 180, height: 240)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .shadow(radius: 4)
+                    } else {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(width: 180, height: 240)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    
+                    // Genre overlay at the bottom of the card
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(genre)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        Text("\(bookCount) books")
+                            .font(.system(size: 13))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .frame(width: 180, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.black.opacity(0.7), Color.black.opacity(0)]),
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                    )
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: 8,
+                            style: .continuous
+                        )
+                    )
                 }
-                VStack(spacing: 2) {
-                    Text(genre)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-
-                    Text("\(bookCount) books")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 4)
             }
             .frame(width: 180)
         }
@@ -283,7 +302,8 @@ struct BookCardView: View {
                 action()
             }
         }) {
-            VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .bottom) {
+                // Book cover image or placeholder
                 if let imageURL = book.imageURL,
                    let url = URL(string: imageURL) {
                     CachedAsyncImage(url: url)
@@ -305,6 +325,31 @@ struct BookCardView: View {
                             isImageLoaded = true
                         }
                 }
+                
+                // Title overlay at the bottom of the card
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(book.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                }
+                .frame(width: 180, alignment: .leading)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.black.opacity(0.7), Color.black.opacity(0)]),
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: 8,
+                        style: .continuous
+                    )
+                )
             }
         }
     }

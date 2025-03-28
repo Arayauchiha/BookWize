@@ -835,6 +835,10 @@ struct BookDetailCard: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     VStack(spacing: 20) {
+                        // Add top padding to create space from the top
+                        Spacer()
+                            .frame(height: 16)
+                            
                         // Book Cover
                         if let imageURL = book.imageURL {
                             BookCoverView(
