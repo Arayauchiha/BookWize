@@ -65,16 +65,17 @@ struct MembersListView: View {
     }
     
     private func loadMembers() async {
-        isLoading = true
         do {
             print("Loading members...")
+            // First calculate and update fines
+            await FineCalculator.shared.calculateAndUpdateFines()
+            // Then fetch updated member data
             members = (await fetchMembers()) ?? []
             print("Loaded members count:", members.count)
         } catch {
-            print("Load error:", error)
-            errorMessage = "Failed to load members: \(error.localizedDescription)"
+            print("Error loading members:", error)
+            errorMessage = error.localizedDescription
         }
-        isLoading = false
     }
 }
 
