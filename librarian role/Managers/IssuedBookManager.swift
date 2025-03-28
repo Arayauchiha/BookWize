@@ -1,117 +1,6 @@
 import Supabase
 import Foundation
 
-//class IssuedBookManager: ObservableObject {
-//    static let shared = IssuedBookManager()
-//    
-//    @Published var bookTitle: String = ""
-//    @Published var authorName: String = ""
-//    @Published var memberEmail: String = ""
-//    @Published var isLoading: Bool = false
-//    @Published var errorMessage: String?
-//
-//    private init() {}
-//
-//    /// Fetch book details using ISBN from Supabase
-////    func fetchBookDetails(isbn: String) async {
-////        isLoading = true
-////        errorMessage = nil
-////
-////        do {
-////            let response = try await SupabaseManager.shared.client
-////                .from("books")
-////                .select("title, author")
-////                .eq("isbn", value: isbn)
-////                .single()
-////                .execute()
-////            
-////            if let book = response.value as? [String: Any] {
-////                await MainActor.run {
-////                    bookTitle = book["title"] as? String ?? "Unknown"
-////                    authorName = book["author"] as? String ?? "Unknown"
-////                    isLoading = false
-////                }
-////            }
-////        } catch {
-////            await MainActor.run {
-////                errorMessage = "Book not found."
-////                isLoading = false
-////            }
-////        }
-////    }
-//
-//
-//    /// Fetch member details using scanned QR ID from Supabase
-////    private func fetchMemberDetails(memberID: UUID) async {
-////        isLoading = true
-////        errorMessage = nil
-////
-////        do {
-////            let response = try await SupabaseManager.shared.client
-////                .from("members")
-////                .select("email")
-////                .eq("id", value: memberID)
-////                .single()
-////                .execute()
-////            
-////            if let member = response.value as? [String: Any] {
-////                await MainActor.run {
-////                    memberEmail = member["email"] as? String ?? "Unknown"
-////                    isLoading = false
-////                }
-////            }
-////        } catch {
-////            await MainActor.run {
-////                errorMessage = "Member not found."
-////                isLoading = false
-////            }
-////        }
-////    }
-//
-//    /// Issue a book and store it in Supabase
-////    func issueBook(_ issuedBook: issueBooks, completion: @escaping (Bool) -> Void) {
-////        Task {
-////            do {
-////                try await SupabaseManager.shared.client
-////                    .from("issueBooks")
-////                    .insert(issuedBook)
-////                    .execute()
-////                
-////                DispatchQueue.main.async {
-////                    completion(true)
-////                }
-////            } catch {
-////                print("Error issuing book:", error)
-////                DispatchQueue.main.async {
-////                    completion(false)
-////                }
-////            }
-////        }
-////    }
-//
-//    /// Fetch all issued books
-////    func fetchIssuedBooks(completion: @escaping ([issueBooks]) -> Void) {
-////        Task {
-////            do {
-////                let issuedBooks: [issueBooks] = try await SupabaseManager.shared.client
-////                    .from("issueBooks")
-////                    .select()
-////                    .execute()
-////                    .value
-////                
-////                DispatchQueue.main.async {
-////                    completion(issuedBooks)
-////                }
-////            } catch {
-////                print("Error fetching issued books:", error)
-////                DispatchQueue.main.async {
-////                    completion([])
-////                }
-////            }
-////        }
-////    }
-//}
-
 class IssuedBookManager: ObservableObject {
     static let shared = IssuedBookManager()
     
@@ -122,8 +11,11 @@ class IssuedBookManager: ObservableObject {
     private init() {}
     
     func fetchIssuedBooks() async {
-        isLoading = true
-        errorMessage = nil
+        //Runtime warning fix
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
         
         do {
             let response = try await SupabaseManager.shared.client

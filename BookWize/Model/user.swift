@@ -31,5 +31,4 @@ enum Library: String,CaseIterable{
     case cityLibrary = "City Library"
 }
 
-//var selectedLibrary: [Library]
 
