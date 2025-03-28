@@ -20,7 +20,7 @@ struct InventoryManagerView: View {
                             Label("Circulation", systemImage: "arrow.left.arrow.right.circle.fill")
                         }
                     
-                    UserManagementView()
+                    MembersListView()
                         .tabItem {
                             Label("Members", systemImage: "person.2.fill")
                         }

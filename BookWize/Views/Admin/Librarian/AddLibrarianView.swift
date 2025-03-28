@@ -239,29 +239,56 @@ struct AddLibrarianView: View {
             return
         }
         
-        var librarianData = LibrarianData()
-        
-        librarianData.name = name
-        librarianData.age = ageInt
-        librarianData.email = email
-        librarianData.phone = phoneInt
-        librarianData.password = generatedPassword
-        librarianData.status = .pending
-        librarianData.dateAdded = Date()
-        librarianData.requiresPasswordReset = true
-        librarianData.roleFetched = .librarian
-        
         Task {
             do {
+                // Check if a librarian with this email already exists
+                let existingLibrarians = try await SupabaseManager.shared.client
+                    .from("Users")
+                    .select("*")
+                    .eq("email", value: email)
+                    .execute()
+                
+                // Decode the response to check if any librarians were found
+                struct ResponseData: Codable {
+                    let email: String
+                }
+                
+                if let librarians = try? JSONDecoder().decode([ResponseData].self, from: existingLibrarians.data),
+                   !librarians.isEmpty {
+                    // A librarian with this email already exists
+                    await MainActor.run {
+                        alertType = .error("A librarian with email '\(email)' already exists")
+                    }
+                    return
+                }
+                
+                // If we get here, no duplicate was found, so add the new librarian
+                var librarianData = LibrarianData()
+                
+                librarianData.name = name
+                librarianData.age = ageInt
+                librarianData.email = email
+                librarianData.phone = phoneInt
+                librarianData.password = generatedPassword
+                librarianData.status = .pending
+                librarianData.dateAdded = Date()
+                librarianData.requiresPasswordReset = true
+                librarianData.roleFetched = .librarian
+                
                 try await SupabaseManager.shared.client.database
                     .from("Users")
                     .insert(librarianData)
                     .execute()
-                onAdd(librarianData)
-                dismiss()
+                
+                await MainActor.run {
+                    onAdd(librarianData)
+                    dismiss()
+                }
             } catch {
                 print("Error: \(error.localizedDescription)")
-                alertType = .error("Failed to add librarian: \(error.localizedDescription)")
+                await MainActor.run {
+                    alertType = .error("Failed to add librarian: \(error.localizedDescription)")
+                }
             }
         }
     }

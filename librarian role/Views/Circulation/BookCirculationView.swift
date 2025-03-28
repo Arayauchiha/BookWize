@@ -20,8 +20,11 @@ struct BookCirculationView: View {
                     IssueBookView()
                 case .returned:
                     ReturnBookView()
-                case .renew:
+                case .renewed:
                     RenewBookView()
+                case .reserved:
+                    ReservedBookView()
+                    
                 }
             }
             .navigationTitle("Book Circulation")
@@ -46,7 +49,8 @@ struct BookCirculationView: View {
 enum CirculationTab: String, CaseIterable {
     case issue = "Issue Book"
     case returned = "Return Book"
-    case renew = "Renew Book"
+    case renewed = "Renewd Book"
+    case reserved = "Reserved Book"
 }
 
 struct CustomSegmentedControl<T: Hashable>: View {
