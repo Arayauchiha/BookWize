@@ -20,19 +20,20 @@ struct InventoryView: View {
         NavigationView {
             List {
                 ForEach(filteredBooks) { book in
-                    BookRowView(book: book)
+                    EnhancedBookRowView(book: book)
                         .onTapGesture {
                             selectedBook = book
                         }
                 }
             }
-            .searchable(text: $searchText, prompt: "Search books...")
+            .listStyle(.insetGrouped)
+            .searchable(text: $searchText, prompt: "Search by title, author, or ISBN...")
             .navigationTitle("Library Inventory")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button(action: { showingAddBookSheet = true }) {
-                            Label("Add Book Manually", systemImage: "plus")
+                            Label("Add Book Manually", systemImage: "plus.rectangle.fill.on.rectangle.fill")
                         }
                         
                         Button(action: { showingISBNScanner = true }) {
@@ -40,10 +41,12 @@ struct InventoryView: View {
                         }
                         
                         Button(action: { showingCSVUpload = true }) {
-                            Label("Import CSV", systemImage: "doc.text.below.ecg")
+                            Label("Import CSV", systemImage: "square.and.arrow.down.fill")
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.blue)
+                            .font(.title2)
                     }
                 }
             }
@@ -98,66 +101,64 @@ struct InventoryView: View {
     }
 }
 
-struct BookRowView: View {
+struct EnhancedBookRowView: View {
     let book: Book
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(book.title)
-                .font(.headline)
-            Text("by \(book.author)")
-                .font(.subheadline)
-            HStack {
-                Text("ISBN: \(book.isbn)")
-                Spacer()
-                Text("Available: \(book.availableQuantity)/\(book.quantity)")
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-struct AddBookView: View {
-    @Environment(\.dismiss) var dismiss
-    @ObservedObject var inventoryManager: InventoryManager
-    
-    @State private var isbn = ""
-    @State private var title = ""
-    @State private var author = ""
-    @State private var publisher = ""
-    @State private var quantity = 1
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Book Details")) {
-                    TextField("ISBN", text: $isbn)
-                        .keyboardType(.numberPad)
-                    TextField("Title", text: $title)
-                    TextField("Author", text: $author)
-                    TextField("Publisher", text: $publisher)
-                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+        HStack(spacing: 16) {
+            // Book Cover Image
+            AsyncImage(url: URL(string: book.imageURL ?? "")) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure(_):
+                    Image(systemName: "book.fill")
+                        .foregroundStyle(.gray)
+                case .empty:
+                    Image(systemName: "book.fill")
+                        .foregroundStyle(.gray)
+                @unknown default:
+                    Image(systemName: "book.fill")
+                        .foregroundStyle(.gray)
                 }
             }
-            .navigationTitle("Add New Book")
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
-                trailing: Button("Save") {
-                    let newBook = Book(
-                        isbn: isbn,
-                        title: title,
-                        author: author,
-                        publisher: publisher,
-                        quantity: quantity
-                    )
-                    inventoryManager.addBook(newBook)
-                    dismiss()
+            .frame(width: 60, height: 90)
+            .cornerRadius(8)
+            .shadow(radius: 2)
+            
+            // Book Details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(book.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                
+                Text(book.author)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                
+                HStack {
+                    // Availability Badge
+                    Text("\(book.availableQuantity) of \(book.quantity) available")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(book.isAvailable ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                        .foregroundStyle(book.isAvailable ? .green : .red)
+                        .cornerRadius(4)
+                    
+                    Spacer()
+                    
+                    // ISBN Badge
+                    Text(book.isbn)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
-            )
+            }
         }
+        .padding(.vertical, 8)
     }
 }
 
@@ -233,6 +234,64 @@ struct BookDetailView: View {
     }
 }
 
+struct StatusItem: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3)
+                .fontWeight(.semibold)
+        }
+    }
+}
+
+struct AddBookView: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var inventoryManager: InventoryManager
+    
+    @State private var isbn = ""
+    @State private var title = ""
+    @State private var author = ""
+    @State private var publisher = ""
+    @State private var quantity = 1
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Book Details")) {
+                    TextField("ISBN", text: $isbn)
+                        .keyboardType(.numberPad)
+                    TextField("Title", text: $title)
+                    TextField("Author", text: $author)
+                    TextField("Publisher", text: $publisher)
+                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+                }
+            }
+            .navigationTitle("Add New Book")
+            .navigationBarItems(
+                leading: Button("Cancel") { dismiss() },
+                trailing: Button("Save") {
+                    let newBook = Book(
+                        isbn: isbn,
+                        title: title,
+                        author: author,
+                        publisher: publisher,
+                        quantity: quantity
+                    )
+                    inventoryManager.addBook(newBook)
+                    dismiss()
+                }
+                .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
+            )
+        }
+    }
+}
+
 struct EditBookView: View {
     let book: Book
     @ObservedObject var inventoryManager: InventoryManager
@@ -284,7 +343,7 @@ struct EditBookView: View {
                     TextField("Page Count", text: $pageCount)
                         .keyboardType(.numberPad)
                     TextField("Genre", text: $genre)
-                    TextField("Image URL", text: $imageURL)
+//                    TextField("Image URL", text: $imageURL)
                 }
             }
             .navigationTitle("Edit Book")
@@ -324,6 +383,7 @@ struct DetailRow: View {
         }
     }
 }
+
 #Preview {
     InventoryView()
 }
