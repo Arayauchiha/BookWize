@@ -120,7 +120,8 @@ struct Search_BrowseApp: View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
             NavigationView {
-                DashboardView(supabase: supabase)
+                Text("Dashboard Coming Soon")
+                    .navigationTitle("Dashboard")
             }
             .tabItem {
                 Label("Dashboard", systemImage: "rectangle.3.group")
