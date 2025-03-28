@@ -1,4 +1,3 @@
-
 import SwiftUI
 import Supabase
 
@@ -67,47 +66,72 @@ struct ReservationRecord: Identifiable, Codable {
 }
 
 struct ReservedBookView: View {
-//    let circulationManager: CirculationManager
     @State private var searchText = ""
     @State private var reservations: [ReservationRecord] = []
-    @State private var isLoading = false
+    @State private var isLoading = true
     @State private var errorMessage: String?
-    private let supabase = SupabaseClient(
-        supabaseURL: URL(string: "https://qjhfnprghpszprfhjzdl.supabase.co")!,
-        supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqaGZucHJnaHBzenByZmhqemRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzNzE5NTAsImV4cCI6MjA1Nzk0Nzk1MH0.Bny2_LBt2fFjohwmzwCclnFNmrC_LZl3s3PVx-SOeNc"
-    )
+    @State private var selectedReservation: ReservationRecord?
+    @State private var showingDetail = false
+    
+    private let supabase = SupabaseConfig.client
+    
+    var filteredReservations: [ReservationRecord] {
+        if searchText.isEmpty { return reservations }
+        return reservations.filter { reservation in
+            let bookTitle = reservation.book?.title.lowercased() ?? ""
+            let memberName = reservation.member?.name.lowercased() ?? ""
+            let searchQuery = searchText.lowercased()
+            return bookTitle.contains(searchQuery) || memberName.contains(searchQuery)
+        }
+    }
     
     var body: some View {
-        VStack {
+        ZStack {
             if isLoading {
-                ProgressView("Loading reservations...")
+                LoadingView()
             } else if reservations.isEmpty {
-                EmptyStateView(
-                    icon: "book.closed.circle",
-                    title: "No Reserved Books",
-                    message: "There are no books currently reserved"
-                )
+                EmptyView()
             } else {
-                List {
-                    ForEach(reservations) { reservation in
-                        ReservationRowView(reservation: reservation)
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        // Reservations Grid
+                        ForEach(filteredReservations) { reservation in
+                            ReservationCard(reservation: reservation)
+                                .onTapGesture {
+                                    selectedReservation = reservation
+                                    showingDetail = true
+                                }
+                        }
+                        .padding(.horizontal)
                     }
                 }
             }
         }
-        .searchable(text: $searchText, prompt: "Search reservations...")
-        .task {
+        
+        .searchable(text: $searchText, prompt: "Search reservations")
+        .refreshable {
+            isLoading = true
             await fetchReservations()
         }
-        .refreshable {
-            await fetchReservations()
+        .onAppear {
+            Task {
+                await fetchReservations()
+            }
+        }
+        .onChange(of: searchText) { _ in
+            // Refresh data when search text changes
+            Task {
+                await fetchReservations()
+            }
+        }
+        .sheet(isPresented: $showingDetail) {
+            if let reservation = selectedReservation {
+                ReservationDetailSheet(reservation: reservation)
+            }
         }
     }
     
     private func fetchReservations() async {
-        isLoading = true
-        defer { isLoading = false }
-        
         do {
             let response: [ReservationRecord] = try await supabase.database
                 .from("BookReservation")
@@ -116,104 +140,236 @@ struct ReservedBookView: View {
                     member:Members(*), 
                     book:Books(*)
                     """)
+                .order("created_at", ascending: false) // Latest reservations first
                 .execute()
                 .value
             
-            reservations = response
+            await MainActor.run {
+                reservations = response
+                isLoading = false
+                errorMessage = nil
+            }
         } catch {
-            print("Error fetching reservations: \(error)")
-            errorMessage = "Failed to load reservations"
+            await MainActor.run {
+                print("Error fetching reservations: \(error)")
+                errorMessage = "Failed to load reservations"
+                isLoading = false
+            }
         }
     }
 }
 
-struct ReservationRowView: View {
+struct ReservationCard: View {
     let reservation: ReservationRecord
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let book = reservation.book {
-                Text(book.title)
-                    .font(.headline)
+        VStack(spacing: 0) {
+            // Book Cover and Basic Info
+            HStack(alignment: .top, spacing: 16) {
+                // Book Cover
+                if let imageURL = reservation.book?.imageURL,
+                   let url = URL(string: imageURL) {
+                    CachedAsyncImage(url: url)
+                        .frame(width: 100, height: 150)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .shadow(radius: 2)
+                } else {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemGray5))
+                        .frame(width: 100, height: 150)
+                        .overlay(
+                            Image(systemName: "book.closed")
+                                .font(.largeTitle)
+                                .foregroundColor(.gray)
+                        )
+                }
+                
+                // Book and Member Info
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(reservation.book?.title ?? "Unknown Book")
+                        .font(.headline)
+                        .lineLimit(2)
+                    
+                    Text(reservation.book?.author ?? "Unknown Author")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    // Member Info
+                    HStack {
+                        Image(systemName: "person.circle.fill")
+                            .foregroundColor(.blue)
+                        Text(reservation.member?.name ?? "Unknown Member")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Reservation Date
+                    HStack {
+                        Image(systemName: "calendar")
+                            .foregroundColor(.gray)
+                        Text(reservation.created_at.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.vertical, 8)
             }
             
-            if let member = reservation.member {
-                Text(member.name)
+            // Action Button
+            Button(action: {
+                // Implement issue functionality
+            }) {
+                Text("Issue Book")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            HStack {
-                Label(reservation.created_at.formatted(date: .abbreviated, time: .shortened),
-                      systemImage: "calendar")
-                    .font(.caption)
-                Spacer()
-                Text("Reserved")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.blue)
+                    .fontWeight(.medium)
                     .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.blue)
                     .cornerRadius(8)
             }
+            .padding(.top, 12)
         }
-        .padding(.vertical, 4)
+        .padding(16)
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
     }
 }
 
-struct CirculationRowView: View {
-    let transaction: CirculationRecord
+struct ReservationDetailSheet: View {
+    let reservation: ReservationRecord
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Book ID: \(transaction.bookId.uuidString)")
-                    .font(.headline)
-                Spacer()
-                StatusBadge(status: transaction.status)
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Book Cover
+                    if let imageURL = reservation.book?.imageURL,
+                       let url = URL(string: imageURL) {
+                        CachedAsyncImage(url: url)
+                            .frame(height: 240)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(radius: 4)
+                    }
+                    
+                    // Book Details
+                    DetailSection(title: "Book Information") {
+                        DetailItem(title: "Title", value: reservation.book?.title ?? "N/A")
+                        DetailItem(title: "Author", value: reservation.book?.author ?? "N/A")
+                        if let isbn = reservation.book?.isbn {
+                            DetailItem(title: "ISBN", value: isbn)
+                        }
+                        if let genre = reservation.book?.genre {
+                            DetailItem(title: "Genre", value: genre)
+                        }
+                    }
+                    
+                    // Member Details
+                    DetailSection(title: "Member Information") {
+                        DetailItem(title: "Name", value: reservation.member?.name ?? "N/A")
+                        DetailItem(title: "Email", value: reservation.member?.email ?? "N/A")
+                        DetailItem(title: "Library", value: reservation.member?.selectedLibrary ?? "N/A")
+                    }
+                    
+                    // Reservation Details
+                    DetailSection(title: "Reservation Information") {
+                        DetailItem(
+                            title: "Reserved On",
+                            value: reservation.created_at.formatted(date: .long, time: .shortened)
+                        )
+                        DetailItem(
+                            title: "Status",
+                            value: "Reserved",
+                            valueColor: .blue
+                        )
+                    }
+                    
+                    // Action Button
+                    Button(action: {
+                        // Implement issue functionality
+                    }) {
+                        Text("Issue Book")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                    }
+                    .padding(.top)
+                }
+                .padding()
             }
+            .navigationTitle("Reservation Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct DetailSection<Content: View>: View {
+    let title: String
+    let content: Content
+    
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.primary)
             
-            Text("Member ID: \(transaction.memberId.uuidString)")
-                .font(.subheadline)
+            content
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+        }
+    }
+}
+
+struct DetailItem: View {
+    let title: String
+    let value: String
+    var valueColor: Color = .primary
+    
+    var body: some View {
+        HStack(alignment: .top) {
+            Text(title)
                 .foregroundColor(.secondary)
+                .frame(width: 100, alignment: .leading)
             
-            HStack {
-                Label(transaction.issueDate.formatted(date: .abbreviated, time: .omitted),
-                      systemImage: "calendar")
-                Spacer()
-                Label(transaction.dueDate.formatted(date: .abbreviated, time: .omitted),
-                      systemImage: "calendar.badge.clock")
-                    .foregroundColor(transaction.isOverdue ? .red : .primary)
-            }
-            .font(.caption)
+            Spacer()
+            
+            Text(value)
+                .multilineTextAlignment(.trailing)
+                .foregroundColor(valueColor)
         }
-        .padding(.vertical, 4)
+        .font(.subheadline)
     }
 }
 
-struct StatusBadge: View {
-    let status: CirculationStatus
-    
+struct LoadingView: View {
     var body: some View {
-        Text(status.rawValue.capitalized)
-            .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(backgroundColor)
-            .foregroundColor(.white)
-            .cornerRadius(8)
-    }
-    
-    private var backgroundColor: Color {
-        switch status {
-        case .issued:
-            return .blue
-        case .returned:
-            return .green
-        case .renewed:
-            return .orange
-        case .overdue:
-            return .red
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(.blue)
+            Text("Loading reservations...")
+                .font(.headline)
+                .foregroundColor(.secondary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(UIColor.systemBackground))
     }
 }
