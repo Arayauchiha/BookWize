@@ -8,8 +8,9 @@ struct User: Codable, Identifiable {
     var password: String
     var selectedLibrary: String
     var selectedGenres: [String]
+    var fine: Double
     
-    init(id: UUID = UUID(), email: String, name: String, gender: Gender, password: String, selectedLibrary: String, selectedGenres: [String] = []) {
+    init(id: UUID = UUID(), email: String, name: String, gender: Gender, password: String, selectedLibrary: String, selectedGenres: [String] = [], fine: Double = 0) {
         self.id = id
         self.email = email
         self.name = name
@@ -17,6 +18,7 @@ struct User: Codable, Identifiable {
         self.password = password
         self.selectedLibrary = selectedLibrary
         self.selectedGenres = selectedGenres
+        self.fine = fine
     }
 }
 
