@@ -1,5 +1,7 @@
+
 import SwiftUI
 import UniformTypeIdentifiers
+import Supabase
 
 struct InventoryView: View {
     @StateObject private var inventoryManager = InventoryManager()
@@ -7,26 +9,84 @@ struct InventoryView: View {
     @State private var showingAddBookSheet = false
     @State private var showingISBNScanner = false
     @State private var showingCSVUpload = false
+    @State private var showingRequestBook = false
     @State private var selectedBook: Book?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
+    @State private var selectedSegment = 0
+    @State private var requests: [BookRequest] = []
+    @State private var isFetchingRequests = false
+    
+    private let segments = ["Books", "Requests"]
     
     var filteredBooks: [Book] {
         inventoryManager.searchBooks(query: searchText)
     }
     
+    var filteredRequests: [BookRequest] {
+        if searchText.isEmpty {
+            return requests
+        } else {
+            return requests.filter { request in
+                request.author.lowercased().contains(searchText.lowercased()) ||
+                request.title.lowercased().contains(searchText.lowercased()) ||
+                request.reason.lowercased().contains(searchText.lowercased())
+            }
+        }
+    }
+    
     var body: some View {
         NavigationView {
-            List {
-                ForEach(filteredBooks) { book in
-                    BookRowView(book: book)
-                        .onTapGesture {
-                            selectedBook = book
+            VStack {
+                Picker("View", selection: $selectedSegment) {
+                    ForEach(0..<segments.count, id: \.self) { index in
+                        Text(segments[index]).tag(index)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding()
+                
+                if selectedSegment == 0 {
+                    List {
+                        ForEach(filteredBooks) { book in
+                            BookRowView(book: book)
+                                .onTapGesture {
+                                    selectedBook = book
+                                }
                         }
+                    }
+                } else {
+                    List {
+                        ForEach(filteredRequests) { request in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Author: \(request.author)")
+                                    .font(.headline)
+                                Text("Title: \(request.title)")
+                                    .font(.subheadline)
+                                Text("Quantity: \(request.quantity)")
+                                    .font(.caption)
+                                Text("Reason: \(request.reason)")
+                                    .font(.caption)
+                                Text("Status: \(request.Request_status.rawValue.capitalized)")
+                                    .font(.caption)
+                                    //.foregroundColor(request.Request_status == .accepted ? .orange : .green)
+                                    .foregroundColor(request.Request_status .background)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .overlay {
+                        if isFetchingRequests {
+                            ProgressView("Loading requests...")
+                        }
+                    }
+                    .onAppear {
+                        fetchRequests()
+                    }
                 }
             }
-            .searchable(text: $searchText, prompt: "Search books...")
+            .searchable(text: $searchText, prompt: selectedSegment == 0 ? "Search books..." : "Search requests...")
             .navigationTitle("Library Inventory")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -41,6 +101,9 @@ struct InventoryView: View {
                         
                         Button(action: { showingCSVUpload = true }) {
                             Label("Import CSV", systemImage: "doc.text.below.ecg")
+                        }
+                        Button(action: { showingRequestBook = true }) {
+                            Label("Request Book", systemImage: "book.circle")
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
@@ -57,6 +120,9 @@ struct InventoryView: View {
             }
             .sheet(isPresented: $showingCSVUpload) {
                 CSVUploadView(viewModel: inventoryManager)
+            }
+            .sheet(isPresented: $showingRequestBook) {
+                RequestBookView()
             }
             .sheet(item: $selectedBook) { book in
                 BookDetailView(book: book, inventoryManager: inventoryManager)
@@ -92,6 +158,34 @@ struct InventoryView: View {
                     errorMessage = "Error fetching book details: \(error.localizedDescription)"
                     showError = true
                     isLoading = false
+                }
+            }
+        }
+    }
+    
+    
+
+    
+    private func fetchRequests() {
+        isFetchingRequests = true
+        Task {
+            do {
+                let client = SupabaseManager.shared.client
+                let fetchedRequests: [BookRequest] = try await client
+                    .from("BookRequest")
+                    .select()
+                    .execute()
+                    .value
+                
+                await MainActor.run {
+                    self.requests = fetchedRequests
+                    isFetchingRequests = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to fetch requests: \(error.localizedDescription)"
+                    isFetchingRequests = false
+                    showError = true
                 }
             }
         }
@@ -324,17 +418,8 @@ struct DetailRow: View {
         }
     }
 }
+
+
 #Preview {
     InventoryView()
 }
-
-
-
-
-
-
-
-
-
-
-
