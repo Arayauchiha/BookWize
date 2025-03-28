@@ -145,16 +145,6 @@ struct Search_BrowseApp: View {
                 }
                 .tag(2)
             
-            // Book Club Tab
-            NavigationView {
-                Text("Book Club Coming Soon")
-                    .navigationTitle("Book Club")
-            }
-            .tabItem {
-                Label("Book Club", systemImage: "person.3.fill")
-            }
-            .tag(3)
-            
             // Account Tab - Modified to include Membership Details
             NavigationView {
                 List {
@@ -219,7 +209,7 @@ struct Search_BrowseApp: View {
             .tabItem {
                 Label("Account", systemImage: "person.circle")
             }
-            .tag(4)
+            .tag(3)
             
             .accentColor(.blue)
             .onAppear {

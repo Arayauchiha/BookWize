@@ -1,6 +1,47 @@
 import SwiftUI
 import Supabase
 
+// Add a BookReservationManager to handle persistent state
+class BookReservationManager {
+    static let shared = BookReservationManager()
+    private var reservedBooks: [UUID: UUID] = [:] // [bookId: reservationId]
+    private var pendingOperations: Set<UUID> = [] // Currently processing book IDs
+    
+    private init() {}
+    
+    func setReservation(bookId: UUID, reservationId: UUID) {
+        reservedBooks[bookId] = reservationId
+        pendingOperations.remove(bookId)
+    }
+    
+    func removeReservation(bookId: UUID) {
+        reservedBooks.removeValue(forKey: bookId)
+        pendingOperations.remove(bookId)
+    }
+    
+    func isReserved(bookId: UUID) -> Bool {
+        return reservedBooks[bookId] != nil
+    }
+    
+    func getReservationId(bookId: UUID) -> UUID? {
+        return reservedBooks[bookId]
+    }
+    
+    func beginOperation(bookId: UUID) -> Bool {
+        // Return false if operation already in progress
+        if pendingOperations.contains(bookId) {
+            return false
+        }
+        
+        pendingOperations.insert(bookId)
+        return true
+    }
+    
+    func endOperation(bookId: UUID) {
+        pendingOperations.remove(bookId)
+    }
+}
+
 // Add these near the top of the file, after the imports
 private struct SupabaseClientKey: EnvironmentKey {
     static let defaultValue: SupabaseClient = SupabaseClient(
@@ -96,17 +137,10 @@ class BookReservationViewModel: ObservableObject {
             book_id: book.id
         )
         
-        let response: BookReservation = try await supabase.database
+        // Don't try to capture the response as BookReservation
+        try await supabase.database
             .from("BookReservation")
             .insert(reservation)
-            .single()
-            .execute()
-            .value
-        
-        try await supabase
-            .from("Books")
-            .update(["availableQuantity": book.availableQuantity - 1])
-            .eq("id", value: book.id)
             .execute()
     }
 }
@@ -124,29 +158,94 @@ private struct ActionButtonsView: View {
     @State private var showRemoveConfirmation = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isBookReserved = false
+    @State private var reservationId: UUID?
+    @Binding var currentAvailability: Int
+    
+    private func checkReservationStatus() {
+        // First check local cache
+        if BookReservationManager.shared.isReserved(bookId: book.id) {
+            isBookReserved = true
+            reservationId = BookReservationManager.shared.getReservationId(bookId: book.id)
+            print("Book is reserved locally with reservation ID: \(reservationId?.uuidString ?? "unknown")")
+            return
+        }
+        
+        Task {
+            do {
+                // Get current user ID from UserDefaults
+                guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
+                    return
+                }
+                
+                // Check if this book is already reserved by the current user
+                let response = try await supabase.database
+                    .from("BookReservation")
+                    .select("id")
+                    .eq("book_id", value: book.id.uuidString)
+                    .eq("member_id", value: userId)
+                    .execute()
+                
+                struct ReservationResponse: Codable {
+                    let id: String
+                }
+                
+                // Parse the response
+                let decoder = JSONDecoder()
+                if let reservations = try? decoder.decode([ReservationResponse].self, from: response.data),
+                   let firstReservation = reservations.first,
+                   let uuid = UUID(uuidString: firstReservation.id) {
+                    // Book is already reserved by this user
+                    await MainActor.run {
+                        isBookReserved = true
+                        reservationId = uuid
+                        // Update local cache
+                        BookReservationManager.shared.setReservation(bookId: book.id, reservationId: uuid)
+                    }
+                    print("Book is already reserved by user with reservation ID: \(uuid)")
+                } else {
+                    await MainActor.run {
+                        isBookReserved = false
+                        reservationId = nil
+                        // Make sure not in cache
+                        BookReservationManager.shared.removeReservation(bookId: book.id)
+                    }
+                    print("Book is not reserved by this user")
+                }
+            } catch {
+                print("Error checking reservation status: \(error)")
+            }
+        }
+    }
     
     private func reserveBook() async {
+        // Begin reservation operation - return if already in progress
+        if !BookReservationManager.shared.beginOperation(bookId: book.id) {
+            print("Reservation operation already in progress for book: \(book.id)")
+            return
+        }
+        
         isReserving = true
         
         do {
             // First get a valid member ID from the database
-            let members: [MemberID] = try await supabase.database
-                .from("Members")
-                .select("id")
-                .limit(1)
-                .execute()
-                .value
-            
-            guard let member = members.first else {
-                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No members found in the system"])
+            guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
             }
             
             let reservation = BookReservation(
                 id: UUID(),
                 created_at: Date(),
-                member_id: member.id,
+                member_id: UUID(uuidString: userId)!,
                 book_id: book.id
             )
+            
+            // First check if we already have a reservation for this book
+            if BookReservationManager.shared.isReserved(bookId: book.id) {
+                print("Book is already reserved locally, not creating duplicate reservation")
+                BookReservationManager.shared.endOperation(bookId: book.id)
+                return
+            }
             
             // Insert the reservation
             try await supabase.database
@@ -154,30 +253,113 @@ private struct ActionButtonsView: View {
                 .insert(reservation)
                 .execute()
             
-            // Update book's available quantity
-            if book.availableQuantity > 0 {
+            // Update book's available quantity - only do this here, nowhere else
+            if currentAvailability > 0 {
+                // Update the database with the current availability value
                 try await supabase.database
                     .from("Books")
-                    .update(["availableQuantity": book.availableQuantity - 1])
+                    .update(["availableQuantity": currentAvailability - 1])
                     .eq("id", value: book.id)
                     .execute()
+                
+                // Update our local state to match what we just set in the database
+                await MainActor.run {
+                    currentAvailability -= 1
+                }
             }
             
-            print("Book reserved successfully!")
+            print("Book reserved successfully! New availability: \(currentAvailability)")
+            await MainActor.run {
+                isBookReserved = true
+                reservationId = reservation.id
+                // Update local cache
+                BookReservationManager.shared.setReservation(bookId: book.id, reservationId: reservation.id)
+            }
             
         } catch {
             print("Error reserving book: \(error)")
             errorMessage = "Failed to reserve book. Please try again."
             showError = true
+            BookReservationManager.shared.endOperation(bookId: book.id)
         }
         
         isReserving = false
+        BookReservationManager.shared.endOperation(bookId: book.id)
     }
+    
+    private func removeReservation() async {
+        // Begin remove operation - return if already in progress
+        if !BookReservationManager.shared.beginOperation(bookId: book.id) {
+            print("Remove reservation operation already in progress for book: \(book.id)")
+            return
+        }
+        
+        isReserving = true
+        
+        do {
+            guard let reservationId = reservationId else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Reservation ID not found"])
+            }
+            
+            // Check if this book is already removed from the reservation
+            if !BookReservationManager.shared.isReserved(bookId: book.id) {
+                print("Book is not reserved locally, no need to remove reservation")
+                await MainActor.run {
+                    isBookReserved = false
+                    self.reservationId = nil
+                }
+                BookReservationManager.shared.endOperation(bookId: book.id)
+                return
+            }
+            
+            // Delete the reservation
+            try await supabase.database
+                .from("BookReservation")
+                .delete()
+                .eq("id", value: reservationId)
+                .execute()
+            
+            // Increase book's available quantity - only do this here, nowhere else
+            // Use the current availability rather than the book's property
+            try await supabase.database
+                .from("Books")
+                .update(["availableQuantity": currentAvailability + 1])
+                .eq("id", value: book.id)
+                .execute()
+            
+            // Update our local state
+            await MainActor.run {
+                currentAvailability += 1
+            }
+            
+            print("Reservation removed successfully! New availability: \(currentAvailability)")
+            await MainActor.run {
+                isBookReserved = false
+                self.reservationId = nil
+                // Update local cache
+                BookReservationManager.shared.removeReservation(bookId: book.id)
+            }
+            
+        } catch {
+            print("Error removing reservation: \(error)")
+            errorMessage = "Failed to remove reservation. Please try again."
+            showError = true
+            BookReservationManager.shared.endOperation(bookId: book.id)
+        }
+        
+        isReserving = false
+        BookReservationManager.shared.endOperation(bookId: book.id)
+    }
+    
     var body: some View {
         VStack(spacing: 12) {
             Button(action: {
                 Task {
-                    await reserveBook()
+                    if isBookReserved {
+                        await removeReservation()
+                    } else {
+                        await reserveBook()
+                    }
                 }
             }) {
                 HStack {
@@ -185,17 +367,17 @@ private struct ActionButtonsView: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
-                        Text("Reserve")
+                        Text(isBookReserved ? "Remove from Reserved" : "Reserve")
                             .fontWeight(.bold)
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(book.isAvailable ? Color.blue : Color.gray)
+                .background(isBookReserved ? Color.red : (currentAvailability > 0 ? Color.blue : Color.gray))
                 .foregroundColor(.white)
                 .cornerRadius(8)
             }
-            .disabled(!book.isAvailable || isReserving)
+            .disabled((currentAvailability <= 0 && !isBookReserved) || isReserving)
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) { }
             } message: {
@@ -241,6 +423,7 @@ private struct ActionButtonsView: View {
         }
         .onAppear {
             checkIfBookInWishlist()
+            checkReservationStatus()
         }
     }
     
@@ -638,6 +821,14 @@ struct BookDetailCard: View {
     @State private var addedToWishlist = false
     @State private var isFullScreen = false
     @State private var isImageLoaded = false
+    @State private var currentAvailability: Int
+    
+    init(book: Book, supabase: SupabaseClient, isPresented: Binding<Bool>) {
+        self.book = book
+        self.supabase = supabase
+        self._isPresented = isPresented
+        self._currentAvailability = State(initialValue: book.availableQuantity)
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -658,10 +849,10 @@ struct BookDetailCard: View {
                         
                         // Availability Status
                         HStack {
-                            Image(systemName: book.isAvailable ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundColor(book.isAvailable ? .green : .red)
-                            Text(book.isAvailable ? "Available" : "Unavailable")
-                                .foregroundColor(book.isAvailable ? .green : .red)
+                            Image(systemName: currentAvailability > 0 ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundColor(currentAvailability > 0 ? .green : .red)
+                            Text(currentAvailability > 0 ? "Available" : "Unavailable")
+                                .foregroundColor(currentAvailability > 0 ? .green : .red)
                         }
                         
                         // Action Buttons
@@ -669,7 +860,8 @@ struct BookDetailCard: View {
                             book: book,
                             supabase: supabase,
                             isReserving: $isReserving,
-                            addedToWishlist: $addedToWishlist
+                            addedToWishlist: $addedToWishlist,
+                            currentAvailability: $currentAvailability
                         )
                         
                         // Book Description
@@ -762,6 +954,39 @@ struct BookDetailCard: View {
                 }
         )
         .offset(y: dragOffset)
+        .onAppear {
+            // Fetch the latest availability from the database when the view appears
+            Task {
+                do {
+                    let response = try await supabase.database
+                        .from("Books")
+                        .select("availableQuantity")
+                        .eq("id", value: book.id)
+                        .single()
+                        .execute()
+                    
+                    struct BookAvailability: Codable {
+                        let availableQuantity: Int
+                    }
+                    
+                    if let decodedData = try? JSONDecoder().decode(BookAvailability.self, from: response.data) {
+                        print("Updated availability from database: \(decodedData.availableQuantity)")
+                        await MainActor.run {
+                            currentAvailability = decodedData.availableQuantity
+                        }
+                    }
+                } catch {
+                    print("Error fetching availability: \(error)")
+                }
+            }
+        }
+        .onDisappear {
+            // This ensures the reservation status persists when the view disappears
+            // ONLY log the status, don't make any database updates here
+            if let reservationId = BookReservationManager.shared.getReservationId(bookId: book.id) {
+                print("Persisting reservation state for book: \(book.title) with ID: \(book.id)")
+            }
+        }
     }
 }
 
