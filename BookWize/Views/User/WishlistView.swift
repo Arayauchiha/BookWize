@@ -51,7 +51,7 @@ struct WishlistView: View {
                     BookDetailCard(book: book, supabase: supabase, isPresented: $showBookDetail)
                         .navigationBarHidden(true)
                 }
-                .interactiveDismissDisabled()
+                .interactiveDismissDisabled(false)
             }
             .alert("Remove from Wishlist", isPresented: $viewModel.showingRemoveAlert) {
                 Button("Cancel", role: .cancel) {}
