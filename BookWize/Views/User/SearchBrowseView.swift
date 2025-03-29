@@ -72,7 +72,7 @@ struct SearchBrowseView: View {
                         // Main browse content when no search
                         BookSectionsView(
                             forYouBooks: viewModel.forYouBooks,
-                            popularBooks: viewModel.popularBooks,
+                            recentlyAddedBooks: viewModel.recentlyAddedBooks,
                             booksByGenre: initialBooksByGenre,
                             supabase: supabase,
                             selectedGenreFromCard: $selectedGenreFromCard,
@@ -111,7 +111,7 @@ struct SearchBrowseView: View {
                     BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
                         .navigationBarHidden(true)
                 }
-                .interactiveDismissDisabled()
+                .interactiveDismissDisabled(false)
             }
 
         }

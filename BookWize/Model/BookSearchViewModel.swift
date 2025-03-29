@@ -21,7 +21,7 @@ class BookSearchViewModel: ObservableObject {
     
     @Published var books: [Book] = []
     @Published var forYouBooks: [Book] = []
-    @Published var popularBooks: [Book] = []
+    @Published var recentlyAddedBooks: [Book] = []
     @Published var booksByAuthor: [String: [Book]] = [:]
     @Published var allPreferredBooks: [Book] = []
     @Published var memberSelectedGenres: [String] = []
@@ -125,8 +125,15 @@ class BookSearchViewModel: ObservableObject {
             forYouBooks = Array(preferredBooks.shuffled().prefix(6))
         }
         
-        // Setup Popular Books with random books from all books
-        popularBooks = Array(books.shuffled().prefix(8))
+        // Setup Recently Added Books with books added in the last 7 days
+        let calendar = Calendar.current
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        
+        recentlyAddedBooks = books.filter { book in
+            return book.addedDate >= sevenDaysAgo
+        }.sorted(by: { $0.addedDate > $1.addedDate }) // Sort by newest first
+        
+        print("Found \(recentlyAddedBooks.count) books added in the last 7 days")
         
         // Setup Books by Author
         booksByAuthor = Dictionary(grouping: books, by: { $0.author })

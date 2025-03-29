@@ -37,14 +37,14 @@ struct ForYouGridView: View {
                 BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
                     .navigationBarHidden(true)
             }
-            .interactiveDismissDisabled()
+            .interactiveDismissDisabled(false)
         }
     }
 }
 
 struct BookSectionsView: View {
     let forYouBooks: [Book]
-    let popularBooks: [Book]
+    let recentlyAddedBooks: [Book]
     let booksByGenre: [String: [Book]]
     let supabase: SupabaseClient
     @Binding var selectedGenreFromCard: String?
@@ -63,8 +63,8 @@ struct BookSectionsView: View {
                 showingBookDetail: $showingBookDetail
             )
 
-            PopularBooksSectionView(
-                books: popularBooks,
+            RecentlyAddedSectionView(
+                books: recentlyAddedBooks,
                 selectedBook: $selectedBook,
                 showingBookDetail: $showingBookDetail
             )
@@ -76,9 +76,8 @@ struct BookSectionsView: View {
                 BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
                     .navigationBarHidden(true)
             }
-            .interactiveDismissDisabled()
+            .interactiveDismissDisabled(false)
         }
-
     }
 }
 
@@ -136,42 +135,72 @@ struct ForYouSectionView: View {
     }
 }
 
-    
-    struct PopularBooksSectionView: View {
-        let books: [Book]
-        @Binding var selectedBook: Book?
-        @Binding var showingBookDetail: Bool
+struct RecentlyAddedSectionView: View {
+    let books: [Book]
+    @Binding var selectedBook: Book?
+    @Binding var showingBookDetail: Bool
 
-        var body: some View {
-            VStack(alignment: .leading) {
-                HStack {
-                    Text("Popular Books")
-                        .font(.title2)
-                        .fontWeight(.bold)
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
+                Text("Recently Added")
+                    .font(.title2)
+                    .fontWeight(.bold)
 
-                    Spacer()
+                Spacer()
 
+                if !books.isEmpty {
                     NavigationLink {
                         ScrollView {
-                            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
-                                ForEach(books) { book in
-                                    BookCardView(book: book) {
-                                        selectedBook = book
-                                        showingBookDetail = true
+                            VStack(alignment: .leading) {
+                                Text("Books added this week")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                                    .padding(.top, 8)
+                                
+                                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+                                    ForEach(books) { book in
+                                        BookCardView(book: book) {
+                                            selectedBook = book
+                                            showingBookDetail = true
+                                        }
                                     }
                                 }
+                                .padding()
                             }
-                            .padding()
                         }
-                        .navigationTitle("Popular Books")
+                        .navigationTitle("Recently Added")
                     } label: {
                         Text("See All")
                             .foregroundColor(.blue)
                             .font(.subheadline)
                     }
                 }
-                .padding(.horizontal)
+            }
+            .padding(.horizontal)
 
+            if books.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No new books in the last 7 days")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            
+                        Text("Check back soon for new additions!")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.vertical, 40)
+                    Spacer()
+                }
+            } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(books) { book in
@@ -184,92 +213,103 @@ struct ForYouSectionView: View {
                     .padding(.horizontal)
                 }
             }
-            .padding(.vertical, 8)
         }
+        .padding(.vertical, 8)
     }
+}
 
-    struct BrowseByGenreSectionView: View {
-        let booksByGenre: [String: [Book]]
-        let supabase: SupabaseClient
+struct BrowseByGenreSectionView: View {
+    let booksByGenre: [String: [Book]]
+    let supabase: SupabaseClient
 
-        var body: some View {
-            VStack(alignment: .leading) {
+    var body: some View {
+        VStack(alignment: .leading) {
+            HStack {
                 Text("Browse by Genre")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .padding(.horizontal)
-
-                if booksByGenre.isEmpty {
-                    HStack {
-                        Spacer()
-                        VStack {
-                            ProgressView()
-                                .padding()
-                            Text("Loading genres...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
+                
+                Spacer()
+                
+                if !booksByGenre.isEmpty {
+                    NavigationLink {
+                        GenreGridView(booksByGenre: booksByGenre, supabase: supabase)
+                    } label: {
+                        Text("See All")
+                            .foregroundColor(.blue)
+                            .font(.subheadline)
                     }
-                    .padding()
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(Array(booksByGenre.keys.sorted()), id: \.self) { genre in
-                                NavigationLink {
-                                    GenreBooksView(genre: genre, books: booksByGenre[genre] ?? [], supabase: supabase)
-                                } label: {
-                                    if let firstBook = booksByGenre[genre]?.first {
-                                        GenreCardView(genre: genre, firstBook: firstBook, bookCount: booksByGenre[genre]?.count ?? 0)
-                                    }
+                }
+            }
+            .padding(.horizontal)
+
+            if booksByGenre.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack {
+                        ProgressView()
+                            .padding()
+                        Text("Loading genres...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding()
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(Array(booksByGenre.keys.sorted()), id: \.self) { genre in
+                            NavigationLink {
+                                GenreBooksView(genre: genre, books: booksByGenre[genre] ?? [], supabase: supabase)
+                            } label: {
+                                if let firstBook = booksByGenre[genre]?.first {
+                                    GenreCardView(genre: genre, firstBook: firstBook, bookCount: booksByGenre[genre]?.count ?? 0)
                                 }
                             }
                         }
-                        .padding(.horizontal)
                     }
+                    .padding(.horizontal)
                 }
             }
-            .padding(.vertical, 8)
         }
+        .padding(.vertical, 8)
     }
+}
 
-    struct GenreCardView: View {
-        let genre: String
-        let firstBook: Book
-        let bookCount: Int
+struct GenreCardView: View {
+    let genre: String
+    let firstBook: Book
+    let bookCount: Int
 
-        var body: some View {
-            VStack(alignment: .center, spacing: 8) {
-                if let imageURL = firstBook.imageURL, let url = URL(string: imageURL) {
-                    CachedAsyncImage(url: url)
-                        .frame(width: 180, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .shadow(radius: 4)
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 180, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                VStack(spacing: 2) {
-                    Text(genre)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-
-                    Text("\(bookCount) books")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 4)
+    var body: some View {
+        VStack(alignment: .center, spacing: 8) {
+            if let imageURL = firstBook.imageURL, let url = URL(string: imageURL) {
+                CachedAsyncImage(url: url)
+                    .frame(width: 180, height: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(radius: 4)
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 180, height: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
-            .frame(width: 180)
+            VStack(spacing: 2) {
+                Text(genre)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                Text("\(bookCount) books")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
         }
+        .frame(width: 180)
     }
-
-    
-
-
+}
 
 struct BookCardView: View {
     let book: Book
@@ -307,5 +347,33 @@ struct BookCardView: View {
                 }
             }
         }
+    }
+}
+
+// Add a new view for displaying all genres in a grid
+struct GenreGridView: View {
+    let booksByGenre: [String: [Book]]
+    let supabase: SupabaseClient
+    let columns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
+    ]
+    
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 24) {
+                ForEach(Array(booksByGenre.keys.sorted()), id: \.self) { genre in
+                    if let firstBook = booksByGenre[genre]?.first {
+                        NavigationLink {
+                            GenreBooksView(genre: genre, books: booksByGenre[genre] ?? [], supabase: supabase)
+                        } label: {
+                            GenreCardView(genre: genre, firstBook: firstBook, bookCount: booksByGenre[genre]?.count ?? 0)
+                        }
+                    }
+                }
+            }
+            .padding()
+        }
+        .navigationTitle("All Genres")
     }
 }

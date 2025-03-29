@@ -12,6 +12,7 @@ struct MemberLoginView: View {
     @State private var showPasswordReset = false
     @State private var passwordResetOTP = ""
     @State private var isPasswordVisible = false
+    @State private var emailError: String?
     @FocusState private var focusedField: Field?
     
     // For password reset
@@ -27,6 +28,10 @@ struct MemberLoginView: View {
     
     private enum Field {
         case email, password
+    }
+    
+    private var isEmailValid: Bool {
+        ValidationUtils.isValidEmail(email)
     }
     
     var body: some View {
@@ -62,6 +67,19 @@ struct MemberLoginView: View {
                         .onSubmit {
                             focusedField = .password
                         }
+                        .onChange(of: email) { newValue in
+                            if !newValue.isEmpty && !isEmailValid {
+                                emailError = "Please enter a valid email address"
+                            } else {
+                                emailError = nil
+                            }
+                        }
+                    
+                    if let error = emailError {
+                        Text(error)
+                            .foregroundStyle(Color.red)
+                            .font(.caption)
+                    }
                 }
                 
                 // Password field
@@ -114,10 +132,10 @@ struct MemberLoginView: View {
                     }
                 }
                 .padding(.vertical, 15)
-                .background(!email.isEmpty && !password.isEmpty ? Color.customButton : Color.gray)
+                .background(!email.isEmpty && !password.isEmpty && isEmailValid ? Color.customButton : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || email.isEmpty || password.isEmpty)
+                .disabled(isLoading || email.isEmpty || password.isEmpty || !isEmailValid)
                 .padding(.top, 8)
                 
                 // Forgot password and sign up links
@@ -417,6 +435,9 @@ struct PasswordResetRequestView: View {
     @State private var errorMessage = ""
     @State private var otpSent = false
     @State private var verifyingOTP = false
+    @State private var timeRemaining = 60
+    @State private var timer: Timer?
+    @State private var emailError: String?
     @FocusState private var isEmailFocused: Bool
     @FocusState private var isOTPFocused: Bool
     
@@ -425,6 +446,10 @@ struct PasswordResetRequestView: View {
     
     let onRequestReset: () -> Void
     let onVerifyOTP: () -> Void
+    
+    private var isEmailValid: Bool {
+        ValidationUtils.isValidEmail(email)
+    }
     
     var body: some View {
         NavigationStack {
@@ -451,6 +476,19 @@ struct PasswordResetRequestView: View {
                         .textInputAutocapitalization(.never)
                         .disableAutocorrection(true)
                         .focused($isEmailFocused)
+                        .onChange(of: email) { newValue in
+                            if !newValue.isEmpty && !isEmailValid {
+                                emailError = "Please enter a valid email address"
+                            } else {
+                                emailError = nil
+                            }
+                        }
+                    
+                    if let error = emailError {
+                        Text(error)
+                            .foregroundStyle(Color.red)
+                            .font(.caption)
+                    }
                 } else {
                     Text("Enter the verification code sent to \(email)")
                         .font(.subheadline)
@@ -498,6 +536,11 @@ struct PasswordResetRequestView: View {
                             return
                         }
                         
+                        if !isEmailValid {
+                            errorMessage = "Please enter a valid email address"
+                            return
+                        }
+                        
                         isLoading = true
                         onRequestReset()
                         
@@ -506,33 +549,42 @@ struct PasswordResetRequestView: View {
                             isLoading = false
                             otpSent = true
                             isOTPFocused = true
+                            startTimer()
                         }
                     }
                 }) {
-                    if isLoading || verifyingOTP {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Text(otpSent ? "Verify" : "Send Verification Code")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
+                    HStack {
+                        Spacer()
+                        if isLoading || verifyingOTP {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Text(otpSent ? "Verify" : "Send Verification Code")
+                                .font(.headline)
+                        }
+                        Spacer()
                     }
                 }
-                .padding(.vertical, 15)
-                .background(Color.customButton)
+                .frame(height: 50)
+                .padding(.horizontal)
+                .background(otpSent ? (passwordResetOTP.isEmpty ? Color.gray : Color.customButton) : (email.isEmpty || !isEmailValid ? Color.gray : Color.customButton))
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || verifyingOTP || (!otpSent && email.isEmpty) || (otpSent && passwordResetOTP.isEmpty))
+                .disabled(isLoading || verifyingOTP || (!otpSent && (email.isEmpty || !isEmailValid)) || (otpSent && passwordResetOTP.isEmpty))
                 
                 if otpSent {
-                    Button("Resend Code") {
-                        passwordResetOTP = ""
-                        onRequestReset()
+                    Button(action: {
+                        if timeRemaining == 0 {
+                            passwordResetOTP = ""
+                            onRequestReset()
+                            startTimer()
+                        }
+                    }) {
+                        Text(timeRemaining > 0 ? "Resend code in \(timeRemaining)s" : "Resend Code")
+                            .font(.subheadline)
                     }
-                    .foregroundColor(Color.customButton)
-                    .font(.subheadline)
-                    .padding(.top, 8)
-                    .disabled(isLoading)
+                    .foregroundColor(timeRemaining > 0 ? Color.gray : Color.customButton)
+                    .disabled(timeRemaining > 0 || isLoading)
                 }
                 
                 Spacer()
@@ -545,12 +597,31 @@ struct PasswordResetRequestView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        timer?.invalidate()
+                        timer = nil
                         dismiss()
                     }
                 }
             }
             .onAppear {
                 isEmailFocused = true
+            }
+            .onDisappear {
+                timer?.invalidate()
+                timer = nil
+            }
+        }
+    }
+    
+    private func startTimer() {
+        timeRemaining = 60
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            if timeRemaining > 0 {
+                timeRemaining -= 1
+            } else {
+                timer?.invalidate()
+                timer = nil
             }
         }
     }
