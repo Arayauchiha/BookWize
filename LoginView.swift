@@ -22,6 +22,7 @@ struct LoginView: View {
     @State private var otpCode = ""
     @State private var errorMessage = ""
     @State private var isLoading = false
+    @State private var emailError: String?
     @FocusState private var focusedField: Field?
     
     // For first-time librarian login
@@ -39,6 +40,10 @@ struct LoginView: View {
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     
     @State private var isPasswordVisible = false
+    
+    private var isEmailValid: Bool {
+        ValidationUtils.isValidEmail(email)
+    }
     
     var body: some View {
         ScrollView {
@@ -68,6 +73,19 @@ struct LoginView: View {
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .disableAutocorrection(true)
+                        .onChange(of: email) { newValue in
+                            if !newValue.isEmpty && !isEmailValid {
+                                emailError = "Please enter a valid email address"
+                            } else {
+                                emailError = nil
+                            }
+                        }
+                    
+                    if let error = emailError {
+                        Text(error)
+                            .foregroundStyle(Color.red)
+                            .font(.caption)
+                    }
                 }
                 
                 // Password field
@@ -119,10 +137,10 @@ struct LoginView: View {
                     }
                 }
                 .padding(.vertical, 15)
-                .background(!email.isEmpty && !password.isEmpty ? Color.customButton : Color.gray)
+                .background(!email.isEmpty && !password.isEmpty && isEmailValid ? Color.customButton : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || email.isEmpty || password.isEmpty)
+                .disabled(isLoading || email.isEmpty || password.isEmpty || !isEmailValid)
                 .padding(.top, 8)
                 
                 //                if userRole == .member {
