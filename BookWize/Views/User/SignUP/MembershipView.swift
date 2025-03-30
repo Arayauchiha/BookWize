@@ -380,28 +380,99 @@ struct DigitalLibraryCard: View {
 struct GenreSelectionView: View {
     @Environment(\.dismiss) var dismiss
     @State private var selectedGenres: Set<String> = []
+    @State private var availableGenres: [String] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String? = nil
     let userEmail: String
     
-    let genres = [
-        "Fiction", "Non-Fiction", "Mystery", "Romance", "Science Fiction",
-        "Fantasy", "Biography", "History", "Poetry", "Children's Books"
-    ]
-    
     var body: some View {
-        List(genres, id: \.self) { genre in
-            Button(action: {
-                if selectedGenres.contains(genre) {
-                    selectedGenres.remove(genre)
-                } else {
-                    selectedGenres.insert(genre)
+        ZStack {
+            Color.customBackground.ignoresSafeArea()
+            
+            if isLoading {
+                VStack {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                    Text("Loading genres...")
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
                 }
-            }) {
-                HStack {
-                    Text(genre)
-                    Spacer()
-                    if selectedGenres.contains(genre) {
-                        Image(systemName: "checkmark")
-                            .foregroundColor(.blue)
+            } else if let error = errorMessage {
+                VStack(spacing: 16) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(.orange)
+                    
+                    Text("Error loading genres")
+                        .font(.headline)
+                    
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        fetchGenres()
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+            } else if availableGenres.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "books.vertical")
+                        .font(.system(size: 50))
+                        .foregroundColor(.secondary)
+                    
+                    Text("No genres found")
+                        .font(.headline)
+                    
+                    Text("We couldn't find any genres in our catalog. Please proceed to continue.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button("Continue") {
+                        Task {
+                            await saveSelectedGenres()
+                        }
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+            } else {
+                List {
+                    Section(header: Text("Select your preferred genres")) {
+                        ForEach(availableGenres.sorted(), id: \.self) { genre in
+                            Button(action: {
+                                if selectedGenres.contains(genre) {
+                                    selectedGenres.remove(genre)
+                                } else {
+                                    selectedGenres.insert(genre)
+                                }
+                            }) {
+                                HStack {
+                                    Text(genre)
+                                    Spacer()
+                                    if selectedGenres.contains(genre) {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if !selectedGenres.isEmpty {
+                        Section(footer: Text("You can always change your preferences later")) {
+                            Text("\(selectedGenres.count) genre\(selectedGenres.count > 1 ? "s" : "") selected")
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
             }
@@ -411,8 +482,61 @@ struct GenreSelectionView: View {
             Task {
                 await saveSelectedGenres()
             }
-        })
-        .background(Color.customBackground)
+        }
+        .disabled(isLoading))
+        .onAppear {
+            fetchGenres()
+        }
+    }
+    
+    private func fetchGenres() {
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                let client = SupabaseManager.shared.client
+                
+                // Fetch all books to extract genres from categories
+                let response = try await client.database
+                    .from("Books")
+                    .select("categories")
+                    .execute()
+                
+                // Parse categories from each book to extract genres
+                struct BookCategories: Codable {
+                    let categories: [String]?
+                }
+                
+                let decoder = JSONDecoder()
+                let books = try decoder.decode([BookCategories].self, from: response.data)
+                
+                // Extract first category from each book as the genre
+                var uniqueGenres = Set<String>()
+                
+                for book in books {
+                    if let categories = book.categories, !categories.isEmpty {
+                        // Use the first category as the main genre
+                        let genre = categories[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !genre.isEmpty {
+                            uniqueGenres.insert(genre)
+                        }
+                    }
+                }
+                
+                await MainActor.run {
+                    self.availableGenres = Array(uniqueGenres)
+                    self.isLoading = false
+                    print("Loaded \(uniqueGenres.count) unique genres from Books table")
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Failed to load genres: \(error.localizedDescription)"
+                    self.isLoading = false
+                    print("Error fetching genres: \(error)")
+                }
+            }
+        }
     }
     
     private func saveSelectedGenres() async {
