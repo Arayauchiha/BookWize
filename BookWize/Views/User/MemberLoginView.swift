@@ -376,6 +376,7 @@ struct MemberLoginView: View {
                             // Store the member ID locally for future reference
                             UserDefaults.standard.set(memberId.id, forKey: "currentMemberId")
                             UserDefaults.standard.set(email, forKey: "currentMemberEmail")
+                            UserDefaults.standard.set(true, forKey: "isMemberLoggedIn")
                             
                             DispatchQueue.main.async {
                                 self.showingOTPView = false

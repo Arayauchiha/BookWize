@@ -428,11 +428,34 @@ struct GenreSelectionView: View {
             
             print("Successfully saved selected genres to Supabase")
             
+            // Fetch the complete user data to ensure we have the user ID
+            let userResponse: [User] = try await client.database
+                .from("Members")
+                .select("*")
+                .eq("email", value: userEmail)
+                .execute()
+                .value
+            
+            if let user = userResponse.first {
+                // Store user data in UserDefaults
+                UserDefaults.standard.set(user.id.uuidString, forKey: "currentMemberId")
+                UserDefaults.standard.set(userEmail, forKey: "currentMemberEmail")
+                
+                // Set login status
+                UserDefaults.standard.set(true, forKey: "isMemberLoggedIn")
+                
+                print("Successfully stored user data in UserDefaults")
+                print("User ID: \(user.id.uuidString)")
+                print("User Email: \(userEmail)")
+            }
+            
             // Navigate to Search_BrowseApp with selected genres
-            NavigationUtil.popToRootView()
-            let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-            let window = windowScene?.windows.first
-            window?.rootViewController = UIHostingController(rootView: Search_BrowseApp(userPreferredGenres: Array(selectedGenres)))
+            DispatchQueue.main.async {
+                NavigationUtil.popToRootView()
+                let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                let window = windowScene?.windows.first
+                window?.rootViewController = UIHostingController(rootView: Search_BrowseApp(userPreferredGenres: Array(self.selectedGenres)))
+            }
             
         } catch {
             print("Error saving selected genres: \(error)")
