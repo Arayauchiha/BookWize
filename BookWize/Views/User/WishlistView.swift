@@ -348,7 +348,8 @@ class WishlistViewModel: ObservableObject {
                         
                         // Map to your Book model with only the required parameters
                         func toBook() -> Book {
-                            let book = Book(
+                            // Create a book with the available data
+                            var book = Book(
                                 isbn: isbn,
                                 title: title,
                                 author: author,
@@ -360,6 +361,11 @@ class WishlistViewModel: ObservableObject {
                                 categories: categories,
                                 imageURL: imageURL
                             )
+                            
+                            // Make sure to set the availableQuantity from the database
+                            if let availQty = availableQuantity {
+                                book.availableQuantity = availQty
+                            }
                             
                             // Store the database ID in our map using the ISBN as key
                             BookIdentifier.setDatabaseId(id, for: isbn)
@@ -393,7 +399,7 @@ class WishlistViewModel: ObservableObject {
                                    let isbn = bookJson["isbn"] as? String,
                                    let quantity = bookJson["quantity"] as? Int {
                                     
-                                    let book = Book(
+                                    var book = Book(
                                         isbn: isbn,
                                         title: title,
                                         author: author,
@@ -405,6 +411,11 @@ class WishlistViewModel: ObservableObject {
                                         categories: bookJson["categories"] as? [String],
                                         imageURL: bookJson["imageURL"] as? String
                                     )
+                                    
+                                    // Set available quantity from the database
+                                    if let availableQty = bookJson["availableQuantity"] as? Int {
+                                        book.availableQuantity = availableQty
+                                    }
                                     
                                     // Store the database ID in our map using ISBN as key
                                     if let idUUID = UUID(uuidString: idStr) {

@@ -963,9 +963,10 @@ struct BookDetailCard: View {
         )
         .offset(y: dragOffset)
         .onAppear {
-            // Fetch the latest availability from the database when the view appears
+            // Always fetch the latest availability from the database when the view appears
             Task {
                 do {
+                    print("Fetching latest availability for book: \(book.title) with ID: \(book.id)")
                     let response = try await supabase.database
                         .from("Books")
                         .select("availableQuantity")
@@ -981,6 +982,19 @@ struct BookDetailCard: View {
                         print("Updated availability from database: \(decodedData.availableQuantity)")
                         await MainActor.run {
                             currentAvailability = decodedData.availableQuantity
+                        }
+                    } else {
+                        print("Failed to decode availability data")
+                        
+                        // Try JSON parsing as a fallback
+                        if let jsonString = String(data: response.data, encoding: .utf8),
+                           let jsonData = jsonString.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                           let availQty = json["availableQuantity"] as? Int {
+                            print("Parsed availability using JSON: \(availQty)")
+                            await MainActor.run {
+                                currentAvailability = availQty
+                            }
                         }
                     }
                 } catch {
