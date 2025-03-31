@@ -69,25 +69,61 @@ import Foundation
 ////    }
 //
 //    /// Issue a book and store it in Supabase
-////    func issueBook(_ issuedBook: issueBooks, completion: @escaping (Bool) -> Void) {
-////        Task {
-////            do {
-////                try await SupabaseManager.shared.client
-////                    .from("issueBooks")
-////                    .insert(issuedBook)
-////                    .execute()
-////                
-////                DispatchQueue.main.async {
-////                    completion(true)
-////                }
-////            } catch {
-////                print("Error issuing book:", error)
-////                DispatchQueue.main.async {
-////                    completion(false)
-////                }
-////            }
-////        }
-////    }
+    func issueBook(_ issuedBook: issueBooks, completion: @escaping (Bool) -> Void) {
+        Task {
+            do {
+                // First, get the current available quantity
+                let response = try await SupabaseManager.shared.client
+                    .from("Books")
+                    .select("availableQuantity")
+                    .eq("isbn", value: issuedBook.isbn)
+                    .single()
+                    .execute()
+                
+                guard let data = response.data as? [[String: Any]],
+                      let firstBook = data.first,
+                      let currentQuantity = firstBook["available_quantity"] as? Int else {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get book quantity"])
+                }
+                
+                // Check if there are books available
+                guard currentQuantity > 0 else {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No books available"])
+                }
+                
+                // Start a transaction to ensure both operations succeed or fail together
+                try await SupabaseManager.shared.client.rpc("begin_transaction")
+                
+                // Insert the issued book record
+                try await SupabaseManager.shared.client
+                    .from("issuebooks")
+                    .insert(issuedBook)
+                    .execute()
+                
+                // Update the available quantity
+                try await SupabaseManager.shared.client
+                    .from("Books")
+                    .update(["availableQuantity": currentQuantity - 1])
+                    .eq("isbn", value: issuedBook.isbn)
+                    .execute()
+                
+                // Commit the transaction
+                try await SupabaseManager.shared.client.rpc("commit_transaction")
+                
+                DispatchQueue.main.async {
+                    completion(true)
+                }
+            } catch {
+                print("Error issuing book:", error)
+                // Rollback the transaction if it was started
+                try? await SupabaseManager.shared.client.rpc("rollback_transaction")
+                
+                DispatchQueue.main.async {
+                    completion(false)
+                }
+            }
+        }
+    }
 //
 //    /// Fetch all issued books
 ////    func fetchIssuedBooks(completion: @escaping ([issueBooks]) -> Void) {

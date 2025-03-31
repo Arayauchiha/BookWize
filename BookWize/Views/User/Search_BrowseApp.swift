@@ -49,7 +49,7 @@ struct MembershipDetailsView: View {
             "name": user.name,
             "email": user.email,
             "library": user.selectedLibrary,
-            "membershipType": "Annual",
+            //"membershipType": "Annual",
             "memberId": user.id.uuidString
         ]
         
