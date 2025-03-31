@@ -390,12 +390,7 @@ struct EditBookView: View {
                         title: title,
                         author: author,
                         publisher: publisher,
-                        quantity: quantity,
-                        publishedDate: publishedDate.isEmpty ? nil : publishedDate,
-                        description: description.isEmpty ? nil : description,
-                        pageCount: Int(pageCount),
-                        categories: genre.isEmpty ? nil : [genre],
-                        imageURL: imageURL.isEmpty ? nil : imageURL
+                        publishedDate: publishedDate.isEmpty ? nil : publishedDate, description: description.isEmpty ? nil : description, pageCount: Int(pageCount), categories: genre.isEmpty ? nil : [genre], imageURL: imageURL.isEmpty ? nil : imageURL, quantity: quantity
                     )
                     onSave(updatedBook)
                 }

@@ -354,12 +354,7 @@ class WishlistViewModel: ObservableObject {
                                 title: title,
                                 author: author,
                                 publisher: publisher ?? "",
-                                quantity: quantity,
-                                publishedDate: publishedDate,
-                                description: description,
-                                pageCount: pageCount,
-                                categories: categories,
-                                imageURL: imageURL
+                                publishedDate: publishedDate, description: description, pageCount: pageCount, categories: categories, imageURL: imageURL, quantity: quantity
                             )
                             
                             // Make sure to set the availableQuantity from the database
@@ -404,12 +399,7 @@ class WishlistViewModel: ObservableObject {
                                         title: title,
                                         author: author,
                                         publisher: bookJson["publisher"] as? String ?? "",
-                                        quantity: quantity,
-                                        publishedDate: bookJson["publishedDate"] as? String,
-                                        description: bookJson["description"] as? String,
-                                        pageCount: bookJson["pageCount"] as? Int,
-                                        categories: bookJson["categories"] as? [String],
-                                        imageURL: bookJson["imageURL"] as? String
+                                        publishedDate: bookJson["publishedDate"] as? String, description: bookJson["description"] as? String, pageCount: bookJson["pageCount"] as? Int, categories: bookJson["categories"] as? [String], imageURL: bookJson["imageURL"] as? String, quantity: quantity
                                     )
                                     
                                     // Set available quantity from the database

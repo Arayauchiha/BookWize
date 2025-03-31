@@ -24,11 +24,7 @@ class BookService {
             title: volumeInfo.title,
             author: volumeInfo.authors?.joined(separator: ", ") ?? "Unknown Author",
             publisher: volumeInfo.publisher ?? "Unknown Publisher",
-            quantity: 1, publishedDate: volumeInfo.publishedDate,
-            description: volumeInfo.description,
-            pageCount: volumeInfo.pageCount,
-            categories: volumeInfo.categories,
-            imageURL: volumeInfo.imageLinks?.thumbnail
+            publishedDate: volumeInfo.publishedDate, description: volumeInfo.description, pageCount: volumeInfo.pageCount, categories: volumeInfo.categories, imageURL: volumeInfo.imageLinks?.thumbnail, quantity: 1
         )
     }
 }

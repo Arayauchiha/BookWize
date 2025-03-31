@@ -815,6 +815,7 @@ private struct MemberID: Codable {
 struct BookDetailCard: View {
     let book: Book
     let supabase: SupabaseClient
+
     @Binding var isPresented: Bool
     @State private var cardOffset: CGFloat = 0
     @State private var isDragging = false

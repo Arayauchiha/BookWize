@@ -16,7 +16,8 @@ struct ContentView: View {
             else if isAdminLoggedIn {
                 AdminDashboardView()
             } else if isLibrarianLoggedIn {
-                LibrarianDashboardScreen()
+                //LibrarianDashboardScreen()
+                InventoryManagerView()
             } else if isMemberLoggedIn {
                 Search_BrowseApp()
             } else {
