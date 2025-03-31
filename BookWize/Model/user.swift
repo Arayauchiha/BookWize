@@ -33,5 +33,4 @@ enum Gender: String, Codable, CaseIterable {
 //    case cityLibrary = "City Library"
 //}
 
-//var selectedLibrary: [Library]
 
