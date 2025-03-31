@@ -29,7 +29,8 @@ struct MembershipView: View {
     @State private var showDigitalCard = false
     @State private var showLogoutAlert = false
     @State private var showDigitalPass = false
-    let membershipAmount = 49.99
+    @State private var membershipAmount = 49.99 // Default value that will be updated
+    @State private var isLoadingMembershipAmount = true
     
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     @Environment(\.dismiss) private var dismiss
@@ -51,6 +52,48 @@ struct MembershipView: View {
         self.selectedLibrary = selectedLibrary
         self.userGender = gender
         self.userPassword = password
+    }
+    
+    private func fetchMembershipAmount() {
+        isLoadingMembershipAmount = true
+        
+        Task {
+            do {
+                let response = try await SupabaseManager.shared.client.database
+                    .from("FineAndMembershipSet")
+                    .select("Membership")
+                    .single()
+                    .execute()
+                
+                // Debug: Print raw response data
+                print("Raw response data:", String(data: response.data, encoding: .utf8) ?? "No data")
+                
+                // Try to decode the response
+                do {
+                    // Define a struct to decode the response
+                    struct MembershipResponse: Decodable {
+                        let Membership: Double
+                    }
+                    
+                    let decodedResponse = try JSONDecoder().decode(MembershipResponse.self, from: response.data)
+                    await MainActor.run {
+                        self.membershipAmount = decodedResponse.Membership
+                        self.isLoadingMembershipAmount = false
+                    }
+                    print("Fetched membership amount: $\(decodedResponse.Membership)")
+                } catch {
+                    print("Decoding error: \(error)")
+                    await MainActor.run {
+                        self.isLoadingMembershipAmount = false
+                    }
+                }
+            } catch {
+                print("Error fetching membership amount: \(error)")
+                await MainActor.run {
+                    self.isLoadingMembershipAmount = false
+                }
+            }
+        }
     }
     
     private func saveUserData() async throws {
@@ -188,9 +231,15 @@ struct MembershipView: View {
                         VStack {
                             Text("Membership Amount")
                                 .font(.headline)
-                            Text("$\(String(format: "%.2f", membershipAmount))")
-                                .font(.title)
-                                .fontWeight(.bold)
+                            
+                            if isLoadingMembershipAmount {
+                                ProgressView()
+                                    .padding(5)
+                            } else {
+                                Text("$\(String(format: "%.2f", membershipAmount))")
+                                    .font(.title)
+                                    .fontWeight(.bold)
+                            }
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -279,6 +328,9 @@ struct MembershipView: View {
                 .padding()
             }
             .navigationTitle("Membership")
+            .onAppear {
+                        fetchMembershipAmount() // Add this line
+                    }
             .alert("Payment Successful!", isPresented: $showSuccessAlert) {
                 Button("Generate Digital Card") {
                     generateQRCode()
