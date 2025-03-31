@@ -269,8 +269,13 @@ class InventoryManager: ObservableObject {
                 title: title,
                 author: author,
                 publisher: publisher,
+                quantity: quantity,
                 publishedDate: publishedDate.isEmpty ? nil : publishedDate,
-                description: description.isEmpty ? nil : description, pageCount: pageCount > 0 ? pageCount : nil, categories: genre.isEmpty ? nil : [genre], imageURL: imageURL.isEmpty ? nil : imageURL, quantity: quantity // Avoid storing empty URLs
+                description: description.isEmpty ? nil : description,
+                pageCount: pageCount > 0 ? pageCount : nil,
+                categories: genre.isEmpty ? nil : [genre],
+                imageURL: imageURL.isEmpty ? nil : imageURL
+//                quantity: quantity // Avoid storing empty URLs
             )
             
             addBook(book)

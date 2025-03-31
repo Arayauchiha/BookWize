@@ -353,8 +353,10 @@ class WishlistViewModel: ObservableObject {
                                 isbn: isbn,
                                 title: title,
                                 author: author,
-                                publisher: publisher ?? "",
-                                publishedDate: publishedDate, description: description, pageCount: pageCount, categories: categories, imageURL: imageURL, quantity: quantity
+                                publisher: publisher ?? "",quantity: 1,
+                                publishedDate: publishedDate, description: description,
+                                pageCount: pageCount, categories: categories,
+                                imageURL: imageURL
                             )
                             
                             // Make sure to set the availableQuantity from the database
@@ -398,8 +400,12 @@ class WishlistViewModel: ObservableObject {
                                         isbn: isbn,
                                         title: title,
                                         author: author,
-                                        publisher: bookJson["publisher"] as? String ?? "",
-                                        publishedDate: bookJson["publishedDate"] as? String, description: bookJson["description"] as? String, pageCount: bookJson["pageCount"] as? Int, categories: bookJson["categories"] as? [String], imageURL: bookJson["imageURL"] as? String, quantity: quantity
+                                        publisher: bookJson["publisher"] as? String ?? "", quantity: quantity,
+                                        publishedDate: bookJson["publishedDate"] as? String,
+                                        description: bookJson["description"] as? String,
+                                        pageCount: bookJson["pageCount"] as? Int,
+                                        categories: bookJson["categories"] as? [String],
+                                        imageURL: bookJson["imageURL"] as? String
                                     )
                                     
                                     // Set available quantity from the database
@@ -418,7 +424,8 @@ class WishlistViewModel: ObservableObject {
                             }
                         }
                     }
-                } catch {
+                }
+                catch {
                     print("Error decoding book \(bookId): \(error)")
                 }
             } catch {
