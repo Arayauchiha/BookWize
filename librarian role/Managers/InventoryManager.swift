@@ -17,24 +17,7 @@ class InventoryManager: ObservableObject {
     
     // MARK: - Book Management
     
-//    func addBook(_ book: Book) {
-//        if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
-//            // Update existing book
-//            books[index].quantity += book.quantity
-//            books[index].availableQuantity += book.quantity
-//            books[index].lastModified = Date()
-//        } else {
-//            // Add new book
-//            books.append(book)
-//        }
-//        Task {
-//            try! await SupabaseManager.shared.client
-//                .from("Books")
-//                .insert(book)
-//                .execute()
-//        }
-//        saveBooks()
-//    }
+
     
     func addBook(_ book: Book) {
         if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
@@ -360,4 +343,5 @@ class InventoryManager: ObservableObject {
         }
     }
 }
+
 

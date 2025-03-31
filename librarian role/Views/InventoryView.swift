@@ -1,7 +1,5 @@
-
 import SwiftUI
 import UniformTypeIdentifiers
-import Supabase
 
 struct InventoryView: View {
     @StateObject private var inventoryManager = InventoryManager()
@@ -9,90 +7,33 @@ struct InventoryView: View {
     @State private var showingAddBookSheet = false
     @State private var showingISBNScanner = false
     @State private var showingCSVUpload = false
-    @State private var showingRequestBook = false
     @State private var selectedBook: Book?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
-    @State private var selectedSegment = 0
-    @State private var requests: [BookRequest] = []
-    @State private var isFetchingRequests = false
-    
-    private let segments = ["Books", "Requests"]
     
     var filteredBooks: [Book] {
         inventoryManager.searchBooks(query: searchText)
     }
     
-    var filteredRequests: [BookRequest] {
-        if searchText.isEmpty {
-            return requests
-        } else {
-            return requests.filter { request in
-                request.author.lowercased().contains(searchText.lowercased()) ||
-                request.title.lowercased().contains(searchText.lowercased()) ||
-                request.reason.lowercased().contains(searchText.lowercased())
-            }
-        }
-    }
-    
     var body: some View {
         NavigationView {
-            VStack {
-                Picker("View", selection: $selectedSegment) {
-                    ForEach(0..<segments.count, id: \.self) { index in
-                        Text(segments[index]).tag(index)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                if selectedSegment == 0 {
-                    List {
-                        ForEach(filteredBooks) { book in
-                            BookRowView(book: book)
-                                .onTapGesture {
-                                    selectedBook = book
-                                }
+            List {
+                ForEach(filteredBooks) { book in
+                    EnhancedBookRowView(book: book)
+                        .onTapGesture {
+                            selectedBook = book
                         }
-                    }
-                } else {
-                    List {
-                        ForEach(filteredRequests) { request in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Author: \(request.author)")
-                                    .font(.headline)
-                                Text("Title: \(request.title)")
-                                    .font(.subheadline)
-                                Text("Quantity: \(request.quantity)")
-                                    .font(.caption)
-                                Text("Reason: \(request.reason)")
-                                    .font(.caption)
-                                Text("Status: \(request.Request_status.rawValue.capitalized)")
-                                    .font(.caption)
-                                    //.foregroundColor(request.Request_status == .accepted ? .orange : .green)
-                                    .foregroundColor(request.Request_status .background)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .overlay {
-                        if isFetchingRequests {
-                            ProgressView("Loading requests...")
-                        }
-                    }
-                    .onAppear {
-                        fetchRequests()
-                    }
                 }
             }
-            .searchable(text: $searchText, prompt: selectedSegment == 0 ? "Search books..." : "Search requests...")
+            .listStyle(.insetGrouped)
+            .searchable(text: $searchText, prompt: "Search by title, author, or ISBN...")
             .navigationTitle("Library Inventory")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button(action: { showingAddBookSheet = true }) {
-                            Label("Add Book Manually", systemImage: "plus")
+                            Label("Add Book Manually", systemImage: "plus.rectangle.fill.on.rectangle.fill")
                         }
                         
                         Button(action: { showingISBNScanner = true }) {
@@ -100,13 +41,12 @@ struct InventoryView: View {
                         }
                         
                         Button(action: { showingCSVUpload = true }) {
-                            Label("Import CSV", systemImage: "doc.text.below.ecg")
-                        }
-                        Button(action: { showingRequestBook = true }) {
-                            Label("Request Book", systemImage: "book.circle")
+                            Label("Import CSV", systemImage: "square.and.arrow.down.fill")
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(.blue)
+                            .font(.title2)
                     }
                 }
             }
@@ -120,9 +60,6 @@ struct InventoryView: View {
             }
             .sheet(isPresented: $showingCSVUpload) {
                 CSVUploadView(viewModel: inventoryManager)
-            }
-            .sheet(isPresented: $showingRequestBook) {
-                RequestBookView()
             }
             .sheet(item: $selectedBook) { book in
                 BookDetailView(book: book, inventoryManager: inventoryManager)
@@ -162,96 +99,66 @@ struct InventoryView: View {
             }
         }
     }
-    
-    
-
-    
-    private func fetchRequests() {
-        isFetchingRequests = true
-        Task {
-            do {
-                let client = SupabaseManager.shared.client
-                let fetchedRequests: [BookRequest] = try await client
-                    .from("BookRequest")
-                    .select()
-                    .execute()
-                    .value
-                
-                await MainActor.run {
-                    self.requests = fetchedRequests
-                    isFetchingRequests = false
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to fetch requests: \(error.localizedDescription)"
-                    isFetchingRequests = false
-                    showError = true
-                }
-            }
-        }
-    }
 }
 
-struct BookRowView: View {
+struct EnhancedBookRowView: View {
     let book: Book
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(book.title)
-                .font(.headline)
-            Text("by \(book.author)")
-                .font(.subheadline)
-            HStack {
-                Text("ISBN: \(book.isbn)")
-                Spacer()
-                Text("Available: \(book.availableQuantity)/\(book.quantity)")
-            }
-            .font(.caption)
-            .foregroundColor(.secondary)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-struct AddBookView: View {
-    @Environment(\.dismiss) var dismiss
-    @ObservedObject var inventoryManager: InventoryManager
-    
-    @State private var isbn = ""
-    @State private var title = ""
-    @State private var author = ""
-    @State private var publisher = ""
-    @State private var quantity = 1
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Book Details")) {
-                    TextField("ISBN", text: $isbn)
-                        .keyboardType(.numberPad)
-                    TextField("Title", text: $title)
-                    TextField("Author", text: $author)
-                    TextField("Publisher", text: $publisher)
-                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+        HStack(spacing: 16) {
+            // Book Cover Image
+            AsyncImage(url: URL(string: book.imageURL ?? "")) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure(_):
+                    Image(systemName: "book.fill")
+                        .foregroundStyle(.gray)
+                case .empty:
+                    Image(systemName: "book.fill")
+                        .foregroundStyle(.gray)
+                @unknown default:
+                    Image(systemName: "book.fill")
+                        .foregroundStyle(.gray)
                 }
             }
-            .navigationTitle("Add New Book")
-            .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
-                trailing: Button("Save") {
-                    let newBook = Book(
-                        isbn: isbn,
-                        title: title,
-                        author: author,
-                        publisher: publisher,
-                        quantity: quantity
-                    )
-                    inventoryManager.addBook(newBook)
-                    dismiss()
+            .frame(width: 60, height: 90)
+            .cornerRadius(8)
+            .shadow(radius: 2)
+            
+            // Book Details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(book.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                
+                Text(book.author)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                
+                HStack {
+                    // Availability Badge
+                    Text("\(book.availableQuantity) of \(book.quantity) available")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(book.isAvailable ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                        .foregroundStyle(book.isAvailable ? .green : .red)
+                        .cornerRadius(4)
+                    
+                    Spacer()
+                    
+                    // ISBN Badge
+                    Text(book.isbn)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
-            )
+            }
         }
+        .padding(.vertical, 8)
     }
 }
 
@@ -327,6 +234,64 @@ struct BookDetailView: View {
     }
 }
 
+struct StatusItem: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3)
+                .fontWeight(.semibold)
+        }
+    }
+}
+
+struct AddBookView: View {
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var inventoryManager: InventoryManager
+    
+    @State private var isbn = ""
+    @State private var title = ""
+    @State private var author = ""
+    @State private var publisher = ""
+    @State private var quantity = 1
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Book Details")) {
+                    TextField("ISBN", text: $isbn)
+                        .keyboardType(.numberPad)
+                    TextField("Title", text: $title)
+                    TextField("Author", text: $author)
+                    TextField("Publisher", text: $publisher)
+                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+                }
+            }
+            .navigationTitle("Add New Book")
+            .navigationBarItems(
+                leading: Button("Cancel") { dismiss() },
+                trailing: Button("Save") {
+                    let newBook = Book(
+                        isbn: isbn,
+                        title: title,
+                        author: author,
+                        publisher: publisher,
+                        quantity: quantity
+                    )
+                    inventoryManager.addBook(newBook)
+                    dismiss()
+                }
+                .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
+            )
+        }
+    }
+}
+
 struct EditBookView: View {
     let book: Book
     @ObservedObject var inventoryManager: InventoryManager
@@ -378,7 +343,7 @@ struct EditBookView: View {
                     TextField("Page Count", text: $pageCount)
                         .keyboardType(.numberPad)
                     TextField("Genre", text: $genre)
-                    TextField("Image URL", text: $imageURL)
+//                    TextField("Image URL", text: $imageURL)
                 }
             }
             .navigationTitle("Edit Book")
@@ -390,7 +355,12 @@ struct EditBookView: View {
                         title: title,
                         author: author,
                         publisher: publisher,
-                        publishedDate: publishedDate.isEmpty ? nil : publishedDate, description: description.isEmpty ? nil : description, pageCount: Int(pageCount), categories: genre.isEmpty ? nil : [genre], imageURL: imageURL.isEmpty ? nil : imageURL, quantity: quantity
+                        quantity: quantity,
+                        publishedDate: publishedDate.isEmpty ? nil : publishedDate,
+                        description: description.isEmpty ? nil : description,
+                        pageCount: Int(pageCount),
+                        categories: genre.isEmpty ? nil : [genre],
+                        imageURL: imageURL.isEmpty ? nil : imageURL
                     )
                     onSave(updatedBook)
                 }
@@ -414,7 +384,17 @@ struct DetailRow: View {
     }
 }
 
-
 #Preview {
     InventoryView()
 }
+
+
+
+
+
+
+
+
+
+
+
