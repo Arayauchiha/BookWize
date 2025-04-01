@@ -27,13 +27,13 @@ struct InventoryManagerView: View {
                             Label("Members", systemImage: "person.2.fill")
                         }
                     
-//                    if SHOW_FINES {
-//                        FineManagementView()
-//                            .tabItem {
-//                                Label("Fines", systemImage: "dollarsign.circle.fill")
-//                            }
-//                    }
-//                    
+                    if SHOW_FINES {
+                        FineManagementView()
+                            .tabItem {
+                                Label("Fines", systemImage: "dollarsign.circle.fill")
+                            }
+                    }
+                    
                     AccountView(isLoggedIn: $isLoggedIn)
                         .tabItem {
                             Label("Account", systemImage: "person.circle.fill")
