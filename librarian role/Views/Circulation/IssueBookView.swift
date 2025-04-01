@@ -50,7 +50,7 @@ struct IssueBookView: View {
                 .padding(.vertical, 8)
             }
         }
-        .searchable(text: $searchText, prompt: "Search transactions...")
+        .searchable(text: $searchText, prompt: "Search Books")
         .sheet(isPresented: $showingIssueForm) {
             IssueBookFormView { newLoan in
                 Task {

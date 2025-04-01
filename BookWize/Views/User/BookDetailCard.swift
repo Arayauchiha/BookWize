@@ -1,6 +1,30 @@
 import SwiftUI
 import Supabase
 
+// Add a WishlistManager to handle persistent state
+class WishlistManager {
+    static let shared = WishlistManager()
+    private var wishlistBooks: [String: Bool] = [:]
+    
+    private init() {}
+    
+    func setInWishlist(isbn: String) {
+        wishlistBooks[isbn] = true
+    }
+    
+    func removeFromWishlist(isbn: String) {
+        wishlistBooks.removeValue(forKey: isbn)
+    }
+    
+    func isBookInWishlist(isbn: String) -> Bool {
+        return wishlistBooks[isbn] ?? false
+    }
+    
+    func clearWishlist() {
+        wishlistBooks.removeAll()
+    }
+}
+
 // Add a BookReservationManager to handle persistent state
 class BookReservationManager {
     static let shared = BookReservationManager()
@@ -162,62 +186,140 @@ private struct ActionButtonsView: View {
     @State private var showRemoveConfirmation = false
     @State private var showError = false
     @State private var errorMessage = ""
-    @State private var isBookReserved = false
+    @State private var isBookReserved: Bool
     @State private var reservationId: UUID?
     @Binding var currentAvailability: Int
+    @Binding var parentIsBookReserved: Bool
+    
+    init(book: Book, supabase: SupabaseClient, isReserving: Binding<Bool>, addedToWishlist: Binding<Bool>, currentAvailability: Binding<Int>, parentIsBookReserved: Binding<Bool>) {
+        self.book = book
+        self.supabase = supabase
+        self._isReserving = isReserving
+        self._addedToWishlist = addedToWishlist
+        self._currentAvailability = currentAvailability
+        self._isBookReserved = State(initialValue: parentIsBookReserved.wrappedValue)
+        self._reservationId = State(initialValue: BookReservationManager.shared.getReservationId(bookId: book.id))
+        self._parentIsBookReserved = parentIsBookReserved
+    }
     
     private func checkReservationStatus() {
+        print("Checking reservation status for book: \(book.title) with ID: \(book.id)")
+        
+        // We need to check for both the current book ID and any possible database ID
+        var bookIdToUse = book.id
+        var foundReservation = false
+        
         // First check local cache
         if BookReservationManager.shared.isReserved(bookId: book.id) {
             isBookReserved = true
+            parentIsBookReserved = true
             reservationId = BookReservationManager.shared.getReservationId(bookId: book.id)
             print("Book is reserved locally with reservation ID: \(reservationId?.uuidString ?? "unknown")")
-            return
+            foundReservation = true
         }
         
-        Task {
-            do {
-                // Get current user ID from UserDefaults
-                guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
-                    return
-                }
-                
-                // Check if this book is already reserved by the current user
-                let response = try await supabase.database
-                    .from("BookReservation")
-                    .select("id")
-                    .eq("book_id", value: book.id.uuidString)
-                    .eq("member_id", value: userId)
-                    .execute()
-                
-                struct ReservationResponse: Codable {
-                    let id: String
-                }
-                
-                // Parse the response
-                let decoder = JSONDecoder()
-                if let reservations = try? decoder.decode([ReservationResponse].self, from: response.data),
-                   let firstReservation = reservations.first,
-                   let uuid = UUID(uuidString: firstReservation.id) {
-                    // Book is already reserved by this user
-                    await MainActor.run {
-                        isBookReserved = true
-                        reservationId = uuid
-                        // Update local cache
-                        BookReservationManager.shared.setReservation(bookId: book.id, reservationId: uuid)
+        // If we have a stored database ID for this ISBN, check that too
+        if !foundReservation, let storedId = BookIdentifier.getDatabaseId(for: book.isbn) {
+            print("Checking stored database ID: \(storedId) for ISBN: \(book.isbn)")
+            bookIdToUse = storedId
+            
+            if BookReservationManager.shared.isReserved(bookId: bookIdToUse) {
+                isBookReserved = true
+                parentIsBookReserved = true
+                reservationId = BookReservationManager.shared.getReservationId(bookId: bookIdToUse)
+                print("Book is reserved locally using database ID with reservation ID: \(reservationId?.uuidString ?? "unknown")")
+                foundReservation = true
+            }
+        }
+        
+        // If we still haven't found a reservation, check with the server
+        if !foundReservation {
+            Task {
+                do {
+                    // Get current user ID from UserDefaults
+                    guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
+                        return
                     }
-                    print("Book is already reserved by user with reservation ID: \(uuid)")
-                } else {
-                    await MainActor.run {
-                        isBookReserved = false
-                        reservationId = nil
-                        // Make sure not in cache
-                        BookReservationManager.shared.removeReservation(bookId: book.id)
+                    
+                    print("Checking database for reservation: book_id=\(bookIdToUse.uuidString), member_id=\(userId)")
+                    
+                    // Check if this book is already reserved by the current user
+                    let response = try await supabase.database
+                        .from("BookReservation")
+                        .select("id")
+                        .eq("book_id", value: bookIdToUse.uuidString)
+                        .eq("member_id", value: userId)
+                        .execute()
+                    
+                    // Try to parse the response data directly for debugging
+                    if let jsonString = String(data: response.data, encoding: .utf8) {
+                        print("Raw reservation response: \(jsonString)")
                     }
-                    print("Book is not reserved by this user")
+                    
+                    struct ReservationResponse: Codable {
+                        let id: String
+                    }
+                    
+                    // Parse the response
+                    if let jsonString = String(data: response.data, encoding: .utf8),
+                       let jsonData = jsonString.data(using: .utf8),
+                       let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                       !jsonArray.isEmpty,
+                       let firstReservation = jsonArray.first,
+                       let reservationIdString = firstReservation["id"] as? String,
+                       let reservationUUID = UUID(uuidString: reservationIdString) {
+                        
+                        // Book is reserved, update the UI
+                        await MainActor.run {
+                            isBookReserved = true
+                            parentIsBookReserved = true
+                            reservationId = reservationUUID
+                            // Save to BookReservationManager for both IDs
+                            BookReservationManager.shared.setReservation(bookId: book.id, reservationId: reservationUUID)
+                            if bookIdToUse != book.id {
+                                BookReservationManager.shared.setReservation(bookId: bookIdToUse, reservationId: reservationUUID)
+                            }
+                        }
+                        print("Found reservation in database with ID: \(reservationUUID.uuidString)")
+                    } else {
+                        // Try decoding with JSONDecoder as fallback
+                        let decoder = JSONDecoder()
+                        if let reservations = try? decoder.decode([ReservationResponse].self, from: response.data),
+                           let firstReservation = reservations.first,
+                           let reservationUUID = UUID(uuidString: firstReservation.id) {
+                            
+                            // Book is reserved, update the UI
+                            await MainActor.run {
+                                isBookReserved = true
+                                parentIsBookReserved = true
+                                reservationId = reservationUUID
+                                // Save to BookReservationManager for both IDs
+                                BookReservationManager.shared.setReservation(bookId: book.id, reservationId: reservationUUID)
+                                if bookIdToUse != book.id {
+                                    BookReservationManager.shared.setReservation(bookId: bookIdToUse, reservationId: reservationUUID)
+                                }
+                            }
+                            print("Found reservation in database with ID: \(reservationUUID.uuidString)")
+                        } else {
+                            // Book is not reserved, update the UI
+                            await MainActor.run {
+                                isBookReserved = false
+                                parentIsBookReserved = false
+                                reservationId = nil
+                                // Make sure it's removed from BookReservationManager if needed
+                                if BookReservationManager.shared.isReserved(bookId: book.id) {
+                                    BookReservationManager.shared.removeReservation(bookId: book.id)
+                                }
+                                if bookIdToUse != book.id && BookReservationManager.shared.isReserved(bookId: bookIdToUse) {
+                                    BookReservationManager.shared.removeReservation(bookId: bookIdToUse)
+                                }
+                            }
+                            print("No reservation found in database for book: \(bookIdToUse.uuidString)")
+                        }
+                    }
+                } catch {
+                    print("Error checking reservation status: \(error)")
                 }
-            } catch {
-                print("Error checking reservation status: \(error)")
             }
         }
     }
@@ -237,15 +339,26 @@ private struct ActionButtonsView: View {
                 throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
             }
             
+            // When we're in wishlist, the book ID might be different from the one in the database
+            // Try to get the correct database ID for this book
+            var bookIdToUse = book.id
+            
+            // If we have a stored database ID for this ISBN, use that instead
+            if let storedId = BookIdentifier.getDatabaseId(for: book.isbn) {
+                print("Using stored database ID: \(storedId) instead of \(book.id) for ISBN: \(book.isbn)")
+                bookIdToUse = storedId
+            }
+            
+            // Create the reservation with the correct book ID
             let reservation = BookReservation(
                 id: UUID(),
                 created_at: Date(),
                 member_id: UUID(uuidString: userId)!,
-                book_id: book.id
+                book_id: bookIdToUse
             )
             
             // First check if we already have a reservation for this book
-            if BookReservationManager.shared.isReserved(bookId: book.id) {
+            if BookReservationManager.shared.isReserved(bookId: bookIdToUse) {
                 print("Book is already reserved locally, not creating duplicate reservation")
                 BookReservationManager.shared.endOperation(bookId: book.id)
                 return
@@ -263,7 +376,7 @@ private struct ActionButtonsView: View {
                 try await supabase.database
                     .from("Books")
                     .update(["availableQuantity": currentAvailability - 1])
-                    .eq("id", value: book.id)
+                    .eq("id", value: bookIdToUse)
                     .execute()
                 
                 // Update our local state to match what we just set in the database
@@ -275,9 +388,20 @@ private struct ActionButtonsView: View {
             print("Book reserved successfully! New availability: \(currentAvailability)")
             await MainActor.run {
                 isBookReserved = true
+                parentIsBookReserved = true
                 reservationId = reservation.id
                 // Update local cache
                 BookReservationManager.shared.setReservation(bookId: book.id, reservationId: reservation.id)
+                BookReservationManager.shared.setReservation(bookId: bookIdToUse, reservationId: reservation.id)
+                
+                // Broadcast reservation change to all instances
+                broadcastReservationChange(bookId: book.id, isReserved: true)
+                if bookIdToUse != book.id {
+                    broadcastReservationChange(bookId: bookIdToUse, isReserved: true)
+                }
+                
+                // Notify that book status has changed
+                NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
             }
             
         } catch {
@@ -305,8 +429,18 @@ private struct ActionButtonsView: View {
                 throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Reservation ID not found"])
             }
             
+            // When we're in wishlist, the book ID might be different from the one in the database
+            // Try to get the correct database ID for this book
+            var bookIdToUse = book.id
+            
+            // If we have a stored database ID for this ISBN, use that instead
+            if let storedId = BookIdentifier.getDatabaseId(for: book.isbn) {
+                print("Using stored database ID: \(storedId) instead of \(book.id) for ISBN: \(book.isbn)")
+                bookIdToUse = storedId
+            }
+            
             // Check if this book is already removed from the reservation
-            if !BookReservationManager.shared.isReserved(bookId: book.id) {
+            if !BookReservationManager.shared.isReserved(bookId: bookIdToUse) && !BookReservationManager.shared.isReserved(bookId: book.id) {
                 print("Book is not reserved locally, no need to remove reservation")
                 await MainActor.run {
                     isBookReserved = false
@@ -328,7 +462,7 @@ private struct ActionButtonsView: View {
             try await supabase.database
                 .from("Books")
                 .update(["availableQuantity": currentAvailability + 1])
-                .eq("id", value: book.id)
+                .eq("id", value: bookIdToUse)
                 .execute()
             
             // Update our local state
@@ -339,9 +473,20 @@ private struct ActionButtonsView: View {
             print("Reservation removed successfully! New availability: \(currentAvailability)")
             await MainActor.run {
                 isBookReserved = false
+                parentIsBookReserved = false
                 self.reservationId = nil
                 // Update local cache
                 BookReservationManager.shared.removeReservation(bookId: book.id)
+                BookReservationManager.shared.removeReservation(bookId: bookIdToUse)
+                
+                // Broadcast reservation change to all instances
+                broadcastReservationChange(bookId: book.id, isReserved: false)
+                if bookIdToUse != book.id {
+                    broadcastReservationChange(bookId: bookIdToUse, isReserved: false)
+                }
+                
+                // Notify that book status has changed
+                NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
             }
             
         } catch {
@@ -357,62 +502,80 @@ private struct ActionButtonsView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            Button(action: {
-                Task {
-                    if isBookReserved {
-                        await removeReservation()
-                    } else {
+            // Reserve Button
+            if currentAvailability > 0 && !parentIsBookReserved {
+                Button(action: {
+                    Task {
                         await reserveBook()
                     }
-                }
-            }) {
-                HStack {
+                }) {
                     if isReserving {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
-                        Text(isBookReserved ? "Remove from Reserved" : "Reserve")
-                            .fontWeight(.bold)
+                        Text("Reserve")
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(isBookReserved ? Color.red : (currentAvailability > 0 ? Color.blue : Color.gray))
+                .background(Color.blue)
                 .foregroundColor(.white)
                 .cornerRadius(8)
-            }
-            .disabled((currentAvailability <= 0 && !isBookReserved) || isReserving)
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(errorMessage)
+                .disabled(isReserving)
+            } else if parentIsBookReserved {
+                Button(action: {
+                    Task {
+                        await removeReservation()
+                    }
+                }) {
+                    if isReserving {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text("Cancel Reservation")
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+                .disabled(isReserving)
+            } else {
+                Button(action: {}) {
+                    Text("Currently Unavailable")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.gray)
+                .foregroundColor(.white)
+                .cornerRadius(8)
+                .disabled(true)
             }
             
+            // Wishlist Button
             Button(action: {
                 if addedToWishlist {
-                    // Show confirmation alert instead of removing immediately
                     showRemoveConfirmation = true
                 } else {
                     addBookToWishlist()
                 }
             }) {
-                HStack {
-                    if isAddingToWishlist || isRemovingFromWishlist {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Image(systemName: addedToWishlist ? "heart.fill" : "heart")
-                        Text(addedToWishlist ? "Remove from Wishlist" : "Add to Wishlist")
-                    }
+                if isAddingToWishlist || isRemovingFromWishlist {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    Image(systemName: addedToWishlist ? "heart.fill" : "heart")
+                    Text(addedToWishlist ? "Remove from Wishlist" : "Add to Wishlist")
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color(.systemGray6))
-                .foregroundColor(addedToWishlist ? .red : .primary)
-                .cornerRadius(8)
             }
-            .disabled(isAddingToWishlist || isRemovingFromWishlist)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color(.systemGray6))
+            .foregroundColor(addedToWishlist ? .red : .primary)
+            .cornerRadius(8)
         }
+        .disabled(isAddingToWishlist || isRemovingFromWishlist)
         .padding(.horizontal)
         .alert(wishlistAlertMessage, isPresented: $showWishlistAlert) {
             Button("OK", role: .cancel) {}
@@ -426,8 +589,17 @@ private struct ActionButtonsView: View {
             Text("Are you sure you want to remove '\(book.title)' from your wishlist?")
         }
         .onAppear {
+            print("ActionButtonsView appeared for book: \(book.title) with ID: \(book.id)")
             checkIfBookInWishlist()
             checkReservationStatus()
+            
+            // If this is accessed from wishlist (addedToWishlist is already true), 
+            // make sure other state is updated
+            if addedToWishlist {
+                // Update WishlistManager shared state
+                WishlistManager.shared.setInWishlist(isbn: book.isbn)
+                print("Book is in wishlist, updating shared state")
+            }
         }
     }
     
@@ -441,78 +613,73 @@ private struct ActionButtonsView: View {
                 
                 print("Checking wishlist for book: \(book.title) with ID: \(book.id.uuidString), ISBN: \(book.isbn)")
                 
-                // Get existing wishlist for the user
+                // Get existing wishlist for the user - don't use .single() to avoid the error
                 let response = try await SupabaseManager.shared.client
                     .from("Members")
                     .select("wishlist")
                     .eq("id", value: userId)
-                    .single()
                     .execute()
                 
                 // Parse the response to get current wishlist
-                struct MemberResponse: Codable {
-                    let wishlist: [String]?
-                }
-                
-                do {
-                    let decoder = JSONDecoder()
-                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                if let jsonString = String(data: response.data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                   let firstMember = jsonArray.first,
+                   let wishlist = firstMember["wishlist"] as? [String] {
                     
-                    // Check if book is in wishlist
-                    if let wishlist = member.wishlist {
-                        print("Current wishlist: \(wishlist)")
+                    print("Current wishlist: \(wishlist)")
+                    
+                    // Now we need to check if any of the book IDs in the wishlist match our book
+                    let bookId = book.id.uuidString
+                    var inWishlist = wishlist.contains(bookId)
+                    
+                    // If not found by direct ID, check each book in the database to find our ISBN
+                    if !inWishlist && !wishlist.isEmpty {
+                        print("Book not found by ID, checking by ISBN...")
                         
-                        // Now we need to check if any of the book IDs in the wishlist match our book
-                        let bookId = book.id.uuidString
-                        var inWishlist = wishlist.contains(bookId)
-                        
-                        // If not found by direct ID, check each book in the database to find our ISBN
-                        if !inWishlist && !wishlist.isEmpty {
-                            print("Book not found by ID, checking by ISBN...")
-                            
-                            // Check if any books in the wishlist have the same ISBN
-                            for dbBookId in wishlist {
-                                do {
-                                    let bookResponse = try await SupabaseManager.shared.client
-                                        .from("Books")
-                                        .select("isbn")
-                                        .eq("id", value: dbBookId)
-                                        .single()
-                                        .execute()
+                        // Check if any books in the wishlist have the same ISBN
+                        for dbBookId in wishlist {
+                            do {
+                                let bookResponse = try await SupabaseManager.shared.client
+                                    .from("Books")
+                                    .select("isbn")
+                                    .eq("id", value: dbBookId)
+                                    .execute()
+                                
+                                if let jsonString = String(data: bookResponse.data, encoding: .utf8),
+                                   let jsonData = jsonString.data(using: .utf8),
+                                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                                   let firstBook = jsonArray.first,
+                                   let isbn = firstBook["isbn"] as? String {
                                     
-                                    struct BookIsbnResponse: Codable {
-                                        let isbn: String
+                                    if isbn == book.isbn {
+                                        print("Found book in wishlist by ISBN match: \(book.isbn)")
+                                        inWishlist = true
+                                        
+                                        // Store this ID to use for later operations
+                                        BookIdentifier.setDatabaseId(UUID(uuidString: dbBookId) ?? book.id, for: book.isbn)
+                                        break
                                     }
-                                    
-                                    if let bookData = try? decoder.decode(BookIsbnResponse.self, from: bookResponse.data) {
-                                        if bookData.isbn == book.isbn {
-                                            print("Found book in wishlist by ISBN match: \(book.isbn)")
-                                            inWishlist = true
-                                            
-                                            // Store this ID to use for later operations
-                                            BookIdentifier.setDatabaseId(UUID(uuidString: dbBookId) ?? book.id, for: book.isbn)
-                                            break
-                                        }
-                                    }
-                                } catch {
-                                    print("Error checking book \(dbBookId): \(error)")
                                 }
+                            } catch {
+                                print("Error checking book \(dbBookId): \(error)")
                             }
                         }
-                        
-                        print("Book \(book.title) is \(inWishlist ? "in" : "not in") wishlist")
-                        
-                        await MainActor.run {
-                            addedToWishlist = inWishlist
-                        }
-                    } else {
-                        print("User has no wishlist")
-                        await MainActor.run {
-                            addedToWishlist = false
+                    }
+                    
+                    print("Book \(book.title) is \(inWishlist ? "in" : "not in") wishlist")
+                    
+                    await MainActor.run {
+                        addedToWishlist = inWishlist
+                        if inWishlist {
+                            WishlistManager.shared.setInWishlist(isbn: book.isbn)
                         }
                     }
-                } catch {
-                    print("Error checking wishlist status: \(error)")
+                } else {
+                    print("Could not parse wishlist data: \(String(data: response.data, encoding: .utf8) ?? "nil")")
+                    await MainActor.run {
+                        addedToWishlist = false
+                    }
                 }
             } catch {
                 print("Error fetching wishlist: \(error)")
@@ -546,27 +713,20 @@ private struct ActionButtonsView: View {
                 var dbBookId = bookId
                 
                 // If we get a response, use the ID from the database
-                struct BookIdResponse: Codable {
-                    let id: String
-                    let isbn: String
-                }
-                
-                // Use a safer approach to handle the data
-                do {
-                    let books = try JSONDecoder().decode([BookIdResponse].self, from: verifyResponse.data)
-                    if let firstBook = books.first {
-                        // Use the ID from the database, which is the canonical ID for this ISBN
-                        dbBookId = firstBook.id
-                        print("Using database ID \(dbBookId) instead of local ID \(bookId) for ISBN \(isbn)")
-                        
-                        // Update our BookIdentifier map
-                        if let uuid = UUID(uuidString: dbBookId) {
-                            BookIdentifier.setDatabaseId(uuid, for: isbn)
-                        }
+                if let jsonString = String(data: verifyResponse.data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                   let firstBook = jsonArray.first,
+                   let databaseId = firstBook["id"] as? String {
+                    
+                    // Use the ID from the database, which is the canonical ID for this ISBN
+                    dbBookId = databaseId
+                    print("Using database ID \(dbBookId) instead of local ID \(bookId) for ISBN \(isbn)")
+                    
+                    // Update our BookIdentifier map
+                    if let uuid = UUID(uuidString: dbBookId) {
+                        BookIdentifier.setDatabaseId(uuid, for: isbn)
                     }
-                } catch {
-                    print("Error decoding book data from database: \(error)")
-                    // Continue using the local book ID
                 }
                 
                 // Get existing wishlist for the user
@@ -574,27 +734,24 @@ private struct ActionButtonsView: View {
                     .from("Members")
                     .select("wishlist")
                     .eq("id", value: userId)
-                    .single()
                     .execute()
                 
-                // Parse the response to get current wishlist
-                struct MemberResponse: Codable {
-                    let wishlist: [String]?
-                }
-                
-                do {
-                    let decoder = JSONDecoder()
-                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                // Parse the response to get current wishlist using safer approach
+                if let jsonString = String(data: response.data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                   let firstMember = jsonArray.first {
                     
-                    // Update the wishlist with the new book ID
-                    var updatedWishlist = member.wishlist ?? []
+                    // Get the wishlist or create empty array if it doesn't exist
+                    var updatedWishlist = (firstMember["wishlist"] as? [String]) ?? []
                     
                     print("Current wishlist before addition: \(updatedWishlist)")
                     
-                    // Check if book is already in wishlist by ID or ISBN
+                    // Check if book is already in wishlist by ID
                     if updatedWishlist.contains(dbBookId) {
                         print("⚠️ Book is already in wishlist with matching ID, not adding duplicate")
                         await showAlert("This book is already in your wishlist")
+                        isAddingToWishlist = false
                         return
                     }
                     
@@ -605,15 +762,15 @@ private struct ActionButtonsView: View {
                             .from("Books")
                             .select("isbn")
                             .eq("id", value: existingBookId)
-                            .single()
                             .execute()
                         
-                        struct BookIsbnResponse: Codable {
-                            let isbn: String
-                        }
-                        
-                        if let bookData = try? decoder.decode(BookIsbnResponse.self, from: bookResponse.data) {
-                            if bookData.isbn == isbn {
+                        if let jsonString = String(data: bookResponse.data, encoding: .utf8),
+                           let jsonData = jsonString.data(using: .utf8),
+                           let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                           let firstBook = jsonArray.first,
+                           let existingIsbn = firstBook["isbn"] as? String {
+                            
+                            if existingIsbn == isbn {
                                 print("⚠️ Book with ISBN \(isbn) is already in wishlist with ID \(existingBookId), not adding duplicate")
                                 alreadyInWishlist = true
                                 break
@@ -623,6 +780,7 @@ private struct ActionButtonsView: View {
                     
                     if alreadyInWishlist {
                         await showAlert("This book is already in your wishlist")
+                        isAddingToWishlist = false
                         return
                     }
                     
@@ -646,14 +804,21 @@ private struct ActionButtonsView: View {
                             wishlistAlertMessage = "Book added to your wishlist"
                             showWishlistAlert = true
                             isAddingToWishlist = false
+                            
+                            // Update WishlistManager
+                            WishlistManager.shared.setInWishlist(isbn: book.isbn)
+                            
+                            // Notify that book status has changed
+                            NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
                         }
                     } else {
                         print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
                         await showAlert("Failed to update wishlist")
                     }
-                } catch {
-                    print("Error decoding wishlist: \(error)")
-                    await showAlert("Failed to retrieve your wishlist: \(error.localizedDescription)")
+                } else {
+                    print("Failed to retrieve or parse wishlist data")
+                    await showAlert("Failed to retrieve your wishlist")
+                    isAddingToWishlist = false
                 }
             } catch {
                 print("Error adding to wishlist: \(error)")
@@ -681,107 +846,106 @@ private struct ActionButtonsView: View {
                     .from("Members")
                     .select("wishlist")
                     .eq("id", value: userId)
-                    .single()
                     .execute()
                 
-                // Parse the response to get current wishlist
-                struct MemberResponse: Codable {
-                    let wishlist: [String]?
-                }
-                
-                do {
-                    let decoder = JSONDecoder()
-                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                // Parse the response using safer JSON approach
+                if let jsonString = String(data: response.data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                   let firstMember = jsonArray.first,
+                   var wishlist = firstMember["wishlist"] as? [String] {
                     
-                    if var wishlist = member.wishlist {
-                        print("Current wishlist before removal: \(wishlist)")
+                    print("Current wishlist before removal: \(wishlist)")
+                    
+                    // Identify all book IDs in the wishlist that match our ISBN
+                    var bookIdsToRemove: [String] = []
+                    var bookIdMatches = 0
+                    
+                    // First check if we have a stored ID for this ISBN
+                    if let storedId = BookIdentifier.getDatabaseId(for: isbn) {
+                        let storedIdString = storedId.uuidString
+                        print("Using stored database ID: \(storedIdString) for ISBN: \(isbn)")
+                        bookIdsToRemove.append(storedIdString)
+                        bookIdMatches += wishlist.filter { $0 == storedIdString }.count
+                    }
+                    
+                    // If we didn't find a match or not all instances were removed, scan the database
+                    if bookIdMatches == 0 {
+                        print("No stored ID found or no matches in wishlist, scanning database for ISBN matches...")
                         
-                        // Identify all book IDs in the wishlist that match our ISBN
-                        var bookIdsToRemove: [String] = []
-                        var bookIdMatches = 0
-                        
-                        // First check if we have a stored ID for this ISBN
-                        if let storedId = BookIdentifier.getDatabaseId(for: isbn) {
-                            let storedIdString = storedId.uuidString
-                            print("Using stored database ID: \(storedIdString) for ISBN: \(isbn)")
-                            bookIdsToRemove.append(storedIdString)
-                            bookIdMatches += wishlist.filter { $0 == storedIdString }.count
-                        }
-                        
-                        // If we didn't find a match or not all instances were removed, scan the database
-                        if bookIdMatches == 0 {
-                            print("No stored ID found or no matches in wishlist, scanning database for ISBN matches...")
-                            
-                            // Check all books in the wishlist to find matching ISBN
-                            for dbBookId in wishlist {
-                                do {
-                                    let bookResponse = try await SupabaseManager.shared.client
-                                        .from("Books")
-                                        .select("isbn")
-                                        .eq("id", value: dbBookId)
-                                        .single()
-                                        .execute()
+                        // Check all books in the wishlist to find matching ISBN
+                        for dbBookId in wishlist {
+                            do {
+                                let bookResponse = try await SupabaseManager.shared.client
+                                    .from("Books")
+                                    .select("isbn")
+                                    .eq("id", value: dbBookId)
+                                    .execute()
+                                
+                                if let jsonString = String(data: bookResponse.data, encoding: .utf8),
+                                   let jsonData = jsonString.data(using: .utf8),
+                                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                                   let firstBook = jsonArray.first,
+                                   let bookIsbn = firstBook["isbn"] as? String {
                                     
-                                    struct BookIsbnResponse: Codable {
-                                        let isbn: String
+                                    if bookIsbn == isbn {
+                                        print("Found book in wishlist with ID \(dbBookId) matching ISBN \(isbn)")
+                                        bookIdsToRemove.append(dbBookId)
                                     }
-                                    
-                                    if let bookData = try? decoder.decode(BookIsbnResponse.self, from: bookResponse.data) {
-                                        if bookData.isbn == isbn {
-                                            print("Found book in wishlist with ID \(dbBookId) matching ISBN \(isbn)")
-                                            bookIdsToRemove.append(dbBookId)
-                                        }
-                                    }
-                                } catch {
-                                    print("Error checking book \(dbBookId): \(error)")
                                 }
+                            } catch {
+                                print("Error checking book \(dbBookId): \(error)")
                             }
                         }
-                        
-                        // Add the current book ID as a fallback if no other matches found
-                        if bookIdsToRemove.isEmpty {
-                            let bookId = book.id.uuidString
-                            print("No matching books found by ISBN, using current book ID: \(bookId)")
-                            bookIdsToRemove.append(bookId)
-                        }
-                        
-                        // Remove all occurrences of book IDs that match our criteria
-                        let originalCount = wishlist.count
-                        for idToRemove in bookIdsToRemove {
-                            wishlist.removeAll { $0 == idToRemove }
-                        }
-                        
-                        let removedCount = originalCount - wishlist.count
-                        print("Removed \(removedCount) book entries from wishlist")
-                        print("Updated wishlist after removal: \(wishlist)")
-                        
-                        // Update the wishlist in Supabase
-                        let updateResponse = try await SupabaseManager.shared.client
-                            .from("Members")
-                            .update(["wishlist": wishlist])
-                            .eq("id", value: userId)
-                            .execute()
-                        
-                        if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
-                            // Success
-                            print("✅ Successfully removed book from wishlist in Supabase")
-                            await MainActor.run {
-                                addedToWishlist = false
-                                wishlistAlertMessage = "Book removed from your wishlist"
-                                showWishlistAlert = true
-                                isRemovingFromWishlist = false
-                            }
-                        } else {
-                            print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
-                            await showAlert("Failed to update wishlist")
+                    }
+                    
+                    // Add the current book ID as a fallback if no other matches found
+                    if bookIdsToRemove.isEmpty {
+                        let bookId = book.id.uuidString
+                        print("No matching books found by ISBN, using current book ID: \(bookId)")
+                        bookIdsToRemove.append(bookId)
+                    }
+                    
+                    // Remove all occurrences of book IDs that match our criteria
+                    let originalCount = wishlist.count
+                    for idToRemove in bookIdsToRemove {
+                        wishlist.removeAll { $0 == idToRemove }
+                    }
+                    
+                    let removedCount = originalCount - wishlist.count
+                    print("Removed \(removedCount) book entries from wishlist")
+                    print("Updated wishlist after removal: \(wishlist)")
+                    
+                    // Update the wishlist in Supabase
+                    let updateResponse = try await SupabaseManager.shared.client
+                        .from("Members")
+                        .update(["wishlist": wishlist])
+                        .eq("id", value: userId)
+                        .execute()
+                    
+                    if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
+                        // Success
+                        print("✅ Successfully removed book from wishlist in Supabase")
+                        await MainActor.run {
+                            addedToWishlist = false
+                            wishlistAlertMessage = "Book removed from your wishlist"
+                            showWishlistAlert = true
+                            isRemovingFromWishlist = false
+                            
+                            // Update WishlistManager
+                            WishlistManager.shared.removeFromWishlist(isbn: book.isbn)
+                            
+                            // Notify that book status has changed
+                            NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
                         }
                     } else {
-                        print("Wishlist is nil for user \(userId)")
-                        await showAlert("Wishlist not found")
+                        print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
+                        await showAlert("Failed to update wishlist")
                     }
-                } catch {
-                    print("Error decoding wishlist: \(error)")
-                    await showAlert("Failed to retrieve your wishlist: \(error.localizedDescription)")
+                } else {
+                    print("Failed to retrieve or parse wishlist data")
+                    await showAlert("Failed to retrieve your wishlist")
+                    isRemovingFromWishlist = false
                 }
             } catch {
                 print("Error removing from wishlist: \(error)")
@@ -812,6 +976,32 @@ private struct MemberID: Codable {
     let id: UUID
 }
 
+// Add a ReservationManager notification function to keep all instances in sync
+extension Notification.Name {
+    static let reservationStatusChanged = Notification.Name("reservationStatusChanged")
+}
+
+// Function to broadcast reservation changes
+func broadcastReservationChange(bookId: UUID, isReserved: Bool) {
+    // Update the shared manager first
+    if isReserved {
+        if let reservationId = BookReservationManager.shared.getReservationId(bookId: bookId) {
+            print("Broadcasting reservation for book ID: \(bookId), reservation ID: \(reservationId)")
+        } else {
+            print("Broadcasting reservation for book ID: \(bookId), but no reservation ID found")
+        }
+    } else {
+        print("Broadcasting reservation removal for book ID: \(bookId)")
+    }
+    
+    // Send notification to update all instances
+    NotificationCenter.default.post(
+        name: .reservationStatusChanged,
+        object: nil,
+        userInfo: ["bookId": bookId, "isReserved": isReserved]
+    )
+}
+
 struct BookDetailCard: View {
     let book: Book
     let supabase: SupabaseClient
@@ -827,12 +1017,18 @@ struct BookDetailCard: View {
     @State private var isFullScreen = false
     @State private var isImageLoaded = false
     @State private var currentAvailability: Int
+    @State private var forceUpdateKey = UUID()
+    @State private var isBookReserved: Bool
     
     init(book: Book, supabase: SupabaseClient, isPresented: Binding<Bool>) {
         self.book = book
         self.supabase = supabase
         self._isPresented = isPresented
         self._currentAvailability = State(initialValue: book.availableQuantity)
+        // Check if book is already reserved at init time
+        let reserved = BookReservationManager.shared.isReserved(bookId: book.id)
+        self._isBookReserved = State(initialValue: reserved)
+        print("BookDetailCard init - Book \(book.title) reserved status: \(reserved)")
     }
     
     var body: some View {
@@ -870,8 +1066,10 @@ struct BookDetailCard: View {
                             supabase: supabase,
                             isReserving: $isReserving,
                             addedToWishlist: $addedToWishlist,
-                            currentAvailability: $currentAvailability
+                            currentAvailability: $currentAvailability,
+                            parentIsBookReserved: $isBookReserved
                         )
+                        .id(forceUpdateKey)
                         
                         // Book Description
                         if let description = book.description {
@@ -964,6 +1162,72 @@ struct BookDetailCard: View {
         )
         .offset(y: dragOffset)
         .onAppear {
+            print("BookDetailCard onAppear for book: \(book.title)")
+            
+            // Force update to ensure consistency
+            forceUpdateKey = UUID()
+            
+            // Get the database ID if available
+            var bookIdToUse = book.id
+            if let storedId = BookIdentifier.getDatabaseId(for: book.isbn) {
+                print("Using stored database ID: \(storedId) for ISBN: \(book.isbn)")
+                bookIdToUse = storedId
+            }
+            
+            // Update reservation status immediately based on BookReservationManager
+            // Check both the local ID and the database ID
+            if BookReservationManager.shared.isReserved(bookId: book.id) || 
+               (bookIdToUse != book.id && BookReservationManager.shared.isReserved(bookId: bookIdToUse)) {
+                isBookReserved = true
+                print("BookDetailCard onAppear - Book is reserved")
+            } else {
+                isBookReserved = false
+                print("BookDetailCard onAppear - Book is not reserved")
+                
+                // Check if there's a reservation for this book and user in the database
+                Task {
+                    do {
+                        let userId = UserDefaults.standard.string(forKey: "currentMemberId") ?? ""
+                        if !userId.isEmpty {
+                            let response = try await supabase.database
+                                .from("BookReservation")
+                                .select("id")
+                                .eq("book_id", value: bookIdToUse.uuidString)
+                                .eq("member_id", value: userId)
+                                .execute()
+                            
+                            print("Checking for reservation immediately on appear using ID: \(bookIdToUse)")
+                            
+                            if let jsonString = String(data: response.data, encoding: .utf8),
+                               let jsonData = jsonString.data(using: .utf8),
+                               let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                               !jsonArray.isEmpty,
+                               let firstReservation = jsonArray.first,
+                               let reservationId = firstReservation["id"] as? String,
+                               let reservationUUID = UUID(uuidString: reservationId) {
+                                print("Found reservation in database: \(reservationId)")
+                                // Save the reservation with both IDs to ensure consistency
+                                BookReservationManager.shared.setReservation(bookId: book.id, reservationId: reservationUUID)
+                                BookReservationManager.shared.setReservation(bookId: bookIdToUse, reservationId: reservationUUID)
+                                
+                                await MainActor.run {
+                                    isBookReserved = true
+                                    forceUpdateKey = UUID() // Force view to update
+                                    
+                                    // Broadcast the change to all instances
+                                    broadcastReservationChange(bookId: book.id, isReserved: true)
+                                    if bookIdToUse != book.id {
+                                        broadcastReservationChange(bookId: bookIdToUse, isReserved: true)
+                                    }
+                                }
+                            }
+                        }
+                    } catch {
+                        print("Error checking reservation on appear: \(error)")
+                    }
+                }
+            }
+            
             // Always fetch the latest availability from the database when the view appears
             Task {
                 do {
@@ -1002,6 +1266,36 @@ struct BookDetailCard: View {
                     print("Error fetching availability: \(error)")
                 }
             }
+            
+            // Check initial wishlist and reservation status to ensure UI is up-to-date
+            DispatchQueue.main.async {
+                addedToWishlist = WishlistManager.shared.isBookInWishlist(isbn: book.isbn)
+                
+                // If we already know it's in the wishlist, update the shared state
+                if addedToWishlist {
+                    WishlistManager.shared.setInWishlist(isbn: book.isbn)
+                    print("Book is in wishlist, updating WishlistManager state")
+                }
+                
+                // Directly check BookReservationManager as first priority
+                if let reservationId = BookReservationManager.shared.getReservationId(bookId: book.id) {
+                    print("Book is already reserved with ID: \(reservationId)")
+                    isBookReserved = true
+                    // Force UI update
+                    forceUpdateKey = UUID()
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .reservationStatusChanged)) { notification in
+            if let bookId = notification.userInfo?["bookId"] as? UUID,
+               let isReserved = notification.userInfo?["isReserved"] as? Bool {
+                if bookId == book.id {
+                    // Update this view's reservation status
+                    print("BookDetailCard received reservation change notification: \(isReserved ? "reserved" : "not reserved")")
+                    isBookReserved = isReserved
+                    forceUpdateKey = UUID() // Force view to update
+                }
+            }
         }
         .onDisappear {
             // This ensures the reservation status persists when the view disappears
@@ -1033,3 +1327,4 @@ struct BookDetailItem: View {
         .frame(maxWidth: .infinity)
     }
 } 
+

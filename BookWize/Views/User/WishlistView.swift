@@ -45,6 +45,8 @@ struct WishlistView: View {
             .onAppear {
                 // Load wishlist data every time the view appears
                 viewModel.loadWishlist()
+                // Listen for notifications about changes to wishlist or reservations
+                NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
             }
             .sheet(item: $selectedBook) { book in
                 NavigationView {
@@ -64,6 +66,11 @@ struct WishlistView: View {
                 } else {
                     Text("Are you sure you want to remove this book from your wishlist?")
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name.reservationStatusChanged)) { _ in
+                // When reservation status changes, force refresh
+                print("WishlistView received reservation change notification, refreshing UI")
+                viewModel.refreshWishlist()
             }
 
         }
@@ -170,6 +177,9 @@ class WishlistViewModel: ObservableObject {
         wishlistBooks = []
         wishlistBookIds = []
         
+        // Make sure the WishlistSyncManager is initialized
+        let _ = WishlistSyncManager.shared
+        
         Task {
             do {
                 // 1. Get current user ID from UserDefaults
@@ -187,70 +197,60 @@ class WishlistViewModel: ObservableObject {
                     .from("Members")
                     .select("wishlist")
                     .eq("id", value: userId)
-                    .single()
                     .execute()
                 
-                // Parse the response to get wishlist book IDs
-                struct MemberResponse: Codable {
-                    let wishlist: [String]?
-                }
-                
-                do {
-                    let decoder = JSONDecoder()
-                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                // Parse the response to get wishlist book IDs using safer method
+                if let jsonString = String(data: response.data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                   let firstMember = jsonArray.first,
+                   let wishlist = firstMember["wishlist"] as? [String] {
                     
-                    if let wishlist = member.wishlist {
-                        print("Fetched wishlist: \(wishlist)")
+                    print("Fetched wishlist: \(wishlist)")
+                    
+                    // Check for duplicates
+                    let uniqueIds = Set(wishlist)
+                    if uniqueIds.count < wishlist.count {
+                        print("⚠️ Detected \(wishlist.count - uniqueIds.count) duplicate book IDs in wishlist")
                         
-                        // Check for duplicates
-                        let uniqueIds = Set(wishlist)
-                        if uniqueIds.count < wishlist.count {
-                            print("⚠️ Detected \(wishlist.count - uniqueIds.count) duplicate book IDs in wishlist")
-                            
-                            // Save unique IDs only
-                            let uniqueArray = Array(uniqueIds)
-                            print("Original wishlist: \(wishlist)")
-                            print("Deduplicated wishlist: \(uniqueArray)")
-                            
-                            // Update the database with deduplicated list
-                            let updateResponse = try await SupabaseManager.shared.client
-                                .from("Members")
-                                .update(["wishlist": uniqueArray])
-                                .eq("id", value: userId)
-                                .execute()
-                            
-                            if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
-                                print("✅ Successfully deduplicated wishlist in database")
-                                self.wishlistBookIds = uniqueArray
-                            } else {
-                                print("❌ Failed to deduplicate wishlist: Status code \(updateResponse.status)")
-                                self.wishlistBookIds = wishlist
-                            }
+                        // Save unique IDs only
+                        let uniqueArray = Array(uniqueIds)
+                        print("Original wishlist: \(wishlist)")
+                        print("Deduplicated wishlist: \(uniqueArray)")
+                        
+                        // Update the database with deduplicated list
+                        let updateResponse = try await SupabaseManager.shared.client
+                            .from("Members")
+                            .update(["wishlist": uniqueArray])
+                            .eq("id", value: userId)
+                            .execute()
+                        
+                        if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
+                            print("✅ Successfully deduplicated wishlist in database")
+                            self.wishlistBookIds = uniqueArray
                         } else {
+                            print("❌ Failed to deduplicate wishlist: Status code \(updateResponse.status)")
                             self.wishlistBookIds = wishlist
                         }
-                        
-                        if self.wishlistBookIds.isEmpty {
-                            await MainActor.run {
-                                self.wishlistBooks = []
-                                self.isLoading = false
-                                print("Wishlist is empty")
-                            }
-                        } else {
-                            // 3. Fetch book details for each book ID in the wishlist
-                            await fetchWishlistBooks(bookIds: self.wishlistBookIds)
-                        }
                     } else {
-                        // User has no wishlist items
+                        self.wishlistBookIds = wishlist
+                    }
+                    
+                    if self.wishlistBookIds.isEmpty {
                         await MainActor.run {
                             self.wishlistBooks = []
                             self.isLoading = false
-                            print("Wishlist is nil")
+                            print("Wishlist is empty")
                         }
+                    } else {
+                        // 3. Fetch book details for each book ID in the wishlist
+                        await fetchWishlistBooks(bookIds: self.wishlistBookIds)
                     }
-                } catch {
-                    print("Error decoding wishlist: \(error)")
+                } else {
+                    // User has no wishlist items or couldn't parse
+                    print("Could not parse wishlist data or wishlist is empty")
                     await MainActor.run {
+                        self.wishlistBooks = []
                         self.isLoading = false
                     }
                 }
