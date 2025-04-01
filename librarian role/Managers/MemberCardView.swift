@@ -15,28 +15,72 @@ struct MemberCardView: View {
     private var genderIcon: String {
         switch member.gender {
         case .male:
-            return "person.badge.plus"
+            return "person.circle.fill"
         case .female:
-            return "person.badge.minus"
+            return "person.circle.fill"
         case .other:
-            return "person.circle"
+            return "person.circle.fill"
         }
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(member.name)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.customText)
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with Avatar and Name
+            HStack(spacing: 12) {
+                // Avatar
+                Image(systemName: genderIcon)
+                    .font(.system(size: 40))
+                    .foregroundStyle(member.gender == .male ? .blue :
+                                   member.gender == .female ? .purple : .gray)
+                    .frame(width: 60, height: 60)
+                    .background(Color(.systemGray6))
+                    .clipShape(Circle())
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(member.name)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    
+                    Text(member.email)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
             
-            MemberDetailsView(member: member, genderIcon: genderIcon)
+            Divider()
+            
+            // Member Details
+            VStack(alignment: .leading, spacing: 12) {
+                // Library Card
+                HStack {
+                    Image(systemName: "books.vertical.fill")
+                        .foregroundStyle(.blue)
+                    Text(member.selectedLibrary)
+                        .font(.subheadline)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                
+                // Fine Status
+                HStack {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .foregroundStyle(member.fine > 0 ? .red : .green)
+                    Text("Fine: ₹\(String(format: "%.2f", member.fine))")
+                        .font(.subheadline)
+                        .foregroundStyle(member.fine > 0 ? .red : .green)
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(member.fine > 0 ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+                .cornerRadius(8)
+            }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.customCardBackground.opacity(0.7))
-        )
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: Color(.systemGray4), radius: 5, x: 0, y: 2)
         .onTapGesture {
             showingEditSheet = true
         }
@@ -54,10 +98,11 @@ struct MemberCardView: View {
         }
         .overlay {
             if isLoading {
+                Color.white.opacity(0.8)
+                    .ignoresSafeArea()
                 ProgressView()
-                    .scaleEffect(1.5)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.2))
+                    .scaleEffect(1.2)
+                    .tint(.blue)
             }
         }
         .alert("Error", isPresented: .constant(errorMessage != nil)) {
@@ -88,23 +133,6 @@ struct MemberCardView: View {
     }
 }
 
-struct MemberDetailsView: View {
-    let member: User
-    let genderIcon: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(member.email, systemImage: "envelope.fill")
-            Label(member.gender.rawValue, systemImage: genderIcon)
-            Label(member.selectedLibrary, systemImage: "books.vertical.fill")
-            Label("₹\(String(format: "%.2f", member.fine))", systemImage: "dollarsign.circle.fill")
-                .foregroundStyle(member.fine > 0 ? .red : .green)
-        }
-        .font(.system(size: 15))
-        .foregroundStyle(Color.customText.opacity(0.6))
-    }
-}
-
 struct EditMemberSheet: View {
     let member: User
     @Binding var editedName: String
@@ -114,21 +142,26 @@ struct EditMemberSheet: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                TextField("Name", text: $editedName)
-                    .font(.system(size: 17))
+            List {
+                Section {
+                    TextField("Name", text: $editedName)
+                        .font(.body)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .padding(.vertical, 4)
+                } header: {
+                    Text("Member Name")
+                }
                 
-                Text(member.email)
-                    .foregroundStyle(Color.customText.opacity(0.6))
-                
-                Text(member.gender.rawValue)
-                    .foregroundStyle(Color.customText.opacity(0.6))
-                
-                Text(member.selectedLibrary)
-                    .foregroundStyle(Color.customText.opacity(0.6))
-                
-                Text("₹\(String(format: "%.2f", member.fine))")
-                    .foregroundStyle(member.fine > 0 ? .red : .green)
+                Section {
+                    InfoRow(icon: "envelope.fill", text: member.email)
+                    InfoRow(icon: genderIcon, text: member.gender.rawValue)
+                    InfoRow(icon: "books.vertical.fill", text: member.selectedLibrary)
+                    InfoRow(icon: "dollarsign.circle.fill",
+                           text: "₹\(String(format: "%.2f", member.fine))",
+                           color: member.fine > 0 ? .red : .green)
+                } header: {
+                    Text("Member Information")
+                }
             }
             .navigationTitle("Edit Member")
             .navigationBarTitleDisplayMode(.inline)
@@ -137,14 +170,30 @@ struct EditMemberSheet: View {
                     Button("Cancel", action: onCancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Save") {
                         Task {
                             await onSave()
                         }
                     }
+                    .fontWeight(.semibold)
                     .disabled(editedName.isEmpty || editedName == member.name)
                 }
             }
+        }
+    }
+}
+
+struct InfoRow: View {
+    let icon: String
+    let text: String
+    var color: Color = .secondary
+    
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+            Text(text)
+                .foregroundStyle(color)
         }
     }
 }
@@ -175,4 +224,4 @@ struct EditMemberSheet: View {
     }
     .padding()
     .background(Color.customBackground)
-} 
+}
