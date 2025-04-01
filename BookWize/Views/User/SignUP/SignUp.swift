@@ -1,4 +1,10 @@
 import SwiftUI
+import Supabase
+
+struct Libraries: Identifiable, Decodable {
+    var id: UUID
+    var Name: String
+}
 
 struct SignupView: View {
     @Environment(\.dismiss) var dismiss
@@ -9,8 +15,9 @@ struct SignupView: View {
     @State private var gender = Gender.male
     @State private var password = ""
     @State private var confirmPassword = ""
-    @State private var selectedLibrary = "Good Reads Library"
+    @State private var selectedLibrary = ""
     @State private var isPasswordVisible = false
+    @State private var selectedLibrary1: [Libraries] = []
     
     // Verification
     @State private var showVerificationView = false
@@ -36,14 +43,18 @@ struct SignupView: View {
         hasSpecialChar: false
     )
     
-    let libraries = ["Good Reads Library"]
+    private var libraries: [String] {
+        let fetched = selectedLibrary1.map { $0.Name }
+        return fetched.isEmpty ? ["Good Reads Library"] : fetched
+    }
     
     private var isFormValid: Bool {
         !name.isEmpty &&
         ValidationUtils.isValidEmail(email) &&
         passwordValidation.isValid &&
         password == confirmPassword &&
-        emailError == nil
+        emailError == nil &&
+        !selectedLibrary.isEmpty
     }
     
     var body: some View {
@@ -274,6 +285,11 @@ struct SignupView: View {
                     .padding(24)
                 }
             }
+            .onAppear {
+                Task {
+                    await fetchLibraries()
+                }
+            }
             .navigationTitle("Sign Up")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showVerificationView) {
@@ -297,6 +313,34 @@ struct SignupView: View {
                     gender: gender,
                     password: password
                 )
+            }
+        }
+    }
+    
+    private func fetchLibraries() async {
+        print("Starting library fetch...")
+        do {
+            let response: [Libraries] = try await SupabaseManager.shared.client
+                .from("Libraries")
+                .select("*")
+                .execute()
+                .value
+            
+            print("Received response: \(response)")
+            
+            DispatchQueue.main.async {
+                self.selectedLibrary1 = response
+                if !self.selectedLibrary1.isEmpty {
+                    self.selectedLibrary = self.selectedLibrary1[0].Name
+                } else {
+                    self.selectedLibrary = "Good Reads Library"
+                }
+            }
+        } catch {
+            print("Error fetching libraries: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.selectedLibrary = "Good Reads Library"
+                self.errorMessage = "Failed to load libraries. Using default library."
             }
         }
     }
