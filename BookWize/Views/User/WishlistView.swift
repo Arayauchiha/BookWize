@@ -43,7 +43,6 @@ struct WishlistView: View {
                 }
             }
             .onAppear {
-                // Load wishlist data every time the view appears
                 viewModel.loadWishlist()
             }
             .sheet(item: $selectedBook) { book in
@@ -65,7 +64,11 @@ struct WishlistView: View {
                     Text("Are you sure you want to remove this book from your wishlist?")
                 }
             }
-
+            .alert("Success", isPresented: $viewModel.showSuccessAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("'\(viewModel.removedBookTitle)' has been removed from your wishlist.")
+            }
         }
     }
     
@@ -159,7 +162,9 @@ class WishlistViewModel: ObservableObject {
     @Published var wishlistBooks: [Book] = []
     @Published var isLoading = false
     @Published var showingRemoveAlert = false
+    @Published var showSuccessAlert = false
     @Published var bookToRemove: Book?
+    @Published var removedBookTitle: String = ""
     
     private var wishlistBookIds: [String] = []
     
@@ -448,6 +453,18 @@ class WishlistViewModel: ObservableObject {
         }
     }
     
+    func showRemoveAlert(for book: Book) {
+        bookToRemove = book
+        showingRemoveAlert = true
+    }
+    
+    func confirmRemoval() {
+        guard let book = bookToRemove else { return }
+        removedBookTitle = book.title
+        removeFromWishlist(book)
+        bookToRemove = nil
+    }
+    
     func removeFromWishlist(_ book: Book) {
         let isbn = book.isbn
         print("Removing book '\(book.title)' with ISBN: \(isbn)")
@@ -555,22 +572,11 @@ class WishlistViewModel: ObservableObject {
                             .execute()
                         
                         if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
-                            print("✅ Successfully updated wishlist in Supabase")
-                            
-                            // Check if we removed multiple entries
-                            if removedCount > 1 {
-                                print("⚠️ Removed \(removedCount) duplicate entries of the same book")
-                            }
-                            
-                            // Refresh the list to ensure UI is in sync with database
                             await MainActor.run {
-                                // We've already removed it from the local array, and updated wishlistBookIds,
-                                // so we don't need to reload the entire list
-                                print("Book successfully removed from wishlist")
+                                showSuccessAlert = true
                             }
                         } else {
                             print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
-                            // If update failed, reload the wishlist to ensure UI matches database
                             await MainActor.run {
                                 self.loadWishlist()
                             }
@@ -586,23 +592,11 @@ class WishlistViewModel: ObservableObject {
                 }
             } catch {
                 print("Error removing from wishlist: \(error)")
-                // If there was an error, reload the wishlist to ensure UI is in sync
                 await MainActor.run {
                     self.loadWishlist()
                 }
             }
         }
-    }
-    
-    func showRemoveAlert(for book: Book) {
-        bookToRemove = book
-        showingRemoveAlert = true
-    }
-    
-    func confirmRemoval() {
-        guard let book = bookToRemove else { return }
-        removeFromWishlist(book)
-        bookToRemove = nil
     }
 }
 
@@ -610,4 +604,4 @@ struct WishlistView_Previews: PreviewProvider {
     static var previews: some View {
         WishlistView()
     }
-} 
+}
