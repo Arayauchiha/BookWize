@@ -15,6 +15,7 @@ struct AdminLoginView: View {
     @State private var errorMessage = ""
     @State private var verificationCode = ""
     @State private var isPasswordVisible = false
+    @State private var emailError: String?
     @FocusState private var focusedField: Field?
     
     @State private var showPasswordChange = false
@@ -24,6 +25,10 @@ struct AdminLoginView: View {
     
     private enum Field {
         case email, password
+    }
+    
+    private var isEmailValid: Bool {
+        ValidationUtils.isValidEmail(email)
     }
     
     var body: some View {
@@ -54,9 +59,23 @@ struct AdminLoginView: View {
                         .keyboardType(.emailAddress)
                         .focused($focusedField, equals: .email)
                         .submitLabel(.next)
+                        .customTextField()
                         .onSubmit {
                             focusedField = .password
                         }
+                        .onChange(of: email) { newValue in
+                            if !newValue.isEmpty && !isEmailValid {
+                                emailError = "Please enter a valid email address"
+                            } else {
+                                emailError = nil
+                            }
+                        }
+                    
+                    if let error = emailError {
+                        Text(error)
+                            .foregroundStyle(Color.red)
+                            .font(.caption)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -64,25 +83,11 @@ struct AdminLoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    HStack {
-                        if isPasswordVisible {
-                            TextField("Enter your password", text: $password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                        } else {
-                            SecureField("Enter your password", text: $password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                        }
-                        
-                        Button(action: {
-                            isPasswordVisible.toggle()
-                        }) {
-                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                .foregroundColor(Color.gray)
-                        }
-                        .padding(.trailing, 8)
-                    }
-                    .background(Color.customInputBackground)
-                    .cornerRadius(10)
+                    ModifiedContent(content: EmptyView(), modifier: CustomPasswordFieldStyle(
+                        text: $password,
+                        isVisible: $isPasswordVisible,
+                        placeholder: "Enter your password"
+                    ))
                 }
 
                 if !errorMessage.isEmpty {
@@ -106,10 +111,10 @@ struct AdminLoginView: View {
                     }
                 }
                 .padding(.vertical, 15)
-                .background(!email.isEmpty && !password.isEmpty ? Color.customButton : Color.gray)
+                .background(!email.isEmpty && !password.isEmpty && isEmailValid ? Color.customButton : Color.gray)
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || email.isEmpty || password.isEmpty)
+                .disabled(isLoading || email.isEmpty || password.isEmpty || !isEmailValid)
                 .padding(.top, 8)
             }
             .padding(.horizontal, 24)
@@ -238,7 +243,7 @@ struct AdminLoginView: View {
             EmailService.shared.clearOTP(for: email)
             
             isAdminLoggedIn = true
-            
+            UserDefaults.standard.set(email, forKey: "currentMemberEmail")
             // Close verification sheet
             showVerification = false
         } else {

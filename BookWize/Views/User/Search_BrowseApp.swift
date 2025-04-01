@@ -7,7 +7,6 @@ import Supabase
 import SwiftUI
 import Foundation
 import Combine
-
 struct MembershipDetailsView: View {
     let user: User
     @State private var qrCodeImage: UIImage?
@@ -50,7 +49,7 @@ struct MembershipDetailsView: View {
             "name": user.name,
             "email": user.email,
             "library": user.selectedLibrary,
-            "membershipType": "Annual",
+            //"membershipType": "Annual",
             "memberId": user.id.uuidString
         ]
         
@@ -75,6 +74,7 @@ struct MembershipDetailsView: View {
     }
 }
 
+// Then modify the Account section in Search_BrowseApp:
 struct Search_BrowseApp: View {
     @State private var selectedTab = 1
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
@@ -119,11 +119,14 @@ struct Search_BrowseApp: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
-            UserDashboardView()
-                .tabItem {
-                    Label("Dashboard", systemImage: "rectangle.3.group")
-                }
-                .tag(3)
+            NavigationView {
+                Text("Dashboard Coming Soon")
+                    .navigationTitle("Dashboard")
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "rectangle.3.group")
+            }
+            .tag(0)
             
             // Explore Tab (Default)
             SearchBrowseView(
@@ -141,16 +144,6 @@ struct Search_BrowseApp: View {
                     Label("Wishlist", systemImage: "heart")
                 }
                 .tag(2)
-            
-            // Book Club Tab
-            NavigationView {
-                Text("Book Club Coming Soon")
-                    .navigationTitle("Book Club")
-            }
-            .tabItem {
-                Label("Book Club", systemImage: "person.3.fill")
-            }
-            .tag(4)
             
             // Account Tab - Modified to include Membership Details
             NavigationView {
@@ -216,7 +209,7 @@ struct Search_BrowseApp: View {
             .tabItem {
                 Label("Account", systemImage: "person.circle")
             }
-            .tag(5)
+            .tag(3)
             
             .accentColor(.blue)
             .onAppear {

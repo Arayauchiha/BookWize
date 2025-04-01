@@ -18,6 +18,8 @@ struct BookCirculationView: View {
                 switch activeTab {
                 case .issue:
                     IssueBookView()
+                    
+                        // UNCOMMENT THIS AFTER SPRINT - 2
                 case .returned:
                     ReturnBookView()
                 case .renewed:
@@ -48,6 +50,7 @@ struct BookCirculationView: View {
 
 enum CirculationTab: String, CaseIterable {
     case issue = "Issue Book"
+    // UNCOMMENT THIS AFTER SPRINT - 2
     case returned = "Return Book"
     case renewed = "Renewd Book"
     case reserved = "Reserved Book"

@@ -1,5 +1,7 @@
 import SwiftUI
 
+let SHOW_FINES = true // MAKE THIS TRUE - SPRINT - 2: Isko true kiya toh sara maal wapais aa jayega - @rtk-rnjn
+
 struct InventoryManagerView: View {
     @State private var isLoggedIn = true
     @State private var showingLoginSheet = false
@@ -25,10 +27,12 @@ struct InventoryManagerView: View {
                             Label("Members", systemImage: "person.2.fill")
                         }
                     
-                    FineManagementView()
-                        .tabItem {
-                            Label("Fines", systemImage: "dollarsign.circle.fill")
-                        }
+                    if SHOW_FINES {
+                        FineManagementView()
+                            .tabItem {
+                                Label("Fines", systemImage: "dollarsign.circle.fill")
+                            }
+                    }
                     
                     AccountView(isLoggedIn: $isLoggedIn)
                         .tabItem {

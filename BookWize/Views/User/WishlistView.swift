@@ -43,7 +43,6 @@ struct WishlistView: View {
                 }
             }
             .onAppear {
-                // Load wishlist data every time the view appears
                 viewModel.loadWishlist()
             }
             .sheet(item: $selectedBook) { book in
@@ -51,7 +50,7 @@ struct WishlistView: View {
                     BookDetailCard(book: book, supabase: supabase, isPresented: $showBookDetail)
                         .navigationBarHidden(true)
                 }
-                .interactiveDismissDisabled()
+                .interactiveDismissDisabled(false)
             }
             .alert("Remove from Wishlist", isPresented: $viewModel.showingRemoveAlert) {
                 Button("Cancel", role: .cancel) {}
@@ -65,7 +64,11 @@ struct WishlistView: View {
                     Text("Are you sure you want to remove this book from your wishlist?")
                 }
             }
-
+            .alert("Success", isPresented: $viewModel.showSuccessAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("'\(viewModel.removedBookTitle)' has been removed from your wishlist.")
+            }
         }
     }
     
@@ -159,7 +162,9 @@ class WishlistViewModel: ObservableObject {
     @Published var wishlistBooks: [Book] = []
     @Published var isLoading = false
     @Published var showingRemoveAlert = false
+    @Published var showSuccessAlert = false
     @Published var bookToRemove: Book?
+    @Published var removedBookTitle: String = ""
     
     private var wishlistBookIds: [String] = []
     
@@ -348,18 +353,21 @@ class WishlistViewModel: ObservableObject {
                         
                         // Map to your Book model with only the required parameters
                         func toBook() -> Book {
-                            let book = Book(
+                            // Create a book with the available data
+                            var book = Book(
                                 isbn: isbn,
                                 title: title,
                                 author: author,
-                                publisher: publisher ?? "",
-                                quantity: quantity,
-                                publishedDate: publishedDate,
-                                description: description,
-                                pageCount: pageCount,
-                                categories: categories,
+                                publisher: publisher ?? "",quantity: 1,
+                                publishedDate: publishedDate, description: description,
+                                pageCount: pageCount, categories: categories,
                                 imageURL: imageURL
                             )
+                            
+                            // Make sure to set the availableQuantity from the database
+                            if let availQty = availableQuantity {
+                                book.availableQuantity = availQty
+                            }
                             
                             // Store the database ID in our map using the ISBN as key
                             BookIdentifier.setDatabaseId(id, for: isbn)
@@ -393,18 +401,22 @@ class WishlistViewModel: ObservableObject {
                                    let isbn = bookJson["isbn"] as? String,
                                    let quantity = bookJson["quantity"] as? Int {
                                     
-                                    let book = Book(
+                                    var book = Book(
                                         isbn: isbn,
                                         title: title,
                                         author: author,
-                                        publisher: bookJson["publisher"] as? String ?? "",
-                                        quantity: quantity,
+                                        publisher: bookJson["publisher"] as? String ?? "", quantity: quantity,
                                         publishedDate: bookJson["publishedDate"] as? String,
                                         description: bookJson["description"] as? String,
                                         pageCount: bookJson["pageCount"] as? Int,
                                         categories: bookJson["categories"] as? [String],
                                         imageURL: bookJson["imageURL"] as? String
                                     )
+                                    
+                                    // Set available quantity from the database
+                                    if let availableQty = bookJson["availableQuantity"] as? Int {
+                                        book.availableQuantity = availableQty
+                                    }
                                     
                                     // Store the database ID in our map using ISBN as key
                                     if let idUUID = UUID(uuidString: idStr) {
@@ -417,7 +429,8 @@ class WishlistViewModel: ObservableObject {
                             }
                         }
                     }
-                } catch {
+                }
+                catch {
                     print("Error decoding book \(bookId): \(error)")
                 }
             } catch {
@@ -438,6 +451,18 @@ class WishlistViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    func showRemoveAlert(for book: Book) {
+        bookToRemove = book
+        showingRemoveAlert = true
+    }
+    
+    func confirmRemoval() {
+        guard let book = bookToRemove else { return }
+        removedBookTitle = book.title
+        removeFromWishlist(book)
+        bookToRemove = nil
     }
     
     func removeFromWishlist(_ book: Book) {
@@ -547,22 +572,11 @@ class WishlistViewModel: ObservableObject {
                             .execute()
                         
                         if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
-                            print("✅ Successfully updated wishlist in Supabase")
-                            
-                            // Check if we removed multiple entries
-                            if removedCount > 1 {
-                                print("⚠️ Removed \(removedCount) duplicate entries of the same book")
-                            }
-                            
-                            // Refresh the list to ensure UI is in sync with database
                             await MainActor.run {
-                                // We've already removed it from the local array, and updated wishlistBookIds,
-                                // so we don't need to reload the entire list
-                                print("Book successfully removed from wishlist")
+                                showSuccessAlert = true
                             }
                         } else {
                             print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
-                            // If update failed, reload the wishlist to ensure UI matches database
                             await MainActor.run {
                                 self.loadWishlist()
                             }
@@ -578,23 +592,11 @@ class WishlistViewModel: ObservableObject {
                 }
             } catch {
                 print("Error removing from wishlist: \(error)")
-                // If there was an error, reload the wishlist to ensure UI is in sync
                 await MainActor.run {
                     self.loadWishlist()
                 }
             }
         }
-    }
-    
-    func showRemoveAlert(for book: Book) {
-        bookToRemove = book
-        showingRemoveAlert = true
-    }
-    
-    func confirmRemoval() {
-        guard let book = bookToRemove else { return }
-        removeFromWishlist(book)
-        bookToRemove = nil
     }
 }
 
@@ -602,4 +604,4 @@ struct WishlistView_Previews: PreviewProvider {
     static var previews: some View {
         WishlistView()
     }
-} 
+}

@@ -17,24 +17,7 @@ class InventoryManager: ObservableObject {
     
     // MARK: - Book Management
     
-//    func addBook(_ book: Book) {
-//        if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
-//            // Update existing book
-//            books[index].quantity += book.quantity
-//            books[index].availableQuantity += book.quantity
-//            books[index].lastModified = Date()
-//        } else {
-//            // Add new book
-//            books.append(book)
-//        }
-//        Task {
-//            try! await SupabaseManager.shared.client
-//                .from("Books")
-//                .insert(book)
-//                .execute()
-//        }
-//        saveBooks()
-//    }
+
     
     func addBook(_ book: Book) {
         if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
@@ -287,11 +270,12 @@ class InventoryManager: ObservableObject {
                 author: author,
                 publisher: publisher,
                 quantity: quantity,
-                publishedDate: publishedDate.isEmpty ? nil : publishedDate, // Handle empty values
+                publishedDate: publishedDate.isEmpty ? nil : publishedDate,
                 description: description.isEmpty ? nil : description,
                 pageCount: pageCount > 0 ? pageCount : nil,
                 categories: genre.isEmpty ? nil : [genre],
-                imageURL: imageURL.isEmpty ? nil : imageURL // Avoid storing empty URLs
+                imageURL: imageURL.isEmpty ? nil : imageURL
+//                quantity: quantity // Avoid storing empty URLs
             )
             
             addBook(book)
@@ -364,4 +348,5 @@ class InventoryManager: ObservableObject {
         }
     }
 }
+
 

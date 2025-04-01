@@ -8,131 +8,6 @@
 import SwiftUI
 import Supabase
 
-//struct IssueBookView: View {
-//    @StateObject private var circulationManager = IssuedBookManager.shared
-//    @State private var searchText = ""
-//    @State private var showingIssueForm = false
-//    @State private var loans: [issueBooks] = []
-//    @State private var isLoading = false
-//    @State private var errorMessage: String?
-//
-//    var body: some View {
-//        VStack(spacing: 0) {
-//            ScrollView {
-//                if isLoading {
-//                    ProgressView()
-//                        .padding()
-//                } else if loans.isEmpty {
-//                    EmptyStateView(
-//                        icon: "book.closed",
-//                        title: "No Books Issued",
-//                        message: "Start by issuing a new book"
-//                    )
-//                } else {
-//                    LazyVStack(spacing: 16) {
-//                        ForEach(loans) { loan in
-//                            LoanCard(issuedBooks: loan)
-//                        }
-//                    }
-//                    .padding()
-//                }
-//            }
-//            
-//            VStack {
-//                Button {
-//                    showingIssueForm = true
-//                } label: {
-//                    Label("Issue New Book", systemImage: "plus.circle.fill")
-//                        .font(.headline)
-//                        .padding()
-//                        .frame(maxWidth: .infinity)
-//                        .background(AppTheme.primaryColor)
-//                        .foregroundColor(.white)
-//                        .cornerRadius(12)
-//                }
-//                .padding()
-//            }
-//            .background(Color(.systemBackground))
-//            .shadow(radius: 2)
-//        }
-//        .searchable(text: $searchText, prompt: "Search transactions...")
-//        .sheet(isPresented: $showingIssueForm) {
-//            IssueBookFormView { newLoan in
-//                // After issuing a new book, refresh the list
-//                Task {
-//                    await fetchIssuedBooks()
-//                }
-//            }
-//        }
-//        .task {
-//            // Fetch issued books when the view appears
-//            await fetchIssuedBooks()
-//        }
-//        .alert("Error", isPresented: .constant(errorMessage != nil)) {
-//            Button("OK") {
-//                errorMessage = nil
-//            }
-//        } message: {
-//            Text(errorMessage ?? "")
-//        }
-//    }
-//    
-//    private func fetchIssuedBooks() async {
-//        isLoading = true
-//        errorMessage = nil
-//        
-//        do {
-//            let query = SupabaseManager.shared.client
-//                .from("issuebooks")
-//                .select()
-//                .order("issue_date", ascending: false)
-//            
-//            let response = try await query.execute()
-//            print("Raw response: \(response)") // Debug print
-//            
-//            if let data = response.data as? [[String: Any]] {
-//                let issuedBooks = data.compactMap { bookData -> issueBooks? in
-//                    guard let isbn = bookData["isbn"] as? String,
-//                          let memberEmail = bookData["member_email"] as? String,
-//                          let issueDateString = bookData["issue_date"] as? String,
-//                          let returnDateString = bookData["return_date"] as? String else {
-//                        return nil
-//                    }
-//                    
-//                    let dateFormatter = ISO8601DateFormatter()
-//                    let issueDate = dateFormatter.date(from: issueDateString) ?? Date()
-//                    let returnDate = dateFormatter.date(from: returnDateString) ?? Date()
-//                    
-//                    return issueBooks(
-//                        id: UUID(),
-//                        isbn: isbn,
-//                        memberEmail: memberEmail,
-//                        issueDate: issueDate,
-//                        returnDate: returnDate
-//                    )
-//                }
-//                
-//                await MainActor.run {
-//                    self.loans = issuedBooks
-//                    self.isLoading = false
-//                }
-//            } else {
-//                print("Response data is not an array") // Debug print
-//                await MainActor.run {
-//                    errorMessage = "Failed to parse issued books data"
-//                    isLoading = false
-//                }
-//            }
-//        } catch {
-//            print("Fetch error: \(error)") // Debug print
-//            await MainActor.run {
-//                errorMessage = "Failed to fetch issued books: \(error.localizedDescription)"
-//                isLoading = false
-//            }
-//        }
-//    }
-//}
-
 struct IssueBookView: View {
     @StateObject private var circulationManager = IssuedBookManager.shared
     @State private var searchText = ""
@@ -153,7 +28,7 @@ struct IssueBookView: View {
                 } else {
                     LazyVStack(spacing: 16) {
                         ForEach(circulationManager.loans) { loan in
-                            LoanCard(issuedBooks: loan)
+                            EnhancedLoanCard(issuedBooks: loan)
                         }
                     }
                     .padding()
@@ -164,30 +39,26 @@ struct IssueBookView: View {
                 Button {
                     showingIssueForm = true
                 } label: {
-                    Label("Issue New Book", systemImage: "plus.circle.fill")
+                    Label("Issue Book", systemImage: "plus.circle.fill")
                         .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(AppTheme.primaryColor)
+                        .frame(height: 60)
+                        .frame(width: 370)
+                        .background(Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(12)
                 }
-                .padding()
+                .padding(.vertical, 8)
             }
-            .background(Color(.systemBackground))
-            .shadow(radius: 2)
         }
         .searchable(text: $searchText, prompt: "Search transactions...")
         .sheet(isPresented: $showingIssueForm) {
             IssueBookFormView { newLoan in
-                // After issuing a new book, refresh the list
                 Task {
                     await circulationManager.fetchIssuedBooks()
                 }
             }
         }
         .task {
-            // Fetch issued books when the view appears
             await circulationManager.fetchIssuedBooks()
         }
         .alert("Error", isPresented: .constant(circulationManager.errorMessage != nil)) {
@@ -200,21 +71,64 @@ struct IssueBookView: View {
     }
 }
 
-struct LoanCard: View {
+// ADD: Enhanced loan card with book cover
+struct EnhancedLoanCard: View {
     let issuedBooks: issueBooks
+    @State private var bookCoverURL: URL?
+    @State private var isLoadingCover = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label("ISBN: \(issuedBooks.isbn)", systemImage: "barcode")
+            HStack(spacing: 16) {
+                // Book Cover
+                AsyncImage(url: bookCoverURL) { phase in
+                    switch phase {
+                    case .empty:
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                            .overlay(
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle())
+                            )
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                    case .failure:
+                        Rectangle()
+                            .foregroundColor(.gray.opacity(0.3))
+                            .frame(width: 60, height: 90)
+                            .cornerRadius(8)
+                            .overlay(
+                                Image(systemName: "book.closed")
+                                    .foregroundColor(.gray)
+                            )
+                    @unknown default:
+                        EmptyView()
+                    }
+                }
+                
+                // Book Details
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("ISBN: \(issuedBooks.isbn)", systemImage: "barcode")
+                            .font(.subheadline)
+                    }
+                    
+                    Text("Member Email: \(issuedBooks.memberEmail)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
                 Spacer()
-                Label("Member Email: \(issuedBooks.memberEmail)", systemImage: "person.circle.fill")
             }
-            .font(.subheadline)
-            .foregroundColor(.secondary)
-
+            
             Divider()
-
+            
             HStack {
                 VStack(alignment: .leading) {
                     Text("Issue Date")
@@ -223,9 +137,9 @@ struct LoanCard: View {
                     Text(issuedBooks.issueDate, style: .date)
                         .font(.subheadline)
                 }
-
+                
                 Spacer()
-
+                
                 VStack(alignment: .trailing) {
                     Text("Return Date")
                         .font(.caption)
@@ -234,7 +148,9 @@ struct LoanCard: View {
                         Text(returnDate, style: .date)
                             .font(.subheadline)
                     } else {
-                        Text("Not Returned").foregroundColor(.red)
+                        Text("Not Returned")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
                     }
                 }
             }
@@ -243,6 +159,16 @@ struct LoanCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(radius: 2)
+        .task {
+            await fetchBookCover()
+        }
+    }
+    
+    // Function to fetch book cover
+    private func fetchBookCover() async {
+        // Construct OpenLibrary API URL for book cover
+        let coverURL = "https://covers.openlibrary.org/b/isbn/\(issuedBooks.isbn)-M.jpg"
+        bookCoverURL = URL(string: coverURL)
     }
 }
 
@@ -258,6 +184,7 @@ struct IssueBookFormView: View {
     @State private var showingSmartCardScanner = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var showSuccessAlert = false
     
     let onIssue: (issueBooks) -> Void
     
@@ -352,6 +279,7 @@ struct IssueBookFormView: View {
                 }
                 .disabled(!isFormValid || isLoading)
                 .padding()
+                
             }
             .navigationTitle("Issue Book")
             .toolbar {
@@ -361,6 +289,14 @@ struct IssueBookFormView: View {
                     }
                 }
             }
+            .alert("Success", isPresented: $showSuccessAlert) {
+                    Button("OK") {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                } message: {
+                    Text("Book has been successfully issued!")
+                }
+            
             .sheet(isPresented: $showingScanner) {
                 ISBNScannerView { scannedISBN in
                     isbn = scannedISBN
@@ -419,53 +355,6 @@ struct IssueBookFormView: View {
         }
     }
     
-//    private func fetchMemberDetails(smartCardID: String) async {
-//        isLoading = true
-//        errorMessage = nil
-//        
-//        do {
-//            // Try to parse the JSON data from the smart card
-//            if let jsonData = smartCardID.data(using: .utf8),
-//               let memberData = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
-//               let memberId = memberData["memberId"] as? String,
-//               let memberName = memberData["name"] as? String {
-//                
-//                await MainActor.run {
-//                    // Update the @State properties
-//                    self.smartCardID = memberId
-//                    self.memberName = memberName
-//                    isLoading = false
-//                }
-//            } else {
-//                // If JSON parsing fails, try fetching from Supabase
-//                let query = SupabaseManager.shared.client
-//                    .from("Members")
-//                    .select("id, name")
-//                    .eq("id", value: smartCardID)
-//                    .single()
-//                
-//                let response = try await query.execute()
-//                if let data = response.data as? [String: Any],
-//                   let name = data["name"] as? String {
-//                    await MainActor.run {
-//                        self.memberName = name
-//                        isLoading = false
-//                    }
-//                } else {
-//                    await MainActor.run {
-//                        errorMessage = "Member details not found."
-//                        isLoading = false
-//                    }
-//                }
-//            }
-//        } catch {
-//            await MainActor.run {
-//                errorMessage = "Failed to fetch member details."
-//                isLoading = false
-//            }
-//        }
-//    }
-    
     private func fetchMemberDetails(smartCardID: String) async {
         isLoading = true
         errorMessage = nil
@@ -515,37 +404,108 @@ struct IssueBookFormView: View {
         }
     }
     
+    //    func issueBook() {
+    //        circulationManager.isLoading = true
+    //        circulationManager.errorMessage = nil
+    //
+    //        Task {
+    //            let newIssue = issueBooks(
+    //                id: UUID(),
+    //                isbn: isbn,
+    //                memberEmail: smartCardID,  // Ensure this is the correct email
+    //                issueDate: issueDate,
+    //                returnDate: returnDate
+    //            )
+    //
+    //            do {
+    //                let response = try await SupabaseManager.shared.client
+    //                    .from("issuebooks")
+    //                    .insert(newIssue)
+    //                    .execute()
+    //
+    //                // Print the response for debugging
+    //                print("Insertion Response: \(response)")
+    //
+    //                DispatchQueue.main.async {
+    //                    circulationManager.isLoading = false
+    //                    onIssue(newIssue)
+    //                    presentationMode.wrappedValue.dismiss()
+    //                }
+    //            } catch {
+    //                // Print the detailed error for debugging
+    //                print("Book Issue Error: \(error.localizedDescription)")
+    //
+    //                DispatchQueue.main.async {
+    //                    circulationManager.errorMessage = "Failed to issue book: \(error.localizedDescription)"
+    //                    circulationManager.isLoading = false
+    //                }
+    //            }
+    //        }
+    //    }
+  
     func issueBook() {
         circulationManager.isLoading = true
         circulationManager.errorMessage = nil
-        
+
         Task {
             let newIssue = issueBooks(
                 id: UUID(),
                 isbn: isbn,
-                memberEmail: smartCardID,  // Ensure this is the correct email
+                memberEmail: smartCardID,
                 issueDate: issueDate,
                 returnDate: returnDate
             )
-            
             do {
-                let response = try await SupabaseManager.shared.client
+                // First, fetch the current book to get its current available quantity
+                let bookQuery = SupabaseManager.shared.client
+                    .from("Books")
+                    .select()
+                    .eq("isbn", value: isbn)
+                    .single()
+                
+                let currentBook: Book = try await bookQuery.execute().value
+                
+                // Check if book is available
+                guard currentBook.availableQuantity > 0 else {
+                    await MainActor.run {
+                        circulationManager.errorMessage = "Book is not available"
+                        circulationManager.isLoading = false
+                    }
+                    return
+                }
+                
+                // Create the new book issue
+                let newIssue = issueBooks(
+                    id: UUID(),
+                    isbn: isbn,
+                    memberEmail: smartCardID,
+                    issueDate: issueDate,
+                    returnDate: returnDate
+                )
+                
+                // Insert the new book issue
+                let issueResponse = try await SupabaseManager.shared.client
                     .from("issuebooks")
                     .insert(newIssue)
                     .execute()
+
+//                print("Insertion Response: \(response)")
+
                 
-                // Print the response for debugging
-                print("Insertion Response: \(response)")
-                
+                // Update the book's available quantity
+                let updateResponse = try await SupabaseManager.shared.client
+                    .from("Books")
+                    .update(["availableQuantity": currentBook.availableQuantity - 1])
+                    .eq("isbn", value: isbn)
+                    .execute()
                 DispatchQueue.main.async {
                     circulationManager.isLoading = false
                     onIssue(newIssue)
-                    presentationMode.wrappedValue.dismiss()
+                    showSuccessAlert = true // Show success alert
                 }
             } catch {
-                // Print the detailed error for debugging
                 print("Book Issue Error: \(error.localizedDescription)")
-                
+
                 DispatchQueue.main.async {
                     circulationManager.errorMessage = "Failed to issue book: \(error.localizedDescription)"
                     circulationManager.isLoading = false
@@ -553,5 +513,7 @@ struct IssueBookFormView: View {
             }
         }
     }
-}
+} 
+
+
 

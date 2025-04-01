@@ -1,15 +1,16 @@
 import SwiftUI
 
 extension Color {
-    static let customBackground = Color(hex: "F5EBE0")  // Light beige
-    static let customCardBackground = Color(hex: "F8F1E9")  // Card background
+    static let customBackground = Color(hex: "F2F2F7")  // iOS system background
+    static let customCardBackground = Color(hex: "FFFFFF")  // iOS card background
     static let customInputBackground = Color(hex: "FFFFFF")  // Input background (White)
-    static let customText = Color(hex: "463F3A")  // Text color
-    static let customButton = Color(hex: "2C1810")  // Button color (Dark brown)
+    static let customText = Color(hex: "1C1C1E")  // iOS dark text
+    static let customButton = Color(hex: "003D5B")  // Dark blue
     
-    static let memberColor = Color(hex: "007AFF")  // Blue
-    static let librarianColor = Color(hex: "34C759")  // Green
-    static let adminColor = Color(hex: "AF52DE")  // Purple
+    // Role colors - variations of the theme color
+    static let memberColor = Color(hex: "003D5B")  // Theme color
+    static let librarianColor = Color(hex: "004D6D")  // Slightly lighter
+    static let adminColor = Color(hex: "002D4D")  // Slightly darker
     
     static let iconBackgroundOpacity: Double = 0.15
     static let secondaryIconOpacity: Double = 0.6

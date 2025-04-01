@@ -53,15 +53,11 @@ struct SignupView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
-                        // Header
                         Text("Create Account")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .foregroundStyle(Color.customText)
                             .padding(.bottom, 8)
-                        
-                        // Personal Information Section
-                        sectionTitle("Personal Information")
                         
                         // Email
                         inputField(title: "Email", error: emailError) {
@@ -99,9 +95,6 @@ struct SignupView: View {
                             .frame(height: 1)
                             .padding(.vertical, 8)
                         
-                        // Security Section
-                        sectionTitle("Security")
-                        
                         // Password
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Password")
@@ -112,9 +105,23 @@ struct SignupView: View {
                                 if isPasswordVisible {
                                     TextField("Enter password", text: $password)
                                         .textFieldStyle(CustomTextFieldStyle())
+                                        .onChange(of: password) { newValue in
+                                            passwordValidation = ValidationUtils.validatePassword(newValue)
+                                            
+                                            if !confirmPassword.isEmpty {
+                                                confirmPasswordError = confirmPassword != newValue ? "Passwords do not match" : nil
+                                            }
+                                        }
                                 } else {
                                     SecureField("Enter password", text: $password)
                                         .textFieldStyle(CustomTextFieldStyle())
+                                        .onChange(of: password) { newValue in
+                                            passwordValidation = ValidationUtils.validatePassword(newValue)
+                                            
+                                            if !confirmPassword.isEmpty {
+                                                confirmPasswordError = confirmPassword != newValue ? "Passwords do not match" : nil
+                                            }
+                                        }
                                 }
                                 
                                 Button(action: {
@@ -209,6 +216,16 @@ struct SignupView: View {
                                     .padding(.leading, 4)
                             }
                         }
+                        
+                        // Password matching validation
+                        HStack {
+                            Image(systemName: !confirmPassword.isEmpty && password == confirmPassword ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(!confirmPassword.isEmpty && password == confirmPassword ? .green : .gray)
+                            Text("Passwords match")
+                                .font(.caption)
+                                .foregroundStyle(Color.customText.opacity(0.7))
+                        }
+                        .padding(.leading, 4)
                         
                         // Divider
                         Rectangle()

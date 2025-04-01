@@ -59,7 +59,7 @@ struct GenreBooksView: View {
                 BookDetailCard(book: book, supabase: supabase, isPresented: $showingBookDetail)
                     .navigationBarHidden(true)
             }
-            .interactiveDismissDisabled()
+            .interactiveDismissDisabled(false)
         }
 
     }
