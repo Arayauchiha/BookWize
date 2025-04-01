@@ -66,28 +66,39 @@ struct RecentRequestsView: View {
     let errorMessage: String?
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Requests")
-                .font(.title2.bold())
+        NavigationLink {
+            AllRequestsView(bookRequests: .constant(bookRequests))
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Recent Requests")
+                        .font(.title2.bold())
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(Color.customButton.opacity(Color.secondaryIconOpacity))
+                        .font(.system(size: 14))
+                }
                 .padding(.horizontal)
-            
-            if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding()
-            } else if let error = errorMessage {
-                Text(error)
-                    .foregroundColor(.red)
-                    .padding()
-            } else if bookRequests.isEmpty {
-                Text("No recent requests")
-                    .foregroundColor(.secondary)
-                    .padding()
-            } else {
-                ForEach(bookRequests.prefix(5), id: \.id) { request in
-                    RequestRow(request: request)
+                
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .padding()
+                } else if bookRequests.isEmpty {
+                    Text("No recent requests")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    ForEach(bookRequests.prefix(5), id: \.id) { request in
+                        RequestRow(request: request)
+                    }
                 }
             }
+            .foregroundColor(Color.customText)
         }
     }
 }
@@ -110,10 +121,10 @@ struct RequestRow: View {
             Spacer()
             Text(request.Request_status.rawValue.capitalized)
                 .font(.caption)
-                .foregroundColor(statusColor)
+                .foregroundColor(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(statusColor.opacity(0.1))
+                .background(statusColor)
                 .cornerRadius(6)
         }
         .padding()
@@ -125,7 +136,7 @@ struct RequestRow: View {
     private var statusColor: Color {
         switch request.Request_status {
         case .pending: return .orange
-        case .approved: return .green
+        case .approved: return Color.librarianColor
         case .rejected: return .red
         }
     }
