@@ -6,7 +6,7 @@ struct LibrarianData: Codable {
     var name: String = ""
     var age: Int? = 0
     var email: String = ""
-    var phone: Int? = 0
+    var phone: String?
     var password: String = ""
     var status: Status = .pending
     var dateAdded: Date = Date()

@@ -268,14 +268,14 @@ struct AddLibrarianView: View {
                 librarianData.name = name
                 librarianData.age = ageInt
                 librarianData.email = email
-                librarianData.phone = phoneInt
+                librarianData.phone = phone
                 librarianData.password = generatedPassword
                 librarianData.status = .pending
                 librarianData.dateAdded = Date()
                 librarianData.requiresPasswordReset = true
                 librarianData.roleFetched = .librarian
                 
-                try await SupabaseManager.shared.client.database
+                try await SupabaseManager.shared.client
                     .from("Users")
                     .insert(librarianData)
                     .execute()
