@@ -309,28 +309,23 @@ struct MembershipView: View {
                         .padding(.horizontal)
                     }
                     
-                    // Logout Button
-                    Button(action: {
-                        showLogoutAlert = true
-                    }) {
-                        HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                            Text("Logout")
-                        }
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: 200)
-                        .background(Color.customButton)
-                        .cornerRadius(10)
-                    }
-                    .padding(.top, 30)
                 }
                 .padding()
             }
             .navigationTitle("Membership")
+            .navigationBarBackButtonHidden(true)
+            .navigationBarItems(leading: Button(action: {
+                dismiss()
+            }) {
+                HStack {
+                    Image(systemName: "chevron.left")
+                    Text("Back")
+                }
+                .foregroundColor(Color.customButton)
+            })
             .onAppear {
-                        fetchMembershipAmount() // Add this line
-                    }
+                fetchMembershipAmount()
+            }
             .alert("Payment Successful!", isPresented: $showSuccessAlert) {
                 Button("Generate Digital Card") {
                     generateQRCode()
