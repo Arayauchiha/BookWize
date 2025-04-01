@@ -7,6 +7,7 @@ import Supabase
 import SwiftUI
 import Foundation
 import Combine
+
 struct MembershipDetailsView: View {
     let user: User
     @State private var qrCodeImage: UIImage?
@@ -74,7 +75,6 @@ struct MembershipDetailsView: View {
     }
 }
 
-// Then modify the Account section in Search_BrowseApp:
 struct Search_BrowseApp: View {
     @State private var selectedTab = 1
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
@@ -119,14 +119,11 @@ struct Search_BrowseApp: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
-            NavigationView {
-                Text("Dashboard Coming Soon")
-                    .navigationTitle("Dashboard")
-            }
-            .tabItem {
-                Label("Dashboard", systemImage: "rectangle.3.group")
-            }
-            .tag(0)
+            UserDashboardView()
+                .tabItem {
+                    Label("Dashboard", systemImage: "rectangle.3.group")
+                }
+                .tag(3)
             
             // Explore Tab (Default)
             SearchBrowseView(
@@ -153,7 +150,7 @@ struct Search_BrowseApp: View {
             .tabItem {
                 Label("Book Club", systemImage: "person.3.fill")
             }
-            .tag(3)
+            .tag(4)
             
             // Account Tab - Modified to include Membership Details
             NavigationView {
@@ -219,7 +216,7 @@ struct Search_BrowseApp: View {
             .tabItem {
                 Label("Account", systemImage: "person.circle")
             }
-            .tag(4)
+            .tag(5)
             
             .accentColor(.blue)
             .onAppear {
