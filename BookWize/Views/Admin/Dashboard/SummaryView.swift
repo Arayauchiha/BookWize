@@ -1,5 +1,3 @@
-
-
 import SwiftUI
 import Supabase
 
@@ -198,7 +196,7 @@ struct RequestCard: View {
         case .pending:
             return .orange
         case .approved:
-            return Color.librarianColor
+            return .green
         case .rejected:
             return .red
         }
