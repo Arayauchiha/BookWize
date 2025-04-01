@@ -333,7 +333,7 @@ struct EditBookView: View {
                     TextField("Publisher", text: $publisher)
                     TextField("ISBN", text: .constant(book.isbn))
                         .disabled(true)
-                    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+                //    Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
                 }
                 
                 Section(header: Text("Additional Information")) {
