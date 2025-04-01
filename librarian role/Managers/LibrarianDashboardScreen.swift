@@ -28,7 +28,7 @@
 //                        .tabItem {
 //                            Label("Fines", systemImage: "dollarsign.circle.fill")
 //                        }
-//                    
+                    
 //                    AccountView(isLoggedIn: $isLoggedIn)
 //                        .tabItem {
 //                            Label("Account", systemImage: "person.circle.fill")

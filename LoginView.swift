@@ -335,6 +335,7 @@ struct LoginView: View {
             // OTP verified
             EmailService.shared.clearOTP(for: email)
             isLibrarianLoggedIn = true
+            UserDefaults.standard.set(email, forKey: "currentMemberEmail")
             showingOTPView = false
             
             // Set login state based on role
