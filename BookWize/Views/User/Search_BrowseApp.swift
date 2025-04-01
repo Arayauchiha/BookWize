@@ -3,10 +3,12 @@
 //
 //  Created by Devashish Upadhyay on 19/03/25.
 //
+
 import Supabase
 import SwiftUI
 import Foundation
 import Combine
+
 struct MembershipDetailsView: View {
     let user: User
     @State private var qrCodeImage: UIImage?
@@ -74,7 +76,43 @@ struct MembershipDetailsView: View {
     }
 }
 
-// Then modify the Account section in Search_BrowseApp:
+struct AccountSettingsView: View {
+    @State private var isPasswordResetPresented = false
+    @State private var newPassword = ""
+    @State private var confirmPassword = ""
+    @State private var isNewPasswordVisible = false
+    let user: User
+    
+    var body: some View {
+        List {
+            Section {
+                Button {
+                    isPasswordResetPresented = true
+                } label: {
+                    Label("Change Password", systemImage: "lock")
+                }
+            }
+        }
+        .sheet(isPresented: $isPasswordResetPresented) {
+            PasswordResetView(
+                newPassword: $newPassword,
+                confirmPassword: $confirmPassword,
+                isNewPasswordVisible: $isNewPasswordVisible,
+                email: user.email,
+                title: "Change Password",
+                message: "Please enter your new password below.",
+                buttonTitle: "Update Password",
+                onSave: {
+                    isPasswordResetPresented = false
+                },
+                onCancel: {
+                    isPasswordResetPresented = false
+                }
+            )
+        }
+    }
+}
+
 struct Search_BrowseApp: View {
     @State private var selectedTab = 1
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
@@ -82,37 +120,41 @@ struct Search_BrowseApp: View {
     @State private var user: User?
     private let supabase = SupabaseConfig.client
     
+    @State private var isPasswordResetPresented = false
+    @State private var newPassword = ""
+    @State private var confirmPassword = ""
+    @State private var isNewPasswordVisible = false
+    
     init(userPreferredGenres: [String] = []) {
         self.userPreferredGenres = userPreferredGenres
     }
     
     private func fetchMember() async {
         do {
-            // Get email from UserDefaults
             guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
-                print("No email found in UserDefaults")
+                print("⚠️ No email found in UserDefaults")
                 return
             }
             
-            print("Fetching member with email: \(userEmail)")
+            print("📱 Fetching member with email: \(userEmail)")
             
             let response: [User] = try await SupabaseManager.shared.client
                 .from("Members")
                 .select("*")
-                .eq("email", value: userEmail)  // Use email instead of id
+                .eq("email", value: userEmail)
                 .execute()
                 .value
             
             DispatchQueue.main.async {
                 if let fetchedUser = response.first {
                     self.user = fetchedUser
-                    print("Successfully fetched user: \(fetchedUser.name)")
+                    print("✅ Successfully fetched user: \(fetchedUser.name)")
                 } else {
-                    print("No user found with email: \(userEmail)")
+                    print("❌ No user found with email: \(userEmail)")
                 }
             }
         } catch {
-            print("Error fetching member: \(error)")
+            print("❌ Error fetching member: \(error)")
         }
     }
     
@@ -170,7 +212,24 @@ struct Search_BrowseApp: View {
                             NavigationLink {
                                 MembershipDetailsView(user: user)
                             } label: {
-                                Label("Library Card", systemImage: "creditcard.fill")
+                                Label {
+                                    Text("Library Card")
+                                } icon: {
+                                    Image(systemName: "creditcard.fill")
+                                        .frame(width: 30, height: 30)
+                                }
+                            }
+                            
+                            Button {
+                                print("🔐 Change password tapped for user:", user.email)
+                                isPasswordResetPresented = true
+                            } label: {
+                                Label {
+                                    Text("Change Password")
+                                } icon: {
+                                    Image(systemName: "lock")
+                                        .frame(width: 30, height: 30)
+                                }
                             }
                         }
                         
@@ -200,6 +259,27 @@ struct Search_BrowseApp: View {
                     }
                 }
                 .navigationTitle("Account")
+                .sheet(isPresented: $isPasswordResetPresented) {
+                    if let user = user {
+                        MemberPasswordResetView(
+                            newPassword: $newPassword,
+                            confirmPassword: $confirmPassword,
+                            isNewPasswordVisible: $isNewPasswordVisible,
+                            email: user.email,
+                            title: "Change Password",
+                            message: "Please enter your new password below.",
+                            buttonTitle: "Update Password",
+                            onSave: {
+                                print("✅ Password update completed for user:", user.email)
+                                isPasswordResetPresented = false
+                            },
+                            onCancel: {
+                                print("❌ Password update cancelled for user:", user.email)
+                                isPasswordResetPresented = false
+                            }
+                        )
+                    }
+                }
                 .onAppear {
                     Task {
                         await fetchMember()
@@ -210,17 +290,16 @@ struct Search_BrowseApp: View {
                 Label("Account", systemImage: "person.circle")
             }
             .tag(3)
-            
-            .accentColor(.blue)
-            .onAppear {
-                Task {
-                    await fetchMember()
-                }
-                let appearance = UITabBarAppearance()
-                appearance.configureWithDefaultBackground()
-                UITabBar.appearance().scrollEdgeAppearance = appearance
-                UITabBar.appearance().standardAppearance = appearance
+        }
+        .accentColor(.blue)
+        .onAppear {
+            Task {
+                await fetchMember()
             }
+            let appearance = UITabBarAppearance()
+            appearance.configureWithDefaultBackground()
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+            UITabBar.appearance().standardAppearance = appearance
         }
     }
 }
