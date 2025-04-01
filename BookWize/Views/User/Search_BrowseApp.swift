@@ -119,14 +119,11 @@ struct Search_BrowseApp: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
-            NavigationView {
-                Text("Dashboard Coming Soon")
-                    .navigationTitle("Dashboard")
-            }
-            .tabItem {
-                Label("Dashboard", systemImage: "rectangle.3.group")
-            }
-            .tag(0)
+            UserDashboardView()
+                .tabItem {
+                    Label("Dashboard", systemImage: "rectangle.3.group")
+                }
+                .tag(0)
             
             // Explore Tab (Default)
             SearchBrowseView(
