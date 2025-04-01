@@ -13,6 +13,16 @@ struct IssueBookView: View {
     @State private var searchText = ""
     @State private var showingIssueForm = false
 
+    var filteredLoans: [issueBooks] {
+        if searchText.isEmpty {
+            return circulationManager.loans
+        }
+        return circulationManager.loans.filter { loan in
+            loan.isbn.localizedCaseInsensitiveContains(searchText) ||
+            loan.memberEmail.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
@@ -25,9 +35,15 @@ struct IssueBookView: View {
                         title: "No Books Issued",
                         message: "Start by issuing a new book"
                     )
+                } else if !searchText.isEmpty && filteredLoans.isEmpty {
+                    EmptyStateView(
+                        icon: "magnifyingglass",
+                        title: "No Results Found",
+                        message: "Try searching with different keywords"
+                    )
                 } else {
                     LazyVStack(spacing: 16) {
-                        ForEach(circulationManager.loans) { loan in
+                        ForEach(filteredLoans) { loan in
                             EnhancedLoanCard(issuedBooks: loan)
                         }
                     }
@@ -50,7 +66,7 @@ struct IssueBookView: View {
                 .padding(.vertical, 8)
             }
         }
-        .searchable(text: $searchText, prompt: "Search transactions...")
+        .searchable(text: $searchText, prompt: "Search Issue Books")
         .sheet(isPresented: $showingIssueForm) {
             IssueBookFormView { newLoan in
                 Task {
@@ -403,45 +419,6 @@ struct IssueBookFormView: View {
             }
         }
     }
-    
-    //    func issueBook() {
-    //        circulationManager.isLoading = true
-    //        circulationManager.errorMessage = nil
-    //
-    //        Task {
-    //            let newIssue = issueBooks(
-    //                id: UUID(),
-    //                isbn: isbn,
-    //                memberEmail: smartCardID,  // Ensure this is the correct email
-    //                issueDate: issueDate,
-    //                returnDate: returnDate
-    //            )
-    //
-    //            do {
-    //                let response = try await SupabaseManager.shared.client
-    //                    .from("issuebooks")
-    //                    .insert(newIssue)
-    //                    .execute()
-    //
-    //                // Print the response for debugging
-    //                print("Insertion Response: \(response)")
-    //
-    //                DispatchQueue.main.async {
-    //                    circulationManager.isLoading = false
-    //                    onIssue(newIssue)
-    //                    presentationMode.wrappedValue.dismiss()
-    //                }
-    //            } catch {
-    //                // Print the detailed error for debugging
-    //                print("Book Issue Error: \(error.localizedDescription)")
-    //
-    //                DispatchQueue.main.async {
-    //                    circulationManager.errorMessage = "Failed to issue book: \(error.localizedDescription)"
-    //                    circulationManager.isLoading = false
-    //                }
-    //            }
-    //        }
-    //    }
   
     func issueBook() {
         circulationManager.isLoading = true
