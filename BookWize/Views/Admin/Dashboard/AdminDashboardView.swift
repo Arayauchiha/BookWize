@@ -66,28 +66,39 @@ struct RecentRequestsView: View {
     let errorMessage: String?
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recent Requests")
-                .font(.title2.bold())
+        NavigationLink {
+            AllRequestsView(bookRequests: .constant(bookRequests))
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Recent Requests")
+                        .font(.title2.bold())
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(Color.customButton.opacity(Color.secondaryIconOpacity))
+                        .font(.system(size: 14))
+                }
                 .padding(.horizontal)
-            
-            if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding()
-            } else if let error = errorMessage {
-                Text(error)
-                    .foregroundColor(.red)
-                    .padding()
-            } else if bookRequests.isEmpty {
-                Text("No recent requests")
-                    .foregroundColor(.secondary)
-                    .padding()
-            } else {
-                ForEach(bookRequests.prefix(5), id: \.id) { request in
-                    RequestRow(request: request)
+                
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .padding()
+                } else if bookRequests.isEmpty {
+                    Text("No recent requests")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    ForEach(bookRequests.prefix(5), id: \.id) { request in
+                        RequestRow(request: request)
+                    }
                 }
             }
+            .foregroundColor(Color.customText)
         }
     }
 }
@@ -110,10 +121,10 @@ struct RequestRow: View {
             Spacer()
             Text(request.Request_status.rawValue.capitalized)
                 .font(.caption)
-                .foregroundColor(statusColor)
+                .foregroundColor(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(statusColor.opacity(0.1))
+                .background(statusColor)
                 .cornerRadius(6)
         }
         .padding()
@@ -125,7 +136,7 @@ struct RequestRow: View {
     private var statusColor: Color {
         switch request.Request_status {
         case .pending: return .orange
-        case .approved: return .green
+        case .approved: return Color.librarianColor
         case .rejected: return .red
         }
     }
@@ -286,68 +297,138 @@ struct AdminDashboardView: View {
         do {
             let client = SupabaseManager.shared.client
             
-            // Fetch total revenue from payouts
-            struct PayoutAmount: Codable {
-                let amount: Double
+            // First, let's print raw JSON for membership fee
+            print("Fetching membership fee...")
+            let membershipRawResponse = try await client
+                .from("FineAndMembershipSet")
+                .select("*")
+                .execute()
+            print("Raw membership response: \(String(describing: membershipRawResponse.data))")
+            
+            struct MembershipSetting: Codable, Hashable {
+                let Membership: Double?
+                let PerDayFine: Double?
+                let FineSet_id: UUID?
             }
             
-            let payoutsResponse: [PayoutAmount] = try await client
-                .from("payouts")
-                .select("amount")
+            let membershipFeeResponse: [MembershipSetting] = try await client
+                .from("FineAndMembershipSet")
+                .select("*")
                 .execute()
                 .value
             
-            let totalAmount = payoutsResponse.reduce(0) { $0 + $1.amount }
-            totalRevenue = String(format: "$%.2f", totalAmount)
+            print("Decoded membership response: \(membershipFeeResponse)")
+            let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
             
-            // Fetch overdue fines
-            struct Fine: Codable {
-                let fine_amount: Double
-            }
-            
-            let finesResponse: [Fine] = try await client
-                .from("issuebooks")
-                .select("fine_amount")
+            // Print raw JSON for members
+            print("Fetching members count...")
+            let membersRawResponse = try await client
+                .from("Members")
+                .select("*")
                 .execute()
-                .value
+            print("Raw members response: \(String(describing: membersRawResponse.data))")
             
-            let totalFines = finesResponse.reduce(0) { $0 + $1.fine_amount }
-            overdueFines = String(format: "$%.2f", totalFines)
-            
-            // Fetch active librarians
-            let librariansCount: Int = try await client
-                .from("Librarians")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            activeLibrarians = "\(librariansCount)"
-            
-            // Fetch active members
             let membersCount: Int = try await client
                 .from("Members")
                 .select("*", head: true)
                 .execute()
                 .count ?? 0
+            
+            print("Members count: \(membersCount)")
+            let membershipRevenue = Double(membersCount) * membershipFee
+            
+            // Print raw JSON for fines
+            print("Fetching fines...")
+            let finesRawResponse = try await client
+                .from("issuebooks")
+                .select("*")
+                .execute()
+            print("Raw fines response: \(String(describing: finesRawResponse.data))")
+            
+            struct Fine: Codable {
+                let fineAmount: Double?
+                let id: UUID?
+            }
+            
+            let finesResponse: [Fine] = try await client
+                .from("issuebooks")
+                .select("fineAmount, id")
+                .execute()
+                .value
+            
+            print("Decoded fines: \(finesResponse)")
+            let totalFines = finesResponse.reduce(0) { $0 + ($1.fineAmount ?? 0) }
+            
+            // Calculate total revenue
+            let totalAmount = membershipRevenue + totalFines
+            totalRevenue = String(format: "$%.2f", totalAmount)
+            overdueFines = String(format: "$%.2f", totalFines)
+            
+            // Print raw JSON for librarians
+            print("Fetching librarians count...")
+            let librariansRawResponse = try await client
+                .from("Users")
+                .select("*")
+                .eq("roleFetched", value: "librarian")
+                .execute()
+            print("Raw librarians response: \(String(describing: librariansRawResponse.data))")
+            
+            let librariansCount: Int = try await client
+                .from("Users")
+                .select("*", head: true)
+                .eq("roleFetched", value: "librarian")
+                .execute()
+                .count ?? 0
+            
+            activeLibrarians = "\(librariansCount)"
             activeMembers = "\(membersCount)"
             
-            // Fetch total books
+            // Print raw JSON for books
+            print("Fetching books count...")
+            let booksRawResponse = try await client
+                .from("Books")
+                .select("*")
+                .execute()
+            print("Raw books response: \(String(describing: booksRawResponse.data))")
+            
             let booksCount: Int = try await client
                 .from("Books")
                 .select("*", head: true)
                 .execute()
                 .count ?? 0
+            
             totalBooks = "\(booksCount)"
             
-            // Fetch issued books
+            // Print raw JSON for issued books
+            print("Fetching issued books count...")
+            let issuedRawResponse = try await client
+                .from("issuebooks")
+                .select("*")
+                .execute()
+            print("Raw issued books response: \(String(describing: issuedRawResponse.data))")
+            
             let issuedCount: Int = try await client
                 .from("issuebooks")
                 .select("*", head: true)
                 .execute()
                 .count ?? 0
+            
             issuedBooks = "\(issuedCount)"
             
         } catch {
-            errorMessage = "Failed to load analytics: \(error.localizedDescription)"
+            print("Analytics error details: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, _):
+                    errorMessage = "Column not found: \(key)"
+                case .typeMismatch(_, let context):
+                    errorMessage = "Type mismatch: \(context.debugDescription)"
+                default:
+                    errorMessage = "Decoding error: \(decodingError.localizedDescription)"
+                }
+            } else {
+                errorMessage = "Failed to load analytics: \(error.localizedDescription)"
+            }
         }
     }
 }

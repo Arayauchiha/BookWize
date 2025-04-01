@@ -18,41 +18,21 @@ struct BookCirculationView: View {
                 switch activeTab {
                 case .issue:
                     IssueBookView()
-                    
-                        // UNCOMMENT THIS AFTER SPRINT - 2
                 case .returned:
                     ReturnBookView()
-                case .renewed:
-                    RenewBookView()
                 case .reserved:
                     ReservedBookView()
                     
                 }
             }
             .navigationTitle("Book Circulation")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingScanner = true
-                    } label: {
-                        Image(systemName: "barcode.viewfinder")
-                    }
-                }
-            }
-            .sheet(isPresented: $showingScanner) {
-                ISBNScannerView { scannedISBN in
-                    // Handle scanned ISBN
-                }
-            }
         }
     }
 }
 
 enum CirculationTab: String, CaseIterable {
     case issue = "Issue Book"
-    // UNCOMMENT THIS AFTER SPRINT - 2
     case returned = "Return Book"
-    case renewed = "Renewd Book"
     case reserved = "Reserved Book"
 }
 
