@@ -64,6 +64,7 @@ struct MemberLoginView: View {
                         .disableAutocorrection(true)
                         .focused($focusedField, equals: .email)
                         .submitLabel(.next)
+                        .customTextField()
                         .onSubmit {
                             focusedField = .password
                         }
@@ -88,25 +89,11 @@ struct MemberLoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    HStack {
-                        if isPasswordVisible {
-                            TextField("Enter your password", text: $password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                        } else {
-                            SecureField("Enter your password", text: $password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                        }
-                        
-                        Button(action: {
-                            isPasswordVisible.toggle()
-                        }) {
-                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                .foregroundColor(Color.gray)
-                        }
-                        .padding(.trailing, 8)
-                    }
-                    .background(Color.customInputBackground)
-                    .cornerRadius(10)
+                    ModifiedContent(content: EmptyView(), modifier: CustomPasswordFieldStyle(
+                        text: $password,
+                        isVisible: $isPasswordVisible,
+                        placeholder: "Enter your password"
+                    ))
                 }
                 
                 // Error message if any
