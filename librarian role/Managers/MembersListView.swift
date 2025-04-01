@@ -4,6 +4,17 @@ struct MembersListView: View {
     @State private var members: [User] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var searchText = ""
+    
+    var filteredMembers: [User] {
+        if searchText.isEmpty {
+            return members
+        }
+        return members.filter { member in
+            member.name.localizedCaseInsensitiveContains(searchText) ||
+            member.email.localizedCaseInsensitiveContains(searchText)
+        }
+    }
     
     func fetchMembers() async -> [User]? {
         print("Fetching members from Supabase...")
@@ -31,28 +42,103 @@ struct MembersListView: View {
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    if members.isEmpty {
-                        ContentUnavailableView("No Members",
-                            systemImage: "person.2.slash",
-                            description: Text("No members found")
-                        )
-                        .foregroundStyle(Color.customText)
-                        .padding(.top, 40)
+            ZStack {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
+                
+                ScrollView {
+                    if isLoading {
+                        ProgressView("Loading members...")
+                            .padding(.top, 40)
+                    } else if members.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "person.2.slash")
+                                .font(.system(size: 50))
+                                .foregroundStyle(.secondary)
+                            
+                            Text("No Members Found")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            
+                            Text("Members will appear here once they join the library")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 60)
                     } else {
                         LazyVStack(spacing: 16) {
-                            ForEach(members) { member in
+                            // Members Statistics
+//                            VStack(spacing: 8) {
+//                                Text("Total Members: \(members.count)")
+//                                    .font(.subheadline)
+//                                    .foregroundStyle(.secondary)
+                                
+//                                HStack(spacing: 20) {
+//                                    StatisticView(
+//                                        title: "Active",
+//                                        value: members.filter { $0.fine == 0 }.count,
+//                                        color: .green
+//                                    )
+//                                    
+//                                    StatisticView(
+//                                        title: " Fines",
+//                                        value: members.filter { $0.fine > 0 }.count,
+//                                        color: .red
+//                                    )
+//                                }
+//                            }
+//                            .padding()
+//                            .background(Color(.systemBackground))
+//                            .cornerRadius(12)
+                            
+                            // Members List
+                            ForEach(filteredMembers) { member in
                                 MemberCardView(member: member)
+                                    .transition(.opacity)
                             }
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
                     }
                 }
+                .refreshable {
+                    await loadMembers()
+                }
+                .searchable(
+                    text: $searchText,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: "Search by name or email"
+                )
+                .navigationTitle("Library Members")
+                .navigationBarTitleDisplayMode(.large)
+//                .toolbar {
+//                    ToolbarItem(placement: .navigationBarTrailing) {
+//                        Menu {
+//                            Button {
+//                                // Sort by name
+//                            } label: {
+//                                Label("Sort by Name", systemImage: "textformat")
+//                            }
+//                            
+//                            Button {
+//                                // Sort by date
+//                            } label: {
+//                                Label("Sort by Join Date", systemImage: "calendar")
+//                            }
+//                            
+//                            Button {
+//                                // Filter with fines
+//                            } label: {
+//                                Label("Show Members with Fines", systemImage: "dollarsign.circle")
+//                            }
+//                        } label: {
+//                            Image(systemName: "line.3.horizontal.decrease.circle")
+//                                .foregroundStyle(.blue)
+//                        }
+//                    }
+//                }
             }
-            .background(Color.customBackground)
-            .navigationTitle("Members")
-            .navigationBarTitleDisplayMode(.large)
         }
         .task {
             await loadMembers()
@@ -62,23 +148,48 @@ struct MembersListView: View {
                 await loadMembers()
             }
         }
+        .alert("Error", isPresented: .constant(errorMessage != nil)) {
+            Button("OK") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
     
     private func loadMembers() async {
+        isLoading = true
         do {
-            print("Loading members...")
-            // First calculate and update fines
             await FineCalculator.shared.calculateAndUpdateFines()
-            // Then fetch updated member data
             members = (await fetchMembers()) ?? []
-            print("Loaded members count:", members.count)
         } catch {
-            print("Error loading members:", error)
             errorMessage = error.localizedDescription
         }
+        isLoading = false
     }
 }
 
+//struct StatisticView: View {
+//    let title: String
+//    let value: Int
+//    let color: Color
+//    
+//    var body: some View {
+//        VStack(spacing: 4) {
+//            Text(title)
+//                .font(.caption)
+//                .foregroundStyle(.secondary)
+//            
+//            Text("\(value)")
+//                .font(.title2)
+//                .fontWeight(.semibold)
+//                .foregroundStyle(color)
+//        }
+//        .frame(maxWidth: .infinity)
+//        .padding(.vertical, 8)
+//        .background(color.opacity(0.1))
+//        .cornerRadius(8)
+//    }
+//}
+
 #Preview {
     MembersListView()
-} 
+}
