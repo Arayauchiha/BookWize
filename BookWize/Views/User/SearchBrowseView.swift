@@ -17,45 +17,23 @@ enum SearchCategory: String, CaseIterable {
 
 struct SearchBrowseView: View {
     @StateObject private var viewModel: BookSearchViewModel
-    @State private var selectedFilter: String? = nil
-    @State private var selectedGenreFromCard: String? = nil
-    @State private var showingSuggestions = false
-    @State private var selectedAuthor: String? = nil
-    @State private var initialBooksByGenre: [String: [Book]] = [:]
-    @FocusState private var isSearchFocused: Bool
-    @State private var scrollOffset: CGFloat = 0
-    @State private var selectedCategory: SearchCategory = .topResults
-    let userPreferredGenres: [String]
     let supabase: SupabaseClient
-    
-    // Add these states for book detail presentation
+    @State private var isSearchFocused = false
+    @State private var showingSuggestions = false
     @State private var selectedBook: Book?
     @State private var showingBookDetail = false
+    @State private var selectedGenreFromCard: String?
+    @State private var selectedFilter: String?
+    @State private var selectedCategory: SearchCategory = .topResults
+    @State private var forceUpdateKey = UUID()
+    @State private var initialBooksByGenre: [String: [Book]] = [:]
     
-    let genres = [
-        "Fiction", "Non-Fiction", "Science", "History", "Technology", 
-        "Business", "Mystery", "Romance", "Biography", "Poetry",
-        "Children's Books", "Self Help", "Travel", "Art", "Cooking"
-    ]
-    let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
-    ]
+    // Define column layout for grids
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
     
     init(userPreferredGenres: [String] = [], supabase: SupabaseClient) {
-        self.userPreferredGenres = userPreferredGenres
         self.supabase = supabase
         self._viewModel = StateObject(wrappedValue: BookSearchViewModel(userPreferredGenres: userPreferredGenres))
-        
-        // Configure the navigation bar appearance
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .systemBackground
-        
-        // Apply the appearance to all navigation bars
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-        UINavigationBar.appearance().compactAppearance = appearance
     }
     
     var body: some View {
@@ -63,11 +41,12 @@ struct SearchBrowseView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !viewModel.searchText.isEmpty {
-                        // Categories Picker - simplified
+                        // Categories Picker - simplified 
                         categoriesPicker
                         
                         // Search results content - simplified
                         searchResultsContent
+                            .id(forceUpdateKey)
                     } else {
                         // Main browse content when no search
                         BookSectionsView(
@@ -93,6 +72,15 @@ struct SearchBrowseView: View {
                 .onReceive(NotificationCenter.default.publisher(for: Notification.Name("BookDataUpdated"))) { _ in
                     initialBooksByGenre = viewModel.booksByGenre
                 }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RefreshBookStatus"))) { _ in
+                    // Refresh book status in UI when notifications are received
+                    forceUpdateKey = UUID()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: Notification.Name.reservationStatusChanged)) { _ in
+                    // When reservation status changes, force refresh
+                    print("SearchBrowseView received reservation change notification, refreshing UI")
+                    forceUpdateKey = UUID()
+                }
             }
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.large)
@@ -113,7 +101,6 @@ struct SearchBrowseView: View {
                 }
                 .interactiveDismissDisabled(false)
             }
-
         }
         .tabItem {
             Image(systemName: "safari")

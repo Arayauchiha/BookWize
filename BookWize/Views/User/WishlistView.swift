@@ -43,7 +43,10 @@ struct WishlistView: View {
                 }
             }
             .onAppear {
+                // Load wishlist data every time the view appears
                 viewModel.loadWishlist()
+                // Listen for notifications about changes to wishlist or reservations
+                NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
             }
             .sheet(item: $selectedBook) { book in
                 NavigationView {
@@ -64,11 +67,12 @@ struct WishlistView: View {
                     Text("Are you sure you want to remove this book from your wishlist?")
                 }
             }
-            .alert("Success", isPresented: $viewModel.showSuccessAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("'\(viewModel.removedBookTitle)' has been removed from your wishlist.")
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name.reservationStatusChanged)) { _ in
+                // When reservation status changes, force refresh
+                print("WishlistView received reservation change notification, refreshing UI")
+                viewModel.refreshWishlist()
             }
+
         }
     }
     
@@ -162,9 +166,7 @@ class WishlistViewModel: ObservableObject {
     @Published var wishlistBooks: [Book] = []
     @Published var isLoading = false
     @Published var showingRemoveAlert = false
-    @Published var showSuccessAlert = false
     @Published var bookToRemove: Book?
-    @Published var removedBookTitle: String = ""
     
     private var wishlistBookIds: [String] = []
     
@@ -174,6 +176,9 @@ class WishlistViewModel: ObservableObject {
         // Clear existing data when starting to load
         wishlistBooks = []
         wishlistBookIds = []
+        
+        // Make sure the WishlistSyncManager is initialized
+        let _ = WishlistSyncManager.shared
         
         Task {
             do {
@@ -192,70 +197,60 @@ class WishlistViewModel: ObservableObject {
                     .from("Members")
                     .select("wishlist")
                     .eq("id", value: userId)
-                    .single()
                     .execute()
                 
-                // Parse the response to get wishlist book IDs
-                struct MemberResponse: Codable {
-                    let wishlist: [String]?
-                }
-                
-                do {
-                    let decoder = JSONDecoder()
-                    let member = try decoder.decode(MemberResponse.self, from: response.data)
+                // Parse the response to get wishlist book IDs using safer method
+                if let jsonString = String(data: response.data, encoding: .utf8),
+                   let jsonData = jsonString.data(using: .utf8),
+                   let jsonArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                   let firstMember = jsonArray.first,
+                   let wishlist = firstMember["wishlist"] as? [String] {
                     
-                    if let wishlist = member.wishlist {
-                        print("Fetched wishlist: \(wishlist)")
+                    print("Fetched wishlist: \(wishlist)")
+                    
+                    // Check for duplicates
+                    let uniqueIds = Set(wishlist)
+                    if uniqueIds.count < wishlist.count {
+                        print("⚠️ Detected \(wishlist.count - uniqueIds.count) duplicate book IDs in wishlist")
                         
-                        // Check for duplicates
-                        let uniqueIds = Set(wishlist)
-                        if uniqueIds.count < wishlist.count {
-                            print("⚠️ Detected \(wishlist.count - uniqueIds.count) duplicate book IDs in wishlist")
-                            
-                            // Save unique IDs only
-                            let uniqueArray = Array(uniqueIds)
-                            print("Original wishlist: \(wishlist)")
-                            print("Deduplicated wishlist: \(uniqueArray)")
-                            
-                            // Update the database with deduplicated list
-                            let updateResponse = try await SupabaseManager.shared.client
-                                .from("Members")
-                                .update(["wishlist": uniqueArray])
-                                .eq("id", value: userId)
-                                .execute()
-                            
-                            if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
-                                print("✅ Successfully deduplicated wishlist in database")
-                                self.wishlistBookIds = uniqueArray
-                            } else {
-                                print("❌ Failed to deduplicate wishlist: Status code \(updateResponse.status)")
-                                self.wishlistBookIds = wishlist
-                            }
+                        // Save unique IDs only
+                        let uniqueArray = Array(uniqueIds)
+                        print("Original wishlist: \(wishlist)")
+                        print("Deduplicated wishlist: \(uniqueArray)")
+                        
+                        // Update the database with deduplicated list
+                        let updateResponse = try await SupabaseManager.shared.client
+                            .from("Members")
+                            .update(["wishlist": uniqueArray])
+                            .eq("id", value: userId)
+                            .execute()
+                        
+                        if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
+                            print("✅ Successfully deduplicated wishlist in database")
+                            self.wishlistBookIds = uniqueArray
                         } else {
+                            print("❌ Failed to deduplicate wishlist: Status code \(updateResponse.status)")
                             self.wishlistBookIds = wishlist
                         }
-                        
-                        if self.wishlistBookIds.isEmpty {
-                            await MainActor.run {
-                                self.wishlistBooks = []
-                                self.isLoading = false
-                                print("Wishlist is empty")
-                            }
-                        } else {
-                            // 3. Fetch book details for each book ID in the wishlist
-                            await fetchWishlistBooks(bookIds: self.wishlistBookIds)
-                        }
                     } else {
-                        // User has no wishlist items
+                        self.wishlistBookIds = wishlist
+                    }
+                    
+                    if self.wishlistBookIds.isEmpty {
                         await MainActor.run {
                             self.wishlistBooks = []
                             self.isLoading = false
-                            print("Wishlist is nil")
+                            print("Wishlist is empty")
                         }
+                    } else {
+                        // 3. Fetch book details for each book ID in the wishlist
+                        await fetchWishlistBooks(bookIds: self.wishlistBookIds)
                     }
-                } catch {
-                    print("Error decoding wishlist: \(error)")
+                } else {
+                    // User has no wishlist items or couldn't parse
+                    print("Could not parse wishlist data or wishlist is empty")
                     await MainActor.run {
+                        self.wishlistBooks = []
                         self.isLoading = false
                     }
                 }
@@ -453,18 +448,6 @@ class WishlistViewModel: ObservableObject {
         }
     }
     
-    func showRemoveAlert(for book: Book) {
-        bookToRemove = book
-        showingRemoveAlert = true
-    }
-    
-    func confirmRemoval() {
-        guard let book = bookToRemove else { return }
-        removedBookTitle = book.title
-        removeFromWishlist(book)
-        bookToRemove = nil
-    }
-    
     func removeFromWishlist(_ book: Book) {
         let isbn = book.isbn
         print("Removing book '\(book.title)' with ISBN: \(isbn)")
@@ -572,11 +555,22 @@ class WishlistViewModel: ObservableObject {
                             .execute()
                         
                         if updateResponse.status == 200 || updateResponse.status == 201 || updateResponse.status == 204 {
+                            print("✅ Successfully updated wishlist in Supabase")
+                            
+                            // Check if we removed multiple entries
+                            if removedCount > 1 {
+                                print("⚠️ Removed \(removedCount) duplicate entries of the same book")
+                            }
+                            
+                            // Refresh the list to ensure UI is in sync with database
                             await MainActor.run {
-                                showSuccessAlert = true
+                                // We've already removed it from the local array, and updated wishlistBookIds,
+                                // so we don't need to reload the entire list
+                                print("Book successfully removed from wishlist")
                             }
                         } else {
                             print("❌ Failed to update wishlist in Supabase: Status code \(updateResponse.status)")
+                            // If update failed, reload the wishlist to ensure UI matches database
                             await MainActor.run {
                                 self.loadWishlist()
                             }
@@ -592,11 +586,23 @@ class WishlistViewModel: ObservableObject {
                 }
             } catch {
                 print("Error removing from wishlist: \(error)")
+                // If there was an error, reload the wishlist to ensure UI is in sync
                 await MainActor.run {
                     self.loadWishlist()
                 }
             }
         }
+    }
+    
+    func showRemoveAlert(for book: Book) {
+        bookToRemove = book
+        showingRemoveAlert = true
+    }
+    
+    func confirmRemoval() {
+        guard let book = bookToRemove else { return }
+        removeFromWishlist(book)
+        bookToRemove = nil
     }
 }
 
@@ -604,4 +610,4 @@ struct WishlistView_Previews: PreviewProvider {
     static var previews: some View {
         WishlistView()
     }
-}
+} 
