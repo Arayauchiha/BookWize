@@ -387,22 +387,35 @@ struct AdminDashboardView: View {
             overdueFines = String(format: "$%.2f", totalFines)
             
             // Print raw JSON for librarians
+            print("----------------------------------------")
+            print("DEBUGGING LIBRARIAN COUNT")
+            print("----------------------------------------")
+            
             print("Fetching librarians count...")
-            let librariansRawResponse = try await client
-                .from("Users")
-                .select("*")
-                .eq("roleFetched", value: "librarian")
-                .execute()
-            print("Raw librarians response: \(String(describing: librariansRawResponse.data))")
+            struct LibrarianUser: Codable {
+                var email: String
+                var roleFetched: String
+                var status: String
+            }
             
-            let librariansCount: Int = try await client
-                .from("Users")
-                .select("*", head: true)
-                .eq("roleFetched", value: "librarian")
-                .execute()
-                .count ?? 0
+            do {
+                // Use the exact same approach as in LibrarianManagementView.swift
+                let librarians: [LibrarianUser]? = try await client
+                    .from("Users")
+                    .select("email, roleFetched, status")
+                    .eq("roleFetched", value: "librarian")
+                    .eq("status", value: "working")
+                    .execute()
+                    .value
+                
+                let count = librarians?.count ?? 0
+                print("Librarians found: \(count)")
+                activeLibrarians = "\(count)"
+            } catch {
+                print("Error fetching librarians: \(error)")
+                activeLibrarians = "0" // Default to 0 on error
+            }
             
-            activeLibrarians = "\(librariansCount)"
             activeMembers = "\(membersCount)"
             
             // Print raw JSON for books
