@@ -11,6 +11,37 @@ struct AccountView: View {
     @State private var showingPasswordError = false
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var user: FetchAdmin?
+    
+    private func fetchMember() async {
+        do {
+            // Get email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                return
+            }
+            
+            print("Fetching member with email: \(userEmail)")
+            
+            let response: [FetchAdmin] = try await SupabaseManager.shared.client
+                .from("Users")
+                .select("*")
+                .eq("email", value: userEmail)  // Use email instead of id
+                .execute()
+                .value
+            
+            DispatchQueue.main.async {
+                if let fetchedUser = response.first {
+                    self.user = fetchedUser
+                    print("Successfully fetched user: \(fetchedUser.name)")
+                } else {
+                    print("No user found with email: \(userEmail)")
+                }
+            }
+        } catch {
+            print("Error fetching member: \(error)")
+        }
+    }
     
     var body: some View {
         NavigationView {
@@ -22,9 +53,9 @@ struct AccountView: View {
             
                         
                         VStack(alignment: .leading) {
-                            Text("Librarian")
+                            Text(user?.name ?? "Librarian")
                                 .font(.headline)
-                            Text("Admin")
+                            Text(user?.email ?? "Librarian@example.com")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -74,6 +105,9 @@ struct AccountView: View {
                 }
             } message: {
                 Text("Are you sure you want to logout?")
+            }
+            .task {
+                await fetchMember()
             }
         }
     }
