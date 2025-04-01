@@ -69,6 +69,7 @@ struct LibrarianDetailView: View {
     let onDelete: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
+    @State private var showSuccessAlert = false
     @State private var isDeleting = false
     @State private var errorMessage: String?
     
@@ -238,6 +239,14 @@ struct LibrarianDetailView: View {
             } message: {
                 Text("Are you sure you want to delete \(librarian.name)? This action cannot be undone.")
             }
+            .alert("Success", isPresented: $showSuccessAlert) {
+                Button("OK") {
+                    dismiss()
+                    onDelete()
+                }
+            } message: {
+                Text("Librarian \(librarian.name) has been deleted successfully.")
+            }
         }
     }
     
@@ -256,7 +265,7 @@ struct LibrarianDetailView: View {
                 
                 await MainActor.run {
                     isDeleting = false
-                    onDelete()
+                    showSuccessAlert = true // Only show the alert, don't dismiss yet
                 }
             } catch {
                 await MainActor.run {
@@ -273,4 +282,3 @@ struct LibrarianDetailView: View {
         return String(format: "%d", abs(phone)) // Format without commas and ensure positive
     }
 }
-

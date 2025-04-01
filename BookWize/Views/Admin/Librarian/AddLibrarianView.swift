@@ -216,9 +216,27 @@ struct AddLibrarianView: View {
     }
     
     private func generateRandomPassword() -> String {
-        let length = 8
-        let characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
-        return String((0..<length).map { _ in characters.randomElement()! })
+        let length = 12 // Increased length for better security
+        let lowercase = "abcdefghijklmnopqrstuvwxyz"
+        let uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        let numbers = "0123456789"
+        let specialChars = "!@#$%^&*"
+        
+        // Ensure at least one of each required character type
+        var password = ""
+        password += String(lowercase.randomElement()!)
+        password += String(uppercase.randomElement()!)
+        password += String(numbers.randomElement()!)
+        password += String(specialChars.randomElement()!)
+        
+        // Fill the rest with random characters from all sets
+        let allChars = lowercase + uppercase + numbers + specialChars
+        while password.count < length {
+            password += String(allChars.randomElement()!)
+        }
+        
+        // Shuffle the password to make it more random
+        return String(password.shuffled())
     }
     
     private func addLibrarian() {

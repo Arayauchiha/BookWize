@@ -23,14 +23,24 @@ struct ContentView: View {
             } else {
                 NavigationStack {
                     ScrollView {
-                        VStack(spacing: 25) {
-                            Text("Select your role")
-                                .font(.system(size: 28, weight: .semibold))
-                                .foregroundStyle(Color.customText)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 20)
-                                .padding(.top, 50)
-                            VStack(spacing: 16) {
+                        VStack(spacing: 32) {
+                            // Header
+                            VStack(spacing: 8) {
+                                Text("Welcome to BookWize")
+                                    .font(.system(size: 34, weight: .bold))
+                                    .foregroundStyle(Color.customText)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                Text("Select your role to continue")
+                                    .font(.system(size: 17))
+                                    .foregroundStyle(Color.customText.opacity(0.6))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 50)
+                            
+                            // Role Cards
+                            VStack(spacing: 12) {
                                 NavigationLink {
                                     MemberLoginView()
                                 } label: {
@@ -41,7 +51,7 @@ struct ContentView: View {
                                         cardColor: Color.customCardBackground
                                     )
                                 }
-
+                                
                                 NavigationLink {
                                     LoginView(userRole: .librarian)
                                 } label: {
@@ -52,7 +62,7 @@ struct ContentView: View {
                                         cardColor: Color.customCardBackground
                                     )
                                 }
-
+                                
                                 NavigationLink {
                                     AdminLoginView()
                                 } label: {
@@ -65,7 +75,7 @@ struct ContentView: View {
                                 }
                             }
                             .padding(.horizontal, 20)
-
+                            
                             Spacer(minLength: 50)
                         }
                     }
