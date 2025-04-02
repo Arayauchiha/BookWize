@@ -1,8 +1,9 @@
 import SwiftUI
+import Charts
 
-struct FineManagementView: View {
-    @StateObject private var fineManager = FineManager()
-    @StateObject private var userManager = UserManager()
+struct LibrarianDashboard: View {
+    //@StateObject private var fineManager = FineManager()
+    @StateObject private var userManager = LibrarianDashboardManager()
     
     var body: some View {
         NavigationView {
@@ -37,7 +38,7 @@ struct FineManagementView: View {
                         
                         DashboardCard(
                             title: "Total Members",
-                            value: "\(userManager.members.count)",
+                            value: "\(userManager.totalMembers)",
                             icon: "person.3.fill",
                             color: .purple
                         )
@@ -53,11 +54,13 @@ struct FineManagementView: View {
                             .padding(.horizontal)
                         
                         HStack(spacing: 16) {
-                            GenreStatsCard(
-                                title: "Popular Genres",
-                                genres: userManager.getPopularGenres(),
-                                color: .orange
-                            )
+                            if let mostPopularGenre = userManager.getPopularGenres().first {
+                                PopularGenreCard(
+                                    title: "Popular Genres",
+                                    genre: mostPopularGenre.0,
+                                    color: .orange
+                                )
+                            }
                             
                             GenreStatsCard(
                                 title: "Genre-wise Issued",
@@ -69,21 +72,21 @@ struct FineManagementView: View {
                     }
                     
                     // Overdue Books Section
-                    Group {
-                        Text("Overdue Books")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.top)
-                            .padding(.horizontal)
-                        
-                        NavigationLink(destination: OverdueBooksListView()) {
-                            OverdueSummaryCard(
-                                overdueCount: fineManager.overdueBooks.count,
-                                totalFine: calculateTotalFine()
-                            )
-                            .padding(.horizontal)
-                        }
-                    }
+//                    Group {
+//                        Text("Overdue Books")
+//                            .font(.title2)
+//                            .fontWeight(.bold)
+//                            .padding(.top)
+//                            .padding(.horizontal)
+//                        
+//                        NavigationLink(destination: OverdueBooksListView()) {
+//                            OverdueSummaryCard(
+//                                //overdueCount: fineManager.overdueBooks.count,
+//                                totalFine: calculateTotalFine()
+//                            )
+//                            .padding(.horizontal)
+//                        }
+//                    }
                 }
                 .padding(.vertical)
             }
@@ -92,10 +95,10 @@ struct FineManagementView: View {
     }
     
     private func calculateTotalFine() -> Double {
-        return fineManager.overdueBooks.reduce(0) { total, record in
-            total + record.fineAmount
+        //return fineManager.overdueBooks.reduce(0) { total, record in
+            //total + record.fineAmount
+        return 0
         }
-    }
 }
 
 struct OverdueSummaryCard: View {
@@ -237,9 +240,86 @@ struct DashboardCard: View {
     }
 }
 
+
+struct SimpleMiniBarGraph: View {
+    let data: [(String, Int)]
+    let color: Color
+    
+    // Compute the maximum value for scaling
+    private var maxValue: Int {
+        let max = data.map { $0.1 }.max() ?? 1
+        return max > 0 ? max : 1 // Ensure we don't divide by zero
+    }
+    
+    var body: some View {
+        // Center the graph with explicit frame and alignment
+        VStack {
+            HStack(alignment: .bottom, spacing: 4) {
+                // Create a fixed number of bars for testing visibility
+                ForEach(0..<min(data.count, 7), id: \.self) { index in
+                    let item = data[index]
+                    let height = max(4, CGFloat(item.1) * 40 / CGFloat(maxValue))
+                    
+                    Rectangle()
+                        .fill(color)
+                        .frame(width: 4, height: height)
+                        .cornerRadius(2)
+                }
+            }
+            .frame(height: 40, alignment: .bottom)
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.vertical, 8)
+        .background(Color.clear) // Add this to see the bounds
+    }
+}
+
+// Updated GenreStatsCard with debugging info
 struct GenreStatsCard: View {
     let title: String
     let genres: [(String, Int)]
+    let color: Color
+    
+    var body: some View {
+        NavigationLink(destination: GenreAnalyticsView(genres: genres, color: color)) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.title2)
+                        .foregroundColor(color)
+                    Spacer()
+                    if let genre = genres.first {
+                        Text(genre.0)
+                            .font(.title2)
+                            .bold()
+                            .foregroundColor(.primary)
+                    }
+                }
+                
+                // Add debug text to check if genres data exists
+//                Text("Debug: \(genres.count) genres")
+//                    .font(.caption)
+//                    .foregroundColor(.gray)
+                
+                // Simplified graph
+                SimpleMiniBarGraph(data: genres, color: color)
+                
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+    }
+}
+
+struct PopularGenreCard: View {
+    let title: String
+    let genre: String
     let color: Color
     
     var body: some View {
@@ -249,45 +329,18 @@ struct GenreStatsCard: View {
                     .font(.title2)
                     .foregroundColor(color)
                 Spacer()
-                Text("\(genres.count)")
+                Text(genre)
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
             }
             
             Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            if genres.isEmpty {
-                Text("No data available")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(genres.prefix(3), id: \.0) { genre, count in
-                    HStack {
-                        Text(genre)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("\(count)")
-                            .font(.subheadline)
-                            .bold()
-                            .foregroundColor(color)
-                    }
-                }
-            }
-            
-            if genres.count > 3 {
-                Text("+ \(genres.count - 3) more")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
         .padding()
         .frame(maxWidth: .infinity)
-        .frame(height: 180)
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)

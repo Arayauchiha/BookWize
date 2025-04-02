@@ -8,7 +8,7 @@ struct UserData: Encodable {
 }
 
 class UserManagerSupabase {
-    static let shared = UserManager()
+    static let shared = LibrarianDashboardManager()
     private let client = SupabaseManager.shared.client
     
     private init() {}

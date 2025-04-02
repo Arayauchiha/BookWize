@@ -28,7 +28,7 @@ struct InventoryManagerView: View {
                         }
                     
                     if SHOW_FINES {
-                        FineManagementView()
+                        LibrarianDashboard()
                             .tabItem {
                                 Label("Fines", systemImage: "dollarsign.circle.fill")
                             }
