@@ -70,6 +70,18 @@ class BorrowedBooksManager: ObservableObject {
     @Published var borrowedBooks: [BorrowedBook] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    private var timer: Timer?
+    
+    
+    
+    deinit {
+        timer?.invalidate()
+    }
+    
+    
+    func refreshBorrowedBooks() async {
+        await fetchBorrowedBooks()
+    }
     
     func fetchBorrowedBooks() async {
         isLoading = true
@@ -692,7 +704,11 @@ struct BorrowedBooksView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if booksManager.borrowedBooks.isEmpty {
+                if booksManager.isLoading {
+                    ProgressView("Loading books...")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if booksManager.borrowedBooks.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "book.closed")
                             .font(.system(size: 40))
@@ -700,6 +716,15 @@ struct BorrowedBooksView: View {
                         Text("No borrowed books")
                             .font(.headline)
                             .foregroundColor(.gray)
+                        Button(action: {
+                            Task {
+                                await booksManager.refreshBorrowedBooks()
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -712,6 +737,12 @@ struct BorrowedBooksView: View {
             .padding()
         }
         .background(Color(.systemGroupedBackground))
+        .refreshable {
+            await booksManager.refreshBorrowedBooks()
+        }
+        .task {
+            await booksManager.refreshBorrowedBooks()
+        }
     }
 }
 
@@ -780,7 +811,7 @@ struct BorrowedBookRow: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
-                // Book Cover
+                // Book Cover with AsyncImage
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(LinearGradient(
@@ -791,9 +822,33 @@ struct BorrowedBookRow: View {
                         .frame(width: 80, height: 100)
                         .shadow(color: Color.blue.opacity(0.2), radius: 4, x: 0, y: 2)
                     
-                    Image(systemName: book.coverImage)
-                        .font(.system(size: 30))
-                        .foregroundColor(.blue)
+                    if book.coverImage != "book.fill" {
+                        AsyncImage(url: URL(string: book.coverImage)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 50, height: 50)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 70, height: 90)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            @unknown default:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    } else {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.blue)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
