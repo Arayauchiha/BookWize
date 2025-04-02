@@ -9,9 +9,9 @@ struct FineAndMembershipManagement: View {
     @State private var editedMembership: String = ""
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
-    @State private var isEditing = false
-    @State private var showingUpdateMenu = false
-
+    @State private var showingUpdateSheet = false
+    @State private var showingErrorAlert = false
+    
     private func fetchSettings() async {
         do {
             let response: [FineAndMembership] = try await SupabaseManager.shared.client
@@ -25,8 +25,8 @@ struct FineAndMembershipManagement: View {
                 perDayFine = settings.perDayFine
                 membership = settings.membership
                 fineSetId = settings.fineSetId
-                editedFine = settings.perDayFine != nil ? String(settings.perDayFine!) : ""
-                editedMembership = settings.membership != nil ? String(settings.membership!) : ""
+                editedFine = settings.perDayFine != nil ? String(format: "%.2f", settings.perDayFine!) : ""
+                editedMembership = settings.membership != nil ? String(format: "%.2f", settings.membership!) : ""
             } else {
                 let defaultSettings: FineAndMembership = try await SupabaseManager.shared.client
                     .from("FineAndMembershipSet")
@@ -42,8 +42,8 @@ struct FineAndMembershipManagement: View {
                 perDayFine = defaultSettings.perDayFine
                 membership = defaultSettings.membership
                 fineSetId = defaultSettings.fineSetId
-                editedFine = defaultSettings.perDayFine != nil ? String(defaultSettings.perDayFine!) : ""
-                editedMembership = defaultSettings.membership != nil ? String(defaultSettings.membership!) : ""
+                editedFine = defaultSettings.perDayFine != nil ? String(format: "%.2f", defaultSettings.perDayFine!) : ""
+                editedMembership = defaultSettings.membership != nil ? String(format: "%.2f", defaultSettings.membership!) : ""
             }
             isLoading = false
         } catch {
@@ -53,22 +53,26 @@ struct FineAndMembershipManagement: View {
                 errorMessage = "Failed to fetch or create settings: \(error.localizedDescription)"
             }
             isLoading = false
+            showingErrorAlert = true
         }
     }
 
     private func updateSettings() async {
         guard let fineSetId = fineSetId else {
             errorMessage = "Missing record ID. Please try again."
+            showingErrorAlert = true
             return
         }
 
         guard let newFine = Double(editedFine) else {
             errorMessage = "Invalid fine amount. Please enter a valid number."
+            showingErrorAlert = true
             return
         }
 
         guard let newMembership = Double(editedMembership) else {
             errorMessage = "Invalid membership amount. Please enter a valid number."
+            showingErrorAlert = true
             return
         }
 
@@ -84,166 +88,137 @@ struct FineAndMembershipManagement: View {
 
             perDayFine = newFine
             membership = newMembership
-            isEditing = false
-            showingUpdateMenu = false
+            showingUpdateSheet = false
         } catch {
             if error.localizedDescription.contains("permission denied") {
                 errorMessage = "Access denied: Admins only"
             } else {
                 errorMessage = "Failed to update settings: \(error.localizedDescription)"
             }
+            showingErrorAlert = true
         }
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.customBackground.ignoresSafeArea() // Apply custom background color
-                
-                if isLoading {
-                    ProgressView()
-                        .tint(Color.customText) // Use custom text color for the progress view
-                } else if let errorMessage = errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red) // Keep error text red for visibility
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(10)
-                } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        VStack(alignment: .leading, spacing: 16) {
-                            HStack {
-                                Text("Per Day Fine")
-                                    .font(.headline)
-                                    .foregroundColor(Color.customText) // Apply custom text color
-                                Spacer()
-                                if isEditing {
-                                    TextField("$0.00", text: $editedFine)
-                                        .keyboardType(.decimalPad)
-                                        .multilineTextAlignment(.trailing)
-                                        .font(.headline)
-                                        .foregroundColor(Color.customText) // Apply custom text color
-                                        .padding(8)
-                                        .background(Color.customInputBackground) // Apply input background color
-                                        .cornerRadius(5)
-                                } else {
-                                    Text(perDayFine != nil ? String(format: "$%.2f", perDayFine!) : "$0.00")
-                                        .font(.headline)
-                                        .foregroundColor(Color.customText) // Apply custom text color
-                                }
-                            }
-                            .padding(.horizontal)
-                            
-                            Divider()
-                                .background(Color.customText.opacity(0.2)) // Subtle divider color
-                            
-                            HStack {
-                                Text("Membership Fee")
-                                    .font(.headline)
-                                    .foregroundColor(Color.customText) // Apply custom text color
-                                Spacer()
-                                if isEditing {
-                                    TextField("$0.00", text: $editedMembership)
-                                        .keyboardType(.decimalPad)
-                                        .multilineTextAlignment(.trailing)
-                                        .font(.headline)
-                                        .foregroundColor(Color.customText) // Apply custom text color
-                                        .padding(8)
-                                        .background(Color.customInputBackground) // Apply input background color
-                                        .cornerRadius(5)
-                                } else {
-                                    Text(membership != nil ? String(format: "$%.2f", membership!) : "$0.00")
-                                        .font(.headline)
-                                        .foregroundColor(Color.customText) // Apply custom text color
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        .background(Color.customCardBackground) // Apply card background color
-                        .cornerRadius(10)
-                        .shadow(color: Color.customText.opacity(0.2), radius: 5, x: 0, y: 2)
-                        .padding()
+        VStack(spacing: 0) {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+            } else {
+                // Fines & Fees content
+                VStack(spacing: 0) {
+                    // Per Day Fine
+                    HStack {
+                        Text("Per Day Fine")
+                            .font(.body)
                         
                         Spacer()
+                        
+                        Text(perDayFine != nil ? String(format: "$%.2f", perDayFine!) : "$0.00")
+                            .font(.body)
+                            .foregroundColor(.secondary)
                     }
-                }
-            }
-            //.navigationTitle("Fines & Fees")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Update") {
-                            isEditing = true
-                            showingUpdateMenu = true
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .foregroundColor(Color.customText.opacity(Color.secondaryIconOpacity)) // Apply custom text color with opacity
+                    .padding()
+                    .background(Color(.secondarySystemGroupedBackground))
+                    
+                    Divider()
+                        .padding(.leading)
+                        .background(Color(.secondarySystemGroupedBackground))
+                    
+                    // Membership Fee
+                    HStack {
+                        Text("Membership Fee")
+                            .font(.body)
+                        
+                        Spacer()
+                        
+                        Text(membership != nil ? String(format: "$%.2f", membership!) : "$0.00")
+                            .font(.body)
+                            .foregroundColor(.secondary)
                     }
+                    .padding()
+                    .background(Color(.secondarySystemGroupedBackground))
                 }
+                .cornerRadius(10)
+                .padding()
+                
+                Spacer()
+                
+                // Edit button at the bottom
+                Button(action: { showingUpdateSheet = true }) {
+                    HStack {
+                        Image(systemName: "pencil")
+                        Text("Edit Fee Settings")
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.librarianColor)
+                    )
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
         }
-        .task {
-            await fetchSettings()
-        }
-        .sheet(isPresented: $showingUpdateMenu) {
-            VStack {
-                if isEditing {
-                    VStack(spacing: 16) {
+        .background(Color(.systemGroupedBackground))
+        .sheet(isPresented: $showingUpdateSheet) {
+            NavigationView {
+                Form {
+                    Section(header: Text("Edit Fee Settings")) {
                         HStack {
                             Text("Per Day Fine")
-                                .foregroundColor(Color.customText) // Apply custom text color
                             Spacer()
-                            TextField("$0.00", text: $editedFine)
+                            TextField("0.00", text: $editedFine)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
-                                .foregroundColor(Color.customText) // Apply custom text color
-                                .padding(8)
-                                .background(Color.customInputBackground) // Apply input background color
-                                .cornerRadius(5)
+                                .frame(width: 100)
                         }
-                        .padding()
-                        
-                        Divider()
-                            .background(Color.customText.opacity(0.2)) // Subtle divider color
                         
                         HStack {
                             Text("Membership Fee")
-                                .foregroundColor(Color.customText) // Apply custom text color
                             Spacer()
-                            TextField("$0.00", text: $editedMembership)
+                            TextField("0.00", text: $editedMembership)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
-                                .foregroundColor(Color.customText) // Apply custom text color
-                                .padding(8)
-                                .background(Color.customInputBackground) // Apply input background color
-                                .cornerRadius(5)
+                                .frame(width: 100)
                         }
-                        .padding()
-                        
+                    }
+                }
+                .navigationTitle("Update Fees")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            showingUpdateSheet = false
+                        }
+                    }
+                    
+                    ToolbarItem(placement: .confirmationAction) {
                         Button("Save") {
                             Task {
                                 await updateSettings()
                             }
                         }
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.customButton) // Apply custom button color
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.adminColor, lineWidth: 1) // Add admin color border for accent
-                        )
+                        .bold()
                     }
-                    .background(Color.customCardBackground) // Apply card background color
-                    .cornerRadius(15)
-                    .padding()
                 }
             }
-            .background(Color.customBackground) // Apply custom background color to the sheet
             .presentationDetents([.medium])
+        }
+        .task {
+            await fetchSettings()
+        }
+        .alert(isPresented: $showingErrorAlert) {
+            Alert(
+                title: Text("Error"),
+                message: Text(errorMessage ?? "An unknown error occurred"),
+                dismissButton: .default(Text("OK"))
+            )
         }
     }
 }

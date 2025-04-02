@@ -8,23 +8,37 @@ struct StatCard: View {
     let color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
+        VStack(alignment: .leading, spacing: 8) {
+            // Icon and Title in top row
+            HStack(alignment: .top, spacing: 12) {
+                // Icon with simpler styling
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
+                    .font(.system(size: 20))
+                    .foregroundStyle(color)
+                    .frame(width: 28)
+                
+                // Title - now with text wrapping
                 Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
             }
+            
+            Spacer()
+            
+            // Value in bottom row
             Text(value)
-                .font(.title2.bold())
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.primary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color(UIColor.systemBackground))
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -39,8 +53,8 @@ struct AnalyticsGridView: View {
     
     var body: some View {
         LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible())
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
         ], spacing: 16) {
             StatCard(title: "Total Revenue", value: totalRevenue,
                     icon: "dollarsign.circle.fill", color: .green)
@@ -73,12 +87,14 @@ struct RecentRequestsView: View {
                 HStack {
                     Text("Recent Requests")
                         .font(.title2.bold())
+                        .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .foregroundColor(Color.customButton.opacity(Color.secondaryIconOpacity))
+                        .foregroundColor(.secondary)
                         .font(.system(size: 14))
                 }
                 .padding(.horizontal)
+                .padding(.top, 6)
                 
                 if isLoading {
                     ProgressView()
@@ -98,8 +114,8 @@ struct RecentRequestsView: View {
                     }
                 }
             }
-            .foregroundColor(Color.customText)
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -110,26 +126,27 @@ struct RequestRow: View {
     var body: some View {
         HStack {
             Image(systemName: "book.fill")
-                .foregroundColor(.blue)
+                .foregroundStyle(Color.memberColor)
             VStack(alignment: .leading) {
                 Text(request.title)
                     .font(.headline)
+                    .foregroundStyle(.primary)
                 Text(request.author)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             Text(request.Request_status.rawValue.capitalized)
                 .font(.caption)
-                .foregroundColor(statusColor)
+                .foregroundStyle(statusColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(statusColor.opacity(0.1))
                 .cornerRadius(6)
         }
         .padding()
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(10)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(12)
         .padding(.horizontal)
     }
     
@@ -146,159 +163,142 @@ struct AdminDashboardView: View {
     @State private var selectedTab = 0
     @State private var showProfile = false
     @State private var bookRequests: [BookRequest] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-    
-    // Task management
     @State private var currentTask: Task<Void, Never>?
-    
-    // Dashboard Manager
     @StateObject private var dashboardManager = DashboardManager()
     
     var body: some View {
-        NavigationStack {
-            TabView(selection: $selectedTab) {
-                NavigationStack {
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            AnalyticsGridView(
-                                totalRevenue: String(format: "$%.2f", dashboardManager.totalRevenue),
-                                overdueFines: String(format: "$%.2f", dashboardManager.overdueFines),
-                                activeLibrarians: "\(dashboardManager.activeLibrariansCount)",
-                                activeMembers: "\(dashboardManager.totalMembersCount)",
-                                totalBooks: "\(dashboardManager.totalBooksCount)",
-                                issuedBooks: "\(dashboardManager.issuedBooksCount)"
-                            )
-                            
-                            RecentRequestsView(
-                                bookRequests: bookRequests,
-                                isLoading: isLoading,
-                                errorMessage: errorMessage
-                            )
-                        }
-                        .padding(.vertical)
-                    }
-                    .refreshable {
-                        // Cancel any existing task before starting a new one
-                        currentTask?.cancel()
+        TabView(selection: $selectedTab) {
+            // Dashboard Tab
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        AnalyticsGridView(
+                            totalRevenue: String(format: "$%.2f", dashboardManager.totalRevenue),
+                            overdueFines: String(format: "$%.2f", dashboardManager.overdueFines),
+                            activeLibrarians: "\(dashboardManager.activeLibrariansCount)",
+                            activeMembers: "\(dashboardManager.totalMembersCount)",
+                            totalBooks: "\(dashboardManager.totalBooksCount)",
+                            issuedBooks: "\(dashboardManager.issuedBooksCount)"
+                        )
                         
-                        // Create a new task for the refresh
-                        currentTask = Task {
-                            do {
-                                errorMessage = nil // Clear any previous errors
-                                async let requests = fetchBookRequests()
-                                async let analytics = dashboardManager.fetchDashboardData()
-                                try await (requests, analytics)
-                            } catch {
-                                if !Task.isCancelled {
-                                    print("Refresh error (not cancellation): \(error)")
-                                }
+                        RecentRequestsView(
+                            bookRequests: bookRequests,
+                            isLoading: false,
+                            errorMessage: nil
+                        )
+                    }
+                    .padding(.vertical)
+                }
+                .background(Color(.systemGroupedBackground))
+                .ignoresSafeArea(edges: .bottom)
+                .refreshable {
+                    currentTask?.cancel()
+                    currentTask = Task {
+                        async let requests = fetchBookRequests()
+                        async let analytics = dashboardManager.fetchDashboardData()
+                        try? await (requests, analytics)
+                    }
+                }
+                .navigationTitle("Dashboard")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { showProfile = true }) {
+                            Image(systemName: "person.circle")
+                                .font(.system(size: 22))
+                        }
+                    }
+                }
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "chart.bar.fill")
+            }
+            .tag(0)
+            
+            // Librarians Tab
+            NavigationStack {
+                LibrarianManagementView(onProfileTap: { showProfile = true })
+                    .navigationTitle("Management")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+            .tabItem {
+                Label("Librarians", systemImage: "person.2.fill")
+            }
+            .tag(1)
+            
+            // Catalogue Tab
+            NavigationStack {
+                CatalogueView()
+                    .navigationTitle("Catalogue")
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button(action: { showProfile = true }) {
+                                Image(systemName: "person.circle")
+                                    .font(.system(size: 22))
                             }
                         }
-                        
-                        // Wait for the task to complete
-                        await currentTask?.value
                     }
-                    .navigationTitle("Dashboard")
-                }
-                .tabItem {
-                    Label("Dashboard", systemImage: "chart.bar.fill")
-                }
-                .tag(0)
-                
-                NavigationStack {
-                    LibrarianManagementView().navigationTitle("Librarians")
-                }
-                .tabItem {
-                    Label("Librarians", systemImage: "person.2.fill")
-                }
-                .tag(1)
-                
-                NavigationStack {
-                    CatalogueView()
-                        .navigationTitle("Catalogue")
-                }
-                .tabItem {
-                    Label("Catalogue", systemImage: "books.vertical.fill")
-                }
-                .tag(2)
-                
-                NavigationStack {
-                    FinanceView()
-                        .navigationTitle("Finance")
-                }
-                .tabItem {
-                    Label("Finance", systemImage: "dollarsign.circle.fill")
-                }
-                .tag(3)
             }
-            .navigationTitle(tabTitle)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    profileButton
-                }
+            .tabItem {
+                Label("Catalogue", systemImage: "books.vertical.fill")
             }
-            .tint(Color.customButton)
-            .sheet(isPresented: $showProfile) {
-                NavigationStack {
-                    AdminProfileView()
-                        .navigationTitle("Profile")
-                        .navigationBarTitleDisplayMode(.inline)
-                }
-                .presentationDragIndicator(.visible)
+            .tag(2)
+            
+            // Finance Tab
+            NavigationStack {
+                FinanceView(onProfileTap: { showProfile = true })
+                    .navigationTitle("Finance")
+                    .navigationBarTitleDisplayMode(.large)
             }
-            .onAppear {
-                configureTabBar()
-                // Initial data load
-                currentTask = Task {
-                    await fetchBookRequests()
-                }
+            .tabItem {
+                Label("Finance", systemImage: "dollarsign.circle.fill")
             }
-            .onDisappear {
-                // Clean up any running task when view disappears
-                currentTask?.cancel()
-                currentTask = nil
+            .tag(3)
+        }
+        .tint(Color.customButton)
+        .sheet(isPresented: $showProfile) {
+            NavigationStack {
+                AdminProfileView()
+                    .navigationTitle("Profile")
+                    .navigationBarTitleDisplayMode(.inline)
             }
+            .presentationDragIndicator(.visible)
+        }
+        .onAppear {
+            configureTabBar()
+            // Initial data load
+            currentTask = Task {
+                await fetchBookRequests()
+            }
+        }
+        .onDisappear {
+            currentTask?.cancel()
+            currentTask = nil
         }
     }
     
     private func configureTabBar() {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
+        
+        // Configure normal state
         appearance.stackedLayoutAppearance.normal.iconColor = .gray
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.gray]
-        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.black)
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor(Color.black)]
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            NSAttributedString.Key.foregroundColor: UIColor.gray
+        ]
+        
+        // Configure selected state
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.customButton)
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            NSAttributedString.Key.foregroundColor: UIColor(Color.customButton)
+        ]
+        
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
-
-    private var profileButton: some View {
-        Button {
-            showProfile = true
-        } label: {
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(Color.customButton)
-                .padding(.trailing, 4)
-        }
-    }
-
-    private var tabTitle: String {
-        switch selectedTab {
-        case 0: return "Dashboard"
-        case 1: return "Management"
-        case 2: return "Catalogue"
-        case 3: return "Finance"
-        default: return ""
-        }
-    }
-
+    
     private func fetchBookRequests() async {
-        guard !Task.isCancelled else { return }
-        isLoading = true
-        defer { isLoading = false }
-        
         do {
             let client = SupabaseManager.shared.client
             let response: [BookRequest] = try await client
@@ -325,5 +325,4 @@ struct AdminDashboardView: View {
 
 #Preview {
     AdminDashboardView()
-        .environment(\.colorScheme, .light)
 }

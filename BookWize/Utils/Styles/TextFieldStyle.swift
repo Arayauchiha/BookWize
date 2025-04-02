@@ -29,17 +29,17 @@ struct CustomPasswordFieldStyle: ViewModifier {
                     isVisible.toggle()
                 }) {
                     Image(systemName: isVisible ? "eye.slash.fill" : "eye.fill")
-                        .foregroundStyle(Color.customText.opacity(0.4))
+                        .foregroundStyle(.secondary)
                         .frame(width: 20, height: 20)
                 }
                 .padding(.trailing, 12)
             }
         }
-        .background(Color.customInputBackground)
+        .background(Color(.systemBackground))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.customText.opacity(0.1), lineWidth: 1)
+                .stroke(Color(.separator), lineWidth: 0.5)
         )
     }
 }
@@ -47,11 +47,11 @@ struct CustomPasswordFieldStyle: ViewModifier {
 extension View {
     func customTextField() -> some View {
         self
-            .background(Color.customInputBackground)
+            .background(Color(.systemBackground))
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.customText.opacity(0.1), lineWidth: 1)
+                    .stroke(Color(.separator), lineWidth: 0.5)
             )
     }
 }

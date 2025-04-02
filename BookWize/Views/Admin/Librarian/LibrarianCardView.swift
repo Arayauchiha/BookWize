@@ -13,7 +13,7 @@ struct LibrarianCardView: View {
                 HStack {
                     Text(librarian.name)
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.customText)
+                        .foregroundStyle(Color.primary)
                     
                     Spacer()
                     
@@ -35,19 +35,18 @@ struct LibrarianCardView: View {
                     Text(formatPhoneNumber(librarian.phone))
                 }
                 .font(.system(size: 15))
-                .foregroundStyle(Color.customText.opacity(0.6))
+                .foregroundStyle(.secondary)
                 
                 // Date added
                 Text("Added \(librarian.dateAdded.formatted(date: .abbreviated, time: .shortened))")
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.customText.opacity(0.4))
+                    .foregroundStyle(.secondary)
             }
-            .padding(16)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.customCardBackground)
-            )
+            .background(Color(uiColor: .secondarySystemGroupedBackground))
+            .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showDetail) {
@@ -77,122 +76,83 @@ struct LibrarianDetailView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(spacing: 16) {
                     // Profile header
-                    HStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         Circle()
                             .fill(Color.librarianColor)
-                            .frame(width: 70, height: 70)
+                            .frame(width: 80, height: 80)
                             .overlay(
                                 Text(String(librarian.name.prefix(1).uppercased()))
-                                    .font(.title)
-                                    .fontWeight(.bold)
+                                    .font(.system(size: 32, weight: .bold))
                                     .foregroundColor(.white)
                             )
                         
-                        VStack(alignment: .leading, spacing: 5) {
+                        VStack(spacing: 4) {
                             Text(librarian.name)
                                 .font(.title3)
                                 .fontWeight(.bold)
-                            
-                            HStack {
-                                Text("Librarian")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
                                 
-                                Spacer()
-                                
-                                Text(librarian.status.rawValue)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(librarian.status.color)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        Capsule()
-                                            .fill(librarian.status.color.opacity(0.15))
-                                    )
-                            }
+                            Text("Librarian")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                    }
-                    .padding(.horizontal)
-                    
-                    Divider()
-                        .padding(.vertical, 10)
-                    
-                    // Contact information
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Contact Information")
-                            .font(.headline)
-                            .padding(.horizontal)
                         
-                        VStack(spacing: 12) {
-                            HStack {
-                                Label("Email", systemImage: "envelope")
-                                    .frame(width: 100, alignment: .leading)
-                                
-                                Text(librarian.email)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                            }
-                            
-                            HStack {
-                                Label("Phone", systemImage: "phone")
-                                    .frame(width: 100, alignment: .leading)
-                                
-                                Text(formatPhoneNumber(librarian.phone))
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                            }
-                            
-                            HStack {
-                                Label("Age", systemImage: "person")
-                                    .frame(width: 100, alignment: .leading)
-                                
-                                Text("\(librarian.age ?? 0)")
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                            }
-                        }
-                        .padding(.horizontal)
+                        Text(librarian.status.rawValue)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(librarian.status.color)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(librarian.status.color.opacity(0.15))
+                            )
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
                     
-                    Divider()
-                        .padding(.vertical, 10)
+                    // Contact information section
+                    Text("Contact Information")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
                     
-                    // Account Information
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Account Information")
-                            .font(.headline)
-                            .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 0) {
+                        DetailsRow(icon: "envelope", title: "Email", value: librarian.email)
                         
-                        VStack(spacing: 12) {
-                            HStack {
-                                Label("Added On", systemImage: "calendar")
-                                    .frame(width: 100, alignment: .leading)
-                                
-                                Text(librarian.dateAdded.formatted(date: .long, time: .shortened))
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                            }
-                            
-                            HStack {
-                                Label("Status", systemImage: "circle.fill")
-                                    .frame(width: 100, alignment: .leading)
-                                
-                                Text(librarian.status.rawValue.capitalized)
-                                    .foregroundColor(librarian.status.color)
-                                
-                                Spacer()
-                            }
-                        }
-                        .padding(.horizontal)
+                        Divider()
+                            .padding(.leading, 56)
+                        
+                        DetailsRow(icon: "phone", title: "Phone", value: formatPhoneNumber(librarian.phone))
+                        
+                        Divider()
+                            .padding(.leading, 56)
+                        
+                        DetailsRow(icon: "person", title: "Age", value: "\(librarian.age ?? 0)")
                     }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .padding(.horizontal, 16)
                     
-                    Spacer(minLength: 30)
+                    // Account Information section
+                    Text("Account Information")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                    
+                    VStack(alignment: .leading, spacing: 0) {
+                        DetailsRow(icon: "calendar", title: "Added On", value: librarian.dateAdded.formatted(date: .long, time: .shortened))
+                        
+                        Divider()
+                            .padding(.leading, 56)
+                        
+                        DetailsRow(icon: "circle.fill", title: "Status", value: librarian.status.rawValue.capitalized, valueColor: librarian.status.color)
+                    }
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .padding(.horizontal, 16)
                     
                     // Delete button
                     Button(action: {
@@ -204,7 +164,9 @@ struct LibrarianDetailView: View {
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             } else {
                                 Image(systemName: "trash")
+                                    .font(.system(size: 16))
                                 Text("Delete Librarian")
+                                    .font(.system(size: 17, weight: .regular))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -212,9 +174,11 @@ struct LibrarianDetailView: View {
                         .background(Color.red)
                         .foregroundColor(.white)
                         .cornerRadius(10)
-                        .padding(.horizontal)
                     }
                     .disabled(isDeleting)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                     
                     if let errorMessage = errorMessage {
                         Text(errorMessage)
@@ -223,8 +187,9 @@ struct LibrarianDetailView: View {
                             .padding(.horizontal)
                     }
                 }
-                .padding(.vertical)
+                .padding(.top, 16)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Librarian Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -251,14 +216,17 @@ struct LibrarianDetailView: View {
         }
     }
     
+    private func formatPhoneNumber(_ phone: String?) -> String {
+        guard let phone = phone else { return "N/A" }
+        return phone
+    }
+    
     private func deleteLibrarian() {
         isDeleting = true
-        errorMessage = nil
         
         Task {
             do {
-                // Delete the librarian from Supabase
-                try await SupabaseManager.shared.client.database
+                try await SupabaseManager.shared.client
                     .from("Users")
                     .delete()
                     .eq("email", value: librarian.email)
@@ -266,20 +234,41 @@ struct LibrarianDetailView: View {
                 
                 await MainActor.run {
                     isDeleting = false
-                    showSuccessAlert = true // Only show the alert, don't dismiss yet
+                    showSuccessAlert = true
                 }
             } catch {
                 await MainActor.run {
                     isDeleting = false
-                    errorMessage = "Failed to delete: \(error.localizedDescription)"
+                    errorMessage = "Failed to delete librarian: \(error.localizedDescription)"
                 }
             }
         }
     }
+}
+
+struct DetailsRow: View {
+    let icon: String
+    let title: String
+    let value: String
+    var valueColor: Color = .primary
     
-    private func formatPhoneNumber(_ phone: String?) -> String {
-        guard let phone = phone else { return "N/A" }
-        // Use abs to ensure we don't have negative numbers with hyphens
-        return phone // Format without commas and ensure positive
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(.secondary)
+                .frame(width: 28, height: 28)
+                .padding(.leading, 16)
+            
+            Text(title)
+                .foregroundColor(.primary)
+            
+            Spacer()
+            
+            Text(value)
+                .foregroundColor(valueColor)
+                .padding(.trailing, 16)
+        }
+        .padding(.vertical, 12)
     }
 }

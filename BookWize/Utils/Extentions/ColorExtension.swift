@@ -1,25 +1,29 @@
 import SwiftUI
 
 extension Color {
-    static let customBackground = Color(hex: "F2F2F7")  // iOS system background
-    static let customCardBackground = Color(hex: "FFFFFF")  // iOS card background
-    static let customInputBackground = Color(hex: "FFFFFF")  // Input background (White)
-    static let customText = Color(hex: "1C1C1E")  // iOS dark text
-    static let customButton = Color(hex: "003D5B")  // Dark blue
+    // System adaptive colors that respond to dark/light mode
+    static let customBackground = Color(.systemGroupedBackground)
+    static let customCardBackground = Color(.secondarySystemGroupedBackground)
+    static let customInputBackground = Color(.systemBackground)
+    static let customText = Color(.label)
     
-    // Role colors - variations of the theme color
-    static let memberColor = Color(hex: "003D5B")  // Theme color
-    static let librarianColor = Color(hex: "004D6D")  // Slightly lighter
-    static let adminColor = Color(hex: "002D4D")  // Slightly darker
+    // Bright vibrant colors that work well in both light and dark modes
+    static let memberColor = Color(hexString: "0078D7")      // Bright azure blue
+    static let librarianColor = Color(hexString: "0091EA")   // Bright sky blue
+    static let adminColor = Color(hexString: "005FB8")       // Bright royal blue
+    
+    // Use the bright blue as the main button color
+    static let customButtonColor = Color(hexString: "0078D7")
+    
+    // For backward compatibility
+    static let customButton = customButtonColor
     
     static let iconBackgroundOpacity: Double = 0.15
     static let secondaryIconOpacity: Double = 0.6
-}
-
-// Proper initializer for hex colors
-extension Color {
-    func color(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+    
+    // Hex color initializer
+    init(hexString: String) {
+        let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
         
@@ -35,7 +39,7 @@ extension Color {
             (a, r, g, b) = (255, 0, 0, 0)
         }
         
-        type(of: self).init(
+        self.init(
             .sRGB,
             red: Double(r) / 255,
             green: Double(g) / 255,
