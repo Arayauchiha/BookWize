@@ -1,5 +1,6 @@
 import Supabase
 import Foundation
+import UIKit
 
 
     func issueBook(_ issuedBook: issueBooks, completion: @escaping (Bool) -> Void) {
@@ -43,7 +44,8 @@ import Foundation
                 // Commit the transaction
                 try await SupabaseManager.shared.client.rpc("commit_transaction")
                 
-                DispatchQueue.main.async {
+                await MainActor.run {
+                    HapticManager.success()
                     completion(true)
                 }
             } catch {
@@ -51,7 +53,8 @@ import Foundation
                 // Rollback the transaction if it was started
                 try? await SupabaseManager.shared.client.rpc("rollback_transaction")
                 
-                DispatchQueue.main.async {
+                await MainActor.run {
+                    HapticManager.error()
                     completion(false)
                 }
             }
@@ -67,7 +70,7 @@ import Foundation
 ////                    .select()
 ////                    .execute()
 ////                    .value
-////                
+////
 ////                DispatchQueue.main.async {
 ////                    completion(issuedBooks)
 ////                }
@@ -95,6 +98,7 @@ class IssuedBookManager: ObservableObject {
         await MainActor.run {
             isLoading = true
             errorMessage = nil
+            HapticManager.lightImpact()
         }
         
         do {
@@ -131,11 +135,13 @@ class IssuedBookManager: ObservableObject {
                 await MainActor.run {
                     self.loans = issuedBooks
                     self.isLoading = false
+                    HapticManager.success()
                 }
             } else {
                 await MainActor.run {
                     errorMessage = "Unable to parse response data"
                     isLoading = false
+                    HapticManager.error()
                 }
             }
         } catch {
@@ -143,6 +149,7 @@ class IssuedBookManager: ObservableObject {
             await MainActor.run {
                 errorMessage = "Failed to fetch issued books: \(error.localizedDescription)"
                 isLoading = false
+                HapticManager.error()
             }
         }
     }

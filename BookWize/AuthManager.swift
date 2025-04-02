@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 class AuthManager: ObservableObject {
     static let shared = AuthManager()
@@ -42,7 +43,15 @@ class AuthManager: ObservableObject {
         BookWize Team
         """
         
-        return await emailService.sendEmail(to: email, subject: subject, body: body)
+        let success = await emailService.sendEmail(to: email, subject: subject, body: body)
+        await MainActor.run {
+            if success {
+                HapticManager.success()
+            } else {
+                HapticManager.error()
+            }
+        }
+        return success
     }
     
     // Send librarian credentials
@@ -63,12 +72,21 @@ class AuthManager: ObservableObject {
         BookWize Admin Team
         """
         
-        return await emailService.sendEmail(to: email, subject: subject, body: body)
+        let success = await emailService.sendEmail(to: email, subject: subject, body: body)
+        await MainActor.run {
+            if success {
+                HapticManager.success()
+            } else {
+                HapticManager.error()
+            }
+        }
+        return success
     }
     
     // Verify OTP
     func verifyOTP(email: String, enteredOTP: String) -> Bool {
         guard let storedOTP = otpStore[email] else {
+            HapticManager.error()
             return false
         }
         
@@ -76,6 +94,9 @@ class AuthManager: ObservableObject {
         
         if (isValid) {
             otpStore.removeValue(forKey: email)
+            HapticManager.success()
+        } else {
+            HapticManager.error()
         }
         
         return isValid

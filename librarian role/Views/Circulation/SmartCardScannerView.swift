@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 struct SmartCardScannerView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -36,15 +37,18 @@ struct SmartCardScannerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        HapticManager.lightImpact()
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
             }
             .onAppear {
+                HapticManager.mediumImpact()
                 scannerModel.checkPermissions()
             }
             .onChange(of: scannerModel.scannedCode) { newValue in
                 if let code = newValue {
+                    HapticManager.success()
                     onScan(code)
                     presentationMode.wrappedValue.dismiss()
                 }
@@ -70,29 +74,49 @@ class SmartCardScannerModel: NSObject, ObservableObject, AVCaptureMetadataOutput
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 if granted {
                     DispatchQueue.main.async {
+                        HapticManager.success()
                         self?.startSession()
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        HapticManager.error()
                     }
                 }
             }
-        default:
+        case .denied, .restricted:
+            DispatchQueue.main.async {
+                HapticManager.error()
+            }
+        @unknown default:
             break
         }
     }
     
     private func setupCaptureSession() {
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else { return }
+        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+            DispatchQueue.main.async {
+                HapticManager.error()
+            }
+            return
+        }
         
         let videoInput: AVCaptureDeviceInput
         
         do {
             videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
         } catch {
+            DispatchQueue.main.async {
+                HapticManager.error()
+            }
             return
         }
         
         if session.canAddInput(videoInput) {
             session.addInput(videoInput)
         } else {
+            DispatchQueue.main.async {
+                HapticManager.error()
+            }
             return
         }
         
@@ -104,6 +128,9 @@ class SmartCardScannerModel: NSObject, ObservableObject, AVCaptureMetadataOutput
             metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
             metadataOutput.metadataObjectTypes = [.qr, .code128, .code39, .code93, .ean8, .ean13, .pdf417]
         } else {
+            DispatchQueue.main.async {
+                HapticManager.error()
+            }
             return
         }
     }
@@ -123,4 +150,4 @@ class SmartCardScannerModel: NSObject, ObservableObject, AVCaptureMetadataOutput
             scannedCode = stringValue
         }
     }
-} 
+}

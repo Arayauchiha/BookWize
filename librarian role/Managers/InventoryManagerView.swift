@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 let SHOW_FINES = true // MAKE THIS TRUE - SPRINT - 2: Isko true kiya toh sara maal wapais aa jayega - @rtk-rnjn
 
@@ -16,15 +17,24 @@ struct InventoryManagerView: View {
                         .tabItem {
                             Label("Inventory", systemImage: "books.vertical.fill")
                         }
+                        .onAppear {
+                            HapticManager.lightImpact()
+                        }
                     
                     BookCirculationView()
                         .tabItem {
                             Label("Circulation", systemImage: "arrow.left.arrow.right.circle.fill")
                         }
+                        .onAppear {
+                            HapticManager.lightImpact()
+                        }
                     
                     MembersListView()
                         .tabItem {
                             Label("Members", systemImage: "person.2.fill")
+                        }
+                        .onAppear {
+                            HapticManager.lightImpact()
                         }
                     
                     if SHOW_FINES {
@@ -32,11 +42,17 @@ struct InventoryManagerView: View {
                             .tabItem {
                                 Label("Dashboard", systemImage: "dollarsign.circle.fill")
                             }
+                            .onAppear {
+                                HapticManager.lightImpact()
+                            }
                     }
                     
                     AccountView(isLoggedIn: $isLoggedIn)
                         .tabItem {
                             Label("Account", systemImage: "person.circle.fill")
+                        }
+                        .onAppear {
+                            HapticManager.lightImpact()
                         }
                 }
                 .tint(AppTheme.primaryColor)
@@ -61,7 +77,10 @@ struct InventoryManagerView: View {
                                 .foregroundColor(AppTheme.secondaryTextColor)
                         }
                         
-                        Button(action: { showingLoginSheet = true }) {
+                        Button(action: {
+                            HapticManager.mediumImpact()
+                            showingLoginSheet = true
+                        }) {
                             HStack {
                                 Image(systemName: "person.circle.fill")
                                 Text("Login as Librarian")
@@ -78,8 +97,11 @@ struct InventoryManagerView: View {
             }
         }
         .alert("Logout", isPresented: $showingLogoutAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {
+                HapticManager.lightImpact()
+            }
             Button("Logout", role: .destructive) {
+                HapticManager.mediumImpact()
                 isLoggedIn = false
             }
         } message: {
@@ -114,7 +136,6 @@ extension Color {
         )
     }
 }
-
 
 struct UserManagementView: View {
     var body: some View {

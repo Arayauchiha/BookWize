@@ -36,7 +36,10 @@ struct ISBNScannerView: View {
             
             VStack {
                 HStack {
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        HapticManager.lightImpact()
+                        dismiss()
+                    }) {
                         Image(systemName: "xmark")
                             .font(.title)
                             .foregroundColor(.white)
@@ -89,6 +92,7 @@ struct ISBNScannerView: View {
                     
                     HStack(spacing: 30) {
                         Button(action: {
+                            HapticManager.mediumImpact()
                             showBookPreview = false
                             scannerModel.resumeScanning()
                         }) {
@@ -100,6 +104,7 @@ struct ISBNScannerView: View {
                         }
                         
                         Button(action: {
+                            HapticManager.success()
                             onScan(scannerModel.lastScannedCode ?? "")
                             dismiss()
                         }) {
@@ -115,13 +120,17 @@ struct ISBNScannerView: View {
             }
         }
         .onAppear {
+            HapticManager.mediumImpact()
             scannerModel.requestCameraPermission()
             scannerModel.onCodeScanned = { code in
+                HapticManager.success()
                 fetchBookData(isbn: code)
             }
         }
         .alert("Scanner Error", isPresented: $showAlert) {
-            Button("OK") { }
+            Button("OK") {
+                HapticManager.lightImpact()
+            }
         } message: {
             Text(alertMessage)
         }
@@ -135,6 +144,7 @@ struct ISBNScannerView: View {
         // Create a URL for the Google Books API
         let urlString = "https://www.googleapis.com/books/v1/volumes?q=isbn:\(isbn)"
         guard let url = URL(string: urlString) else {
+            HapticManager.error()
             showError("Invalid ISBN format")
             return
         }
@@ -143,6 +153,7 @@ struct ISBNScannerView: View {
             if let error = error {
                 DispatchQueue.main.async {
                     isLoading = false
+                    HapticManager.error()
                     showError("Network error: \(error.localizedDescription)")
                 }
                 return
@@ -151,6 +162,7 @@ struct ISBNScannerView: View {
             guard let data = data else {
                 DispatchQueue.main.async {
                     isLoading = false
+                    HapticManager.error()
                     showError("No data received")
                 }
                 return
@@ -183,6 +195,7 @@ struct ISBNScannerView: View {
                         downloadBookImage(from: imageURL) { image in
                             DispatchQueue.main.async {
                                 isLoading = false
+                                HapticManager.success()
                                 bookImage = image
                                 bookTitle = title
                                 showBookPreview = true
@@ -191,6 +204,7 @@ struct ISBNScannerView: View {
                     } else {
                         DispatchQueue.main.async {
                             isLoading = false
+                            HapticManager.success()
                             bookTitle = title
                             showBookPreview = true
                         }
@@ -198,12 +212,14 @@ struct ISBNScannerView: View {
                 } else {
                     DispatchQueue.main.async {
                         isLoading = false
+                        HapticManager.error()
                         showError("No book found with ISBN: \(isbn)")
                     }
                 }
             } catch {
                 DispatchQueue.main.async {
                     isLoading = false
+                    HapticManager.error()
                     showError("Error parsing data: \(error.localizedDescription)")
                 }
             }

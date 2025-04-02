@@ -32,6 +32,7 @@ struct ReservedBookView: View {
         mainContent
             .searchable(text: $searchText, prompt: "Search reservations")
             .refreshable {
+                HapticManager.mediumImpact()
                 isLoading = true
                 await fetchReservations()
                 await checkExpiredReservations()
@@ -48,6 +49,7 @@ struct ReservedBookView: View {
                 cleanupTimer = nil
             }
             .onChange(of: searchText) { _ in
+                HapticManager.lightImpact()
                 Task {
                     await fetchReservations()
                 }
@@ -57,6 +59,7 @@ struct ReservedBookView: View {
                     ReservationDetailSheet(
                         reservation: reservation,
                         issueAction: {
+                            HapticManager.mediumImpact()
                             showingDetail = false
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                 showIssueConfirmation = true
@@ -66,8 +69,11 @@ struct ReservedBookView: View {
                 }
             }
             .alert("Issue Book", isPresented: $showIssueConfirmation) {
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) {
+                    HapticManager.lightImpact()
+                }
                 Button("Issue") {
+                    HapticManager.mediumImpact()
                     if let reservation = selectedReservation {
                         Task {
                             await issueReservedBook(reservation: reservation)
@@ -82,7 +88,9 @@ struct ReservedBookView: View {
                 }
             }
             .alert("Success", isPresented: $showSuccessAlert) {
-                Button("OK") { }
+                Button("OK") {
+                    HapticManager.success()
+                }
             } message: {
                 Text("Book has been successfully issued!")
             }
@@ -90,7 +98,10 @@ struct ReservedBookView: View {
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {
-                Button("OK") { errorMessage = nil }
+                Button("OK") {
+                    HapticManager.lightImpact()
+                    errorMessage = nil
+                }
             } message: {
                 Text(errorMessage ?? "An error occurred")
             }
@@ -259,200 +270,23 @@ struct ReservedBookView: View {
         }
     }
     
-    //MARK: - issue reserved books:
-//    func issueReservedBook(reservation: ReservationRecord) async {
-//        guard let book = reservation.book, let member = reservation.member else {
-//            errorMessage = "Missing book or member information"
-//            return
-//        }
-//        
-//        isLoading = true
-//        
-//        do {
-//            // First, check if the book exists and has available quantity
-//            struct BookQuantity: Codable {
-//                let availableQuantity: Int
-//            }
-//            
-//            let response: BookQuantity = try await supabase
-//                .from("Books")
-//                .select("availableQuantity")
-//                .eq("id", value: book.id.uuidString)
-//                .single()
-//                .execute()
-//                .value
-//            
-//            // Print the data for debugging
-//            print("Book query response: \(response)")
-//            
-//            let currentQuantity = response.availableQuantity
-//            
-//            // Check if there are books available
-//            guard currentQuantity > 0 else {
-//                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No books available"])
-//            }
-//            
-//            // Create the issueBooks object
-//            let issueDate = Date()
-//            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
-//            
-//            let newIssue = issueBooks(
-//                id: UUID(),
-//                isbn: book.isbn ?? "",
-//                memberEmail: member.email,
-//                issueDate: issueDate,
-//                returnDate: returnDate
-//            )
-//            
-//            // Start a transaction using the same client
-//            try await supabase.rpc("begin_transaction")
-//            
-//            // Insert the issued book record
-//            try await supabase
-//                .from("issuebooks")
-//                .insert(newIssue)
-//                .execute()
-//            
-//            // Update the available quantity
-//            try await supabase
-//                .from("Books")
-//                .update(["availableQuantity": currentQuantity - 1])
-//                .eq("id", value: book.id.uuidString)
-//                .execute()
-//            
-//            // Delete the reservation
-//            try await supabase
-//                .from("BookReservation")
-//                .delete()
-//                .eq("id", value: reservation.id.uuidString)
-//                .execute()
-//            
-//            // Commit the transaction
-//            try await supabase.rpc("commit_transaction")
-//            
-//            await MainActor.run {
-//                isLoading = false
-//                issuedReservationId = reservation.id
-//                showSuccessAlert = true
-//                
-//                // Remove the issued book from the local array
-//                reservations.removeAll(where: { $0.id == reservation.id })
-//            }
-//        } catch {
-//            // Rollback the transaction if it was started
-//            try? await supabase.rpc("rollback_transaction")
-//            
-//            await MainActor.run {
-//                print("Error issuing book: \(error)")
-//                errorMessage = "Failed to issue book: \(error.localizedDescription)"
-//                isLoading = false
-//            }
-//        }
-//    }
-//    
-//    func issueReservedBook(reservation: ReservationRecord) async {
-//        guard let book = reservation.book, let member = reservation.member else {
-//            errorMessage = "Missing book or member information"
-//            return
-//        }
-//        
-//        isLoading = true
-//        
-//        do {
-//            // Create the issueBooks object
-//            let issueDate = Date()
-//            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
-//            
-//            let newIssue = issueBooks(
-//                id: UUID(),
-//                isbn: book.isbn ?? "",
-//                memberEmail: member.email,
-//                issueDate: issueDate,
-//                returnDate: returnDate,
-//                actualReturnedDate: nil
-//            )
-//            
-//            // Start a transaction using the same client
-//            try await supabase.rpc("begin_transaction")
-//            
-//            // Insert the issued book record
-//            try await supabase
-//                .from("issuebooks")
-//                .insert(newIssue)
-//                .execute()
-//            
-//            // Query current quantity (we still need this to keep track)
-//            struct BookQuantity: Codable {
-//                let availableQuantity: Int
-//            }
-//            
-//            let response: BookQuantity = try await supabase
-//                .from("Books")
-//                .select("availableQuantity")
-//                .eq("id", value: book.id.uuidString)
-//                .single()
-//                .execute()
-//                .value
-//            
-//            let currentQuantity = response.availableQuantity
-//            
-//            // Update the available quantity only if it's greater than 0
-//            // This prevents negative quantities but allows issuing reserved books
-//            if currentQuantity > 0 {
-//                try await supabase
-//                    .from("Books")
-//                    .update(["availableQuantity": currentQuantity - 1])
-//                    .eq("id", value: book.id.uuidString)
-//                    .execute()
-//            }
-//            
-//            // Delete the reservation
-//            try await supabase
-//                .from("BookReservation")
-//                .delete()
-//                .eq("id", value: reservation.id.uuidString)
-//                .execute()
-//            
-//            // Commit the transaction
-//            try await supabase.rpc("commit_transaction")
-//            
-//            await MainActor.run {
-//                isLoading = false
-//                issuedReservationId = reservation.id
-//                showSuccessAlert = true
-//                
-//                // Remove the issued book from the local array
-//                reservations.removeAll(where: { $0.id == reservation.id })
-//            }
-//        } catch {
-//            // Rollback the transaction if it was started
-//            try? await supabase.rpc("rollback_transaction")
-//            
-//            await MainActor.run {
-//                print("Error issuing book: \(error)")
-//                errorMessage = "Failed to issue book: \(error.localizedDescription)"
-//                isLoading = false
-//            }
-//        }
-//    }
-//    
-    
     func issueReservedBook(reservation: ReservationRecord) async {
         guard let book = reservation.book, let member = reservation.member else {
+            HapticManager.error()
             errorMessage = "Missing book or member information"
             return
         }
         
         isLoading = true
+        HapticManager.mediumImpact()
         
         do {
             // Check how many books the member has already issued
-            // Using filter() to check for null values
             let countResponse = try await supabase
                 .from("issuebooks")
                 .select("id", count: .exact)
                 .eq("member_email", value: member.email)
-                .filter("actual_returned_date", operator: "is", value: "null") // Correct syntax for null check
+                .filter("actual_returned_date", operator: "is", value: "null")
                 .execute()
             
             let currentlyIssuedCount = countResponse.count ?? 0
@@ -460,6 +294,7 @@ struct ReservedBookView: View {
             // Check if the member has reached the limit
             if currentlyIssuedCount >= 5 {
                 await MainActor.run {
+                    HapticManager.error()
                     errorMessage = "Member has reached the maximum limit of 5 issued books"
                     isLoading = false
                 }
@@ -526,6 +361,7 @@ struct ReservedBookView: View {
             await MainActor.run {
                 isLoading = false
                 issuedReservationId = reservation.id
+                HapticManager.success()
                 showSuccessAlert = true
                 
                 // Remove the issued book from the local array
@@ -537,6 +373,7 @@ struct ReservedBookView: View {
             
             await MainActor.run {
                 print("Error issuing book: \(error)")
+                HapticManager.error()
                 errorMessage = "Failed to issue book: \(error.localizedDescription)"
                 isLoading = false
             }
@@ -641,7 +478,10 @@ struct ReservedBookView: View {
                 }
                 
                 // Action Button
-                Button(action: issueAction){
+                Button(action: {
+                    HapticManager.mediumImpact()
+                    issueAction()
+                }){
                     Text("Issue Book")
                         .font(.subheadline)
                         .fontWeight(.medium)
@@ -819,7 +659,10 @@ struct ReservedBookView: View {
                         }
                         
                         // Action Button
-                        Button(action: issueAction) {
+                        Button(action: {
+                            HapticManager.mediumImpact()
+                            issueAction()
+                        }) {
                             Text("Issue Book")
                                 .font(.headline)
                                 .foregroundColor(.white)
@@ -837,7 +680,10 @@ struct ReservedBookView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") { dismiss() }
+                        Button("Done") {
+                            HapticManager.lightImpact()
+                            dismiss()
+                        }
                     }
                 }
                 .onAppear {

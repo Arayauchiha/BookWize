@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 class DashboardManager: ObservableObject {
     @Published private(set) var overdueMembersCount: Int = 0
@@ -24,6 +25,11 @@ class DashboardManager: ObservableObject {
         await fetchRevenueAndFines()
         await fetchActiveLibrariansCount()
         await loadBooksFromSupabase()
+        
+        // Provide feedback when all data is loaded
+        await MainActor.run {
+            HapticManager.success()
+        }
     }
     
     private func fetchOverdueMembersCount() async {
@@ -35,17 +41,23 @@ class DashboardManager: ObservableObject {
             let overdueMembers: [OverdueMember] = try await SupabaseManager.shared.client
                 .from("Members")
                 .select("fine")
-                .gt("fine", value: 0) // Fetch members who have a fine greater than 0
+                .gt("fine", value: 0)
                 .execute()
                 .value
             
             await MainActor.run {
                 self.overdueMembersCount = overdueMembers.count
+                if overdueMembers.count > 0 {
+                    HapticManager.warning()
+                }
             }
             
             print("Fetched overdue members count: \(overdueMembers.count)")
         } catch {
             print("Error fetching overdue members count: \(error)")
+            await MainActor.run {
+                HapticManager.error()
+            }
         }
     }
     
@@ -157,9 +169,15 @@ class DashboardManager: ObservableObject {
             await MainActor.run {
                 self.totalRevenue = totalAmount
                 self.overdueFines = totalFines
+                if totalFines > 0 {
+                    HapticManager.warning()
+                }
             }
         } catch {
             print("Error fetching revenue and fines: \(error)")
+            await MainActor.run {
+                HapticManager.error()
+            }
         }
     }
 
@@ -202,9 +220,13 @@ class DashboardManager: ObservableObject {
             
             await MainActor.run {
                 self.books = books
+                HapticManager.mediumImpact()
             }
         } catch {
             print("Error loading books from Supabase: \(error)")
+            await MainActor.run {
+                HapticManager.error()
+            }
         }
     }
     
@@ -244,4 +266,4 @@ class DashboardManager: ObservableObject {
         
         return genreIssues.sorted { $0.value > $1.value }
     }
-} 
+}

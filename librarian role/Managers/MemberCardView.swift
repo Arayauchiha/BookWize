@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MemberCardView: View {
     let member: User
@@ -13,75 +14,43 @@ struct MemberCardView: View {
     }
     
     private var genderIcon: String {
+        let icon: String
         switch member.gender {
         case .male:
-            return "person.circle.fill"
+            icon = "person.circle.fill"
         case .female:
-            return "person.circle.fill"
+            icon = "person.circle.fill"
         case .other:
-            return "person.circle.fill"
+            icon = "person.circle.fill"
+        }
+        return icon
+    }
+    
+    private var avatarColor: Color {
+        switch member.gender {
+        case .male:
+            return .blue
+        case .female:
+            return .purple
+        case .other:
+            return .gray
         }
     }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header with Avatar and Name
-            HStack(spacing: 12) {
-                // Avatar
-                Image(systemName: genderIcon)
-                    .font(.system(size: 40))
-                    .foregroundStyle(member.gender == .male ? .blue :
-                                   member.gender == .female ? .purple : .gray)
-                    .frame(width: 60, height: 60)
-                    .background(Color(.systemGray6))
-                    .clipShape(Circle())
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(member.name)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    
-                    Text(member.email)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
+            MemberHeaderView(member: member, genderIcon: genderIcon, avatarColor: avatarColor)
             
             Divider()
             
-            // Member Details
-            VStack(alignment: .leading, spacing: 12) {
-                // Library Card
-                HStack {
-                    Image(systemName: "books.vertical.fill")
-                        .foregroundStyle(.blue)
-                    Text(member.selectedLibrary)
-                        .font(.subheadline)
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(Color(.systemGray6))
-                .cornerRadius(8)
-                
-                // Fine Status
-                HStack {
-                    Image(systemName: "dollarsign.circle.fill")
-                        .foregroundStyle(member.fine > 0 ? .red : .green)
-                    Text("Fine: ₹\(String(format: "%.2f", member.fine))")
-                        .font(.subheadline)
-                        .foregroundStyle(member.fine > 0 ? .red : .green)
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(member.fine > 0 ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
-                .cornerRadius(8)
-            }
+            MemberDetailsView(member: member)
         }
         .padding(16)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: Color(.systemGray4), radius: 5, x: 0, y: 2)
         .onTapGesture {
+            HapticManager.mediumImpact()
             showingEditSheet = true
         }
         .sheet(isPresented: $showingEditSheet) {
@@ -91,6 +60,7 @@ struct MemberCardView: View {
                 genderIcon: genderIcon,
                 onSave: updateName,
                 onCancel: {
+                    HapticManager.lightImpact()
                     showingEditSheet = false
                     editedName = member.name
                 }
@@ -107,6 +77,7 @@ struct MemberCardView: View {
         }
         .alert("Error", isPresented: .constant(errorMessage != nil)) {
             Button("OK") {
+                HapticManager.lightImpact()
                 errorMessage = nil
             }
         } message: {
@@ -123,16 +94,100 @@ struct MemberCardView: View {
                 .eq("id", value: member.id.uuidString)
                 .execute()
             
-            showingEditSheet = false
-            NotificationCenter.default.post(name: NSNotification.Name("RefreshMembers"), object: nil)
+            await MainActor.run {
+                HapticManager.success()
+                showingEditSheet = false
+                NotificationCenter.default.post(name: NSNotification.Name("RefreshMembers"), object: nil)
+            }
         } catch {
             print("Update error:", error)
-            errorMessage = "Failed to update name: \(error.localizedDescription)"
+            await MainActor.run {
+                HapticManager.error()
+                errorMessage = "Failed to update name: \(error.localizedDescription)"
+            }
         }
         isLoading = false
     }
 }
 
+// MARK: - Member Header View
+private struct MemberHeaderView: View {
+    let member: User
+    let genderIcon: String
+    let avatarColor: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: genderIcon)
+                .font(.system(size: 40))
+                .foregroundStyle(avatarColor)
+                .frame(width: 60, height: 60)
+                .background(Color(.systemGray6))
+                .clipShape(Circle())
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(member.name)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                
+                Text(member.email)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Member Details View
+private struct MemberDetailsView: View {
+    let member: User
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            LibraryCardView(member: member)
+            FineStatusView(member: member)
+        }
+    }
+}
+
+// MARK: - Library Card View
+private struct LibraryCardView: View {
+    let member: User
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "books.vertical.fill")
+                .foregroundStyle(.blue)
+            Text(member.selectedLibrary)
+                .font(.subheadline)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color(.systemGray6))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Fine Status View
+private struct FineStatusView: View {
+    let member: User
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "dollarsign.circle.fill")
+                .foregroundStyle(member.fine > 0 ? .red : .green)
+            Text("Fine: ₹\(String(format: "%.2f", member.fine))")
+                .font(.subheadline)
+                .foregroundStyle(member.fine > 0 ? .red : .green)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(member.fine > 0 ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+        .cornerRadius(8)
+    }
+}
+
+// MARK: - Edit Member Sheet
 struct EditMemberSheet: View {
     let member: User
     @Binding var editedName: String
@@ -183,6 +238,7 @@ struct EditMemberSheet: View {
     }
 }
 
+// MARK: - Info Row
 struct InfoRow: View {
     let icon: String
     let text: String

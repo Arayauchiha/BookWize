@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 class InventoryManager: ObservableObject {
     @Published private(set) var books: [Book] = []
@@ -17,8 +18,6 @@ class InventoryManager: ObservableObject {
     
     // MARK: - Book Management
     
-
-    
     func addBook(_ book: Book) {
         if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
             // Update existing book locally
@@ -35,8 +34,14 @@ class InventoryManager: ObservableObject {
                         .eq("isbn", value: book.isbn)
                         .execute()
                     saveBooks()
+                    await MainActor.run {
+                        HapticManager.success()
+                    }
                 } catch {
                     print("Error updating book in Supabase: \(error)")
+                    await MainActor.run {
+                        HapticManager.error()
+                    }
                 }
             }
         } else {
@@ -51,13 +56,18 @@ class InventoryManager: ObservableObject {
                         .insert(book)
                         .execute()
                     saveBooks()
+                    await MainActor.run {
+                        HapticManager.success()
+                    }
                 } catch {
                     print("Error inserting book in Supabase: \(error)")
+                    await MainActor.run {
+                        HapticManager.error()
+                    }
                 }
             }
         }
     }
-    
     
     func removeBook(isbn: String) {
         books.removeAll { $0.isbn == isbn }
@@ -71,11 +81,21 @@ class InventoryManager: ObservableObject {
         
         // Delete from Supabase
         Task {
-            try! await SupabaseManager.shared.client
-                .from("Books")
-                .delete()
-                .eq("isbn", value: isbn)
-                .execute()
+            do {
+                try await SupabaseManager.shared.client
+                    .from("Books")
+                    .delete()
+                    .eq("isbn", value: isbn)
+                    .execute()
+                await MainActor.run {
+                    HapticManager.success()
+                }
+            } catch {
+                print("Error deleting book from Supabase: \(error)")
+                await MainActor.run {
+                    HapticManager.error()
+                }
+            }
         }
         
         saveBooks()
@@ -88,11 +108,21 @@ class InventoryManager: ObservableObject {
             
             // Update in Supabase
             Task {
-                try! await SupabaseManager.shared.client
-                    .from("Books")
-                    .update(book)
-                    .eq("isbn", value: book.isbn)
-                    .execute()
+                do {
+                    try await SupabaseManager.shared.client
+                        .from("Books")
+                        .update(book)
+                        .eq("isbn", value: book.isbn)
+                        .execute()
+                    await MainActor.run {
+                        HapticManager.success()
+                    }
+                } catch {
+                    print("Error updating book in Supabase: \(error)")
+                    await MainActor.run {
+                        HapticManager.error()
+                    }
+                }
             }
             
             saveBooks()
@@ -109,7 +139,9 @@ class InventoryManager: ObservableObject {
         if let data = image.jpegData(compressionQuality: 0.8) {
             if let directory = getImagesDirectory() {
                 let fileURL = directory.appendingPathComponent("\(isbn).jpg")
-                try? data.write(to: fileURL)
+                if (try? data.write(to: fileURL)) != nil {
+                    HapticManager.lightImpact()
+                }
             }
         }
     }
@@ -146,6 +178,7 @@ class InventoryManager: ObservableObject {
                   let self = self else {
                 DispatchQueue.main.async {
                     completion(nil)
+                    HapticManager.error()
                 }
                 return
             }
@@ -166,6 +199,9 @@ class InventoryManager: ObservableObject {
                             if let image = image {
                                 // Save the image
                                 self.saveBookImage(image, for: isbn)
+                                DispatchQueue.main.async {
+                                    HapticManager.success()
+                                }
                             }
                             DispatchQueue.main.async {
                                 completion(image)
@@ -174,16 +210,19 @@ class InventoryManager: ObservableObject {
                     } else {
                         DispatchQueue.main.async {
                             completion(nil)
+                            HapticManager.error()
                         }
                     }
                 } else {
                     DispatchQueue.main.async {
                         completion(nil)
+                        HapticManager.error()
                     }
                 }
             } catch {
                 DispatchQueue.main.async {
                     completion(nil)
+                    HapticManager.error()
                 }
             }
         }.resume()
@@ -195,6 +234,9 @@ class InventoryManager: ObservableObject {
                 completion(image)
             } else {
                 completion(nil)
+                DispatchQueue.main.async {
+                    HapticManager.error()
+                }
             }
         }.resume()
     }
@@ -228,8 +270,10 @@ class InventoryManager: ObservableObject {
                     }
                 }
             }
+            HapticManager.lightImpact()
         } catch {
             print("Error loading images: \(error)")
+            HapticManager.error()
         }
     }
     
@@ -238,6 +282,7 @@ class InventoryManager: ObservableObject {
     func importCSV(from url: URL) throws {
         let csvString = try String(contentsOf: url, encoding: .utf8)
         let rows = csvString.components(separatedBy: "\n")
+        var importCount = 0
         
         for row in rows.dropFirst() { // Skip header row
             let columns = row.components(separatedBy: ",")
@@ -275,10 +320,16 @@ class InventoryManager: ObservableObject {
                 pageCount: pageCount > 0 ? pageCount : nil,
                 categories: genre.isEmpty ? nil : [genre],
                 imageURL: imageURL.isEmpty ? nil : imageURL
-//                quantity: quantity // Avoid storing empty URLs
             )
             
             addBook(book)
+            importCount += 1
+        }
+        
+        if importCount > 0 {
+            HapticManager.success()
+        } else {
+            HapticManager.error()
         }
     }
 
@@ -287,6 +338,9 @@ class InventoryManager: ObservableObject {
     private func saveBooks() {
         if let encoded = try? JSONEncoder().encode(books) {
             UserDefaults.standard.set(encoded, forKey: saveKey)
+            HapticManager.lightImpact()
+        } else {
+            HapticManager.error()
         }
     }
     
@@ -294,6 +348,9 @@ class InventoryManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: saveKey),
            let decoded = try? JSONDecoder().decode([Book].self, from: data) {
             books = decoded
+            HapticManager.lightImpact()
+        } else {
+            HapticManager.error()
         }
     }
     
@@ -326,6 +383,7 @@ class InventoryManager: ObservableObject {
             }
             books[index] = book
             saveBooks()
+            HapticManager.mediumImpact()
         }
     }
     
@@ -342,9 +400,13 @@ class InventoryManager: ObservableObject {
             await MainActor.run {
                 self.books = books
                 self.saveBooks()
+                HapticManager.success()
             }
         } catch {
             print("Error loading books from Supabase: \(error)")
+            await MainActor.run {
+                HapticManager.error()
+            }
         }
     }
 }

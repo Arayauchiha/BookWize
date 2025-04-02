@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 class FineCalculator {
     static let shared = FineCalculator()
@@ -32,6 +33,7 @@ class FineCalculator {
     func calculateAndUpdateFines() async {
         do {
             print("Starting fine calculation...")
+            HapticManager.mediumImpact()
             
             // 1. Get per day fine from FineAndMembershipSet
             let fineSettings: [FineSettings] = try await SupabaseManager.shared.client
@@ -42,6 +44,7 @@ class FineCalculator {
             
             guard let perDayFine = fineSettings.first?.perDayFine else {
                 print("No fine settings found")
+                HapticManager.error()
                 return
             }
             
@@ -73,6 +76,8 @@ class FineCalculator {
             
             let dateFormatter3 = DateFormatter()
             dateFormatter3.dateFormat = "yyyy-MM-dd"
+            
+            var totalFinesCalculated = 0
             
             for book in issueBooks {
                 print("\nProcessing book ID: \(book.id)")
@@ -150,6 +155,7 @@ class FineCalculator {
                     let fine = Double(days) * perDayFine
                     let previousFine = memberFines[book.memberEmail] ?? 0
                     memberFines[book.memberEmail] = previousFine + fine
+                    totalFinesCalculated += 1
                     print("Calculated fine: \(fine)")
                     print("Previous fine: \(previousFine)")
                     print("Total fine for member: \(previousFine + fine)")
@@ -171,6 +177,7 @@ class FineCalculator {
                 .value
             
             // 5. Update fines for each member
+            var updateSuccessCount = 0
             for member in members {
                 let fine = memberFines[member.email] ?? 0.0
                 do {
@@ -179,16 +186,30 @@ class FineCalculator {
                         .update(["fine": fine])
                         .eq("email", value: member.email)
                         .execute()
+                    updateSuccessCount += 1
                     print("Updated fine for \(member.email) to \(fine)")
                 } catch {
                     print("Error updating member \(member.email):", error)
+                    HapticManager.error()
                 }
             }
             
             print("Fine calculation completed successfully")
             
+            // Provide appropriate haptic feedback based on results
+            await MainActor.run {
+                if totalFinesCalculated > 0 {
+                    HapticManager.warning()
+                } else if updateSuccessCount > 0 {
+                    HapticManager.success()
+                }
+            }
+            
         } catch {
             print("Error in fine calculation process:", error)
+            await MainActor.run {
+                HapticManager.error()
+            }
         }
     }
 }

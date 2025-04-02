@@ -1,5 +1,3 @@
-
-
 import SwiftUI
 import Supabase
 
@@ -49,9 +47,11 @@ struct RequestBookView: View {
             .navigationTitle("Request Item")
             .navigationBarItems(
                 leading: Button("Cancel") {
+                    HapticManager.lightImpact()
                     dismiss()
                 },
                 trailing: Button("Submit") {
+                    HapticManager.mediumImpact()
                     validateAndSubmit()
                 }
                 .disabled(!isFormValid || isSubmitting)
@@ -65,12 +65,17 @@ struct RequestBookView: View {
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {
-                Button("OK") { }
+                Button("OK") {
+                    HapticManager.lightImpact()
+                }
             } message: {
                 Text(errorMessage ?? "An unknown error occurred")
             }
             .alert("Success", isPresented: $showSuccessAlert) {
-                Button("OK") { dismiss() }
+                Button("OK") {
+                    HapticManager.success()
+                    dismiss()
+                }
             } message: {
                 Text("Book request submitted successfully!")
             }
@@ -78,6 +83,11 @@ struct RequestBookView: View {
         .onChange(of: quantityString) { newValue in
             if let number = Int(newValue) {
                 showQuantityError = number <= 0
+                if number <= 0 {
+                    HapticManager.error()
+                } else {
+                    HapticManager.success()
+                }
             }
         }
     }
@@ -85,10 +95,12 @@ struct RequestBookView: View {
     private func validateAndSubmit() {
         guard quantity > 0 else {
             showQuantityError = true
+            HapticManager.error()
             return
         }
         
         isSubmitting = true
+        HapticManager.mediumImpact()
         
         let request = BookRequest(
             Request_id: UUID(),
@@ -105,11 +117,13 @@ struct RequestBookView: View {
                 try await saveRequestToSupabase(request)
                 await MainActor.run {
                     isSubmitting = false
+                    HapticManager.success()
                     showSuccessAlert = true
                 }
             } catch {
                 await MainActor.run {
                     errorMessage = "Failed to submit request: \(error.localizedDescription)"
+                    HapticManager.error()
                     isSubmitting = false
                 }
             }

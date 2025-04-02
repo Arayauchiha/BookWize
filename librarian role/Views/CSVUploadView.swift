@@ -175,6 +175,7 @@ struct CSVUploadView: View {
                         
                         // Upload Button
                         Button(action: {
+                            HapticManager.mediumImpact()
                             showFilePicker = true
                         }) {
                             HStack {
@@ -201,6 +202,7 @@ struct CSVUploadView: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
+                            HapticManager.lightImpact()
                             dismiss()
                         }
                     }
@@ -215,9 +217,11 @@ struct CSVUploadView: View {
                         guard let file = files.first else { return }
                         Task {
                             isLoading = true
+                            HapticManager.mediumImpact()
                             do {
                                 // Start accessing the security-scoped resource
                                 guard file.startAccessingSecurityScopedResource() else {
+                                    HapticManager.error()
                                     throw NSError(domain: "FileError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Permission denied to access the file"])
                                 }
                                 
@@ -226,20 +230,25 @@ struct CSVUploadView: View {
                                 }
                                 
                                 try viewModel.importCSV(from: file)
+                                HapticManager.success()
                                 dismiss()
                             } catch {
+                                HapticManager.error()
                                 errorMessage = error.localizedDescription
                                 showError = true
                             }
                             isLoading = false
                         }
                     case .failure(let error):
+                        HapticManager.error()
                         errorMessage = error.localizedDescription
                         showError = true
                     }
                 }
                 .alert("Error", isPresented: $showError) {
-                    Button("OK", role: .cancel) { }
+                    Button("OK", role: .cancel) {
+                        HapticManager.lightImpact()
+                    }
                 } message: {
                     Text(errorMessage)
                 }

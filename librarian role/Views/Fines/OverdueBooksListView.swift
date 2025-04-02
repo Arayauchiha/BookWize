@@ -1,9 +1,16 @@
 import SwiftUI
+import UIKit
 
 struct OverdueBooksListView: View {
     @StateObject private var dashboardManager = DashboardManager()
     @State private var searchText = ""
-    @State private var membersWithFines: [User] = []
+    @State private var membersWithFines: [User] = [] {
+        didSet {
+            if !membersWithFines.isEmpty {
+                HapticManager.warning()
+            }
+        }
+    }
     @State private var isLoading = false
     @State private var errorMessage: String?
     
@@ -22,6 +29,9 @@ struct OverdueBooksListView: View {
             // Search Bar
             SearchBar(text: $searchText, placeholder: "Search by member name or email")
                 .padding()
+                .onChange(of: searchText) { newValue in
+                    HapticManager.lightImpact()
+                }
             
             // Summary Card
             VStack(alignment: .leading, spacing: 8) {
@@ -71,10 +81,15 @@ struct OverdueBooksListView: View {
         }
         .navigationTitle("Overdue Books")
         .refreshable {
+            HapticManager.mediumImpact()
             await fetchMembersWithFines()
         }
         .task {
+            HapticManager.lightImpact()
             await fetchMembersWithFines()
+        }
+        .onAppear {
+            HapticManager.lightImpact()
         }
     }
     
@@ -97,6 +112,7 @@ struct OverdueBooksListView: View {
             }
         } catch {
             await MainActor.run {
+                HapticManager.error()
                 self.errorMessage = "Failed to fetch members with fines: \(error.localizedDescription)"
                 self.isLoading = false
             }
@@ -122,6 +138,10 @@ struct OverdueBookRow: View {
                 .foregroundColor(.red)
         }
         .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            HapticManager.mediumImpact()
+        }
     }
 }
 

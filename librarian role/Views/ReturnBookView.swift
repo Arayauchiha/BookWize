@@ -91,6 +91,7 @@ struct ReturnBookView: View {
             
             VStack {
                 Button {
+                    HapticManager.mediumImpact()
                     showingReturnForm = true
                 } label: {
                     Label("Return Book", systemImage: "arrow.left.circle.fill")
@@ -105,6 +106,9 @@ struct ReturnBookView: View {
             }
         }
         .searchable(text: $searchText, prompt: "Search Returned Books")
+        .onChange(of: searchText) { _ in
+            HapticManager.lightImpact()
+        }
         .sheet(isPresented: $showingReturnForm) {
             ReturnBookFormView { returnedBook in
                 Task {
@@ -118,6 +122,7 @@ struct ReturnBookView: View {
         }
         .alert("Error", isPresented: .constant(circulationManager.errorMessage != nil)) {
             Button("OK") {
+                HapticManager.lightImpact()
                 circulationManager.errorMessage = nil
             }
         } message: {
@@ -261,6 +266,7 @@ struct ReturnBookFormView: View {
                     Text("Book Details")
                     Spacer()
                     Button(action: {
+                        HapticManager.mediumImpact()
                         showingScanner = true
                     }) {
                         Image(systemName: "barcode.viewfinder")
@@ -271,6 +277,7 @@ struct ReturnBookFormView: View {
                         .keyboardType(.numberPad)
                         .onChange(of: isbn) { newValue in
                             if !newValue.isEmpty {
+                                HapticManager.lightImpact()
                                 Task {
                                     await fetchBookDetails(isbn: newValue)
                                 }
@@ -280,6 +287,7 @@ struct ReturnBookFormView: View {
                     TextField("Enter Book Name", text: $bookName)
                         .onChange(of: bookName) { newValue in
                             if !newValue.isEmpty {
+                                HapticManager.lightImpact()
                                 Task {
                                     await fetchBookByName(name: newValue)
                                 }
@@ -291,6 +299,7 @@ struct ReturnBookFormView: View {
                     Text("Member Details")
                     Spacer()
                     Button(action: {
+                        HapticManager.mediumImpact()
                         showingSmartCardScanner = true
                     }) {
                         Image(systemName: "barcode.viewfinder")
@@ -301,6 +310,7 @@ struct ReturnBookFormView: View {
                         .keyboardType(.default)
                         .onChange(of: smartCardID) { newValue in
                             if !newValue.isEmpty {
+                                HapticManager.lightImpact()
                                 Task {
                                     await fetchMemberDetails(smartCardID: newValue)
                                 }
@@ -310,6 +320,7 @@ struct ReturnBookFormView: View {
                     TextField("Enter Member Name", text: $memberName)
                         .onChange(of: memberName) { newValue in
                             if !newValue.isEmpty {
+                                HapticManager.lightImpact()
                                 Task {
                                     await fetchMemberByName(name: newValue)
                                 }
@@ -325,6 +336,12 @@ struct ReturnBookFormView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .onChange(of: selectedCondition) { newValue in
+                        HapticManager.lightImpact()
+                        if newValue == .good {
+                            fineAmount = ""
+                        }
+                    }
                 }
                 
                 Section(header: Text("Fine Details")) {
@@ -339,6 +356,7 @@ struct ReturnBookFormView: View {
                         TextField("Enter Damage Fine Amount", text: $fineAmount)
                             .keyboardType(.decimalPad)
                             .onChange(of: fineAmount) { newValue in
+                                HapticManager.lightImpact()
                                 if !isValidFineAmount(newValue) {
                                     fineAmount = String(newValue.filter { "0123456789.".contains($0) })
                                 }
@@ -367,7 +385,10 @@ struct ReturnBookFormView: View {
                     }
                 }
                 
-                Button(action: returnBook) {
+                Button(action: {
+                    HapticManager.mediumImpact()
+                    returnBook()
+                }) {
                     Label("Return Book", systemImage: "arrow.left.circle.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
@@ -383,12 +404,14 @@ struct ReturnBookFormView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        HapticManager.lightImpact()
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
             }
             .sheet(isPresented: $showingScanner) {
                 ISBNScannerView { scannedISBN in
+                    HapticManager.success()
                     isbn = scannedISBN
                     Task {
                         await fetchBookDetails(isbn: scannedISBN)
@@ -397,15 +420,11 @@ struct ReturnBookFormView: View {
             }
             .sheet(isPresented: $showingSmartCardScanner) {
                 SmartCardScannerView { scannedCode in
+                    HapticManager.success()
                     smartCardID = scannedCode
                     Task {
                         await fetchMemberDetails(smartCardID: scannedCode)
                     }
-                }
-            }
-            .onChange(of: selectedCondition) { newCondition in
-                if newCondition == .good {
-                    fineAmount = ""
                 }
             }
             .overlay {
@@ -416,15 +435,11 @@ struct ReturnBookFormView: View {
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
                 Button("OK") {
+                    HapticManager.lightImpact()
                     errorMessage = nil
                 }
             } message: {
                 Text(errorMessage ?? "")
-            }
-            .task {
-                if !isbn.isEmpty && !smartCardID.isEmpty {
-                    await calculateDuesFine()
-                }
             }
         }
     }
@@ -436,6 +451,7 @@ struct ReturnBookFormView: View {
     private func returnBook() {
         circulationManager.isLoading = true
         circulationManager.errorMessage = nil
+        HapticManager.mediumImpact()
         
         Task {
             do {
@@ -469,6 +485,7 @@ struct ReturnBookFormView: View {
                 
                 DispatchQueue.main.async {
                     circulationManager.isLoading = false
+                    HapticManager.success()
                     presentationMode.wrappedValue.dismiss()
                 }
             } catch {
@@ -476,6 +493,7 @@ struct ReturnBookFormView: View {
                 
                 DispatchQueue.main.async {
                     circulationManager.errorMessage = "Failed to return book: \(error.localizedDescription)"
+                    HapticManager.error()
                     circulationManager.isLoading = false
                 }
             }

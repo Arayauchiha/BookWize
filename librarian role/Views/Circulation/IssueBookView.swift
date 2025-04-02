@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Supabase
+import UIKit
 
 struct IssueBookView: View {
     @StateObject private var circulationManager = IssuedBookManager.shared
@@ -54,6 +55,7 @@ struct IssueBookView: View {
             
             VStack {
                 Button {
+                    HapticManager.mediumImpact()
                     showingIssueForm = true
                 } label: {
                     Label("Issue Book", systemImage: "plus.circle.fill")
@@ -68,6 +70,9 @@ struct IssueBookView: View {
             }
         }
         .searchable(text: $searchText, prompt: "Search Issue Books")
+        .onChange(of: searchText) { newValue in
+            HapticManager.lightImpact()
+        }
         .sheet(isPresented: $showingIssueForm) {
             IssueBookFormView { newLoan in
                 Task {
@@ -80,6 +85,7 @@ struct IssueBookView: View {
         }
         .alert("Error", isPresented: .constant(circulationManager.errorMessage != nil)) {
             Button("OK") {
+                HapticManager.lightImpact()
                 circulationManager.errorMessage = nil
             }
         } message: {
@@ -226,6 +232,7 @@ struct IssueBookFormView: View {
                     Text("Book Details")
                     Spacer()
                     Button(action: {
+                        HapticManager.mediumImpact()
                         showingScanner = true
                     }) {
                         Image(systemName: "barcode.viewfinder")
@@ -253,6 +260,7 @@ struct IssueBookFormView: View {
                     Text("Member Details")
                     Spacer()
                     Button(action: {
+                        HapticManager.mediumImpact()
                         showingSmartCardScanner = true
                     }) {
                         Image(systemName: "barcode.viewfinder")
@@ -285,7 +293,10 @@ struct IssueBookFormView: View {
                 }
                 
                 // Issue Book Button
-                Button(action: issueBook) {
+                Button(action: {
+                    HapticManager.mediumImpact()
+                    issueBook()
+                }) {
                     Label("Issue Book", systemImage: "checkmark.circle.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
@@ -302,12 +313,14 @@ struct IssueBookFormView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        HapticManager.lightImpact()
                         presentationMode.wrappedValue.dismiss()
                     }
                 }
             }
             .alert("Success", isPresented: $showSuccessAlert) {
                 Button("OK") {
+                    HapticManager.success()
                     presentationMode.wrappedValue.dismiss()
                 }
             } message: {
@@ -316,6 +329,7 @@ struct IssueBookFormView: View {
             
             .sheet(isPresented: $showingScanner) {
                 ISBNScannerView { scannedISBN in
+                    HapticManager.mediumImpact()
                     isbn = scannedISBN
                     Task {
                         await fetchBookDetails(isbn: scannedISBN)
@@ -324,6 +338,7 @@ struct IssueBookFormView: View {
             }
             .sheet(isPresented: $showingSmartCardScanner) {
                 SmartCardScannerView { scannedCode in
+                    HapticManager.mediumImpact()
                     smartCardID = scannedCode
                     Task {
                         await fetchMemberDetails(smartCardID: scannedCode)
@@ -338,6 +353,7 @@ struct IssueBookFormView: View {
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
                 Button("OK") {
+                    HapticManager.lightImpact()
                     errorMessage = nil
                 }
             } message: {
@@ -366,6 +382,7 @@ struct IssueBookFormView: View {
             }
         } catch {
             await MainActor.run {
+                HapticManager.error()
                 errorMessage = error.localizedDescription
                 isLoading = false
             }
@@ -408,6 +425,7 @@ struct IssueBookFormView: View {
                     }
                 } else {
                     await MainActor.run {
+                        HapticManager.error()
                         errorMessage = "Member details not found."
                         isLoading = false
                     }
@@ -415,6 +433,7 @@ struct IssueBookFormView: View {
             }
         } catch {
             await MainActor.run {
+                HapticManager.error()
                 errorMessage = "Failed to fetch member details."
                 isLoading = false
             }
@@ -429,85 +448,116 @@ struct IssueBookFormView: View {
             do {
                 print("Checking book limit for member: \(smartCardID)")
                 
-                // Get all currently issued books (not returned) for this member
-                let memberBooksQuery = SupabaseManager.shared.client
-                    .from("issuebooks")
-                    .select()
-                    .eq("member_email", value: smartCardID)
-                    .is("actual_returned_date", value: nil) // Only count books that haven't been returned
-
-                let memberBooksResponse = try await memberBooksQuery.execute()
-                
-                // Decode the response into [issueBooks]
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                let currentlyIssuedBooks = try decoder.decode([issueBooks].self, from: memberBooksResponse.data)
-                
-                print("Currently issued books count: \(currentlyIssuedBooks.count)")
-
-                // Prevent issuing if the user already has 5 books issued
-                if currentlyIssuedBooks.count >= 5 {
-                    print("Member has reached the 5-book limit")
-                    await MainActor.run {
-                        circulationManager.errorMessage = "Member has already issued 5 books. Please return some books before issuing more."
-                        circulationManager.isLoading = false
+                // Check member's book limit
+                if try await checkMemberBookLimit() {
+                    // Fetch and validate book availability
+                    if let currentBook = try await fetchAndValidateBook() {
+                        // Create and insert new issue
+                        let newIssue = try await createAndInsertIssue(book: currentBook)
+                        
+                        // Update book quantity
+                        try await updateBookQuantity(book: currentBook)
+                        
+                        // Handle success
+                        await handleIssueSuccess(newIssue)
                     }
-                    return
                 }
-
-                print("Proceeding with book issue...")
-                // Fetch the current book to get its available quantity
-                let bookQuery = SupabaseManager.shared.client
-                    .from("Books")
-                    .select()
-                    .eq("isbn", value: isbn)
-                    .single()
-
-                let currentBook: Book = try await bookQuery.execute().value
-
-                guard currentBook.availableQuantity > 0 else {
-                    await MainActor.run {
-                        circulationManager.errorMessage = "Book is not available"
-                        circulationManager.isLoading = false
-                    }
-                    return
-                }
-
-                let newIssue = issueBooks(
-                    id: UUID(),
-                    isbn: isbn,
-                    memberEmail: smartCardID,
-                    issueDate: Date(),
-                    returnDate: returnDate,
-                    actualReturnedDate: nil
-                )
-
-                // Insert new issue record
-                let issueResponse = try await SupabaseManager.shared.client
-                    .from("issuebooks")
-                    .insert(newIssue)
-                    .execute()
-
-                // Decrease available quantity of the book
-                let updateResponse = try await SupabaseManager.shared.client
-                    .from("Books")
-                    .update(["availableQuantity": currentBook.availableQuantity - 1])
-                    .eq("isbn", value: isbn)
-                    .execute()
-
-                await MainActor.run {
-                    circulationManager.isLoading = false
-                    onIssue(newIssue)
-                    showSuccessAlert = true
-                }
-
             } catch {
                 print("Book Issue Error: \(error.localizedDescription)")
-                await MainActor.run {
-                    circulationManager.errorMessage = "Failed to issue book: \(error.localizedDescription)"
-                    circulationManager.isLoading = false
-                }
+                await handleIssueError(error)
             }
+        }
+    }
+    
+    private func checkMemberBookLimit() async throws -> Bool {
+        let memberBooksQuery = SupabaseManager.shared.client
+            .from("issuebooks")
+            .select()
+            .eq("member_email", value: smartCardID)
+            .is("actual_returned_date", value: nil)
+
+        let memberBooksResponse = try await memberBooksQuery.execute()
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let currentlyIssuedBooks = try decoder.decode([issueBooks].self, from: memberBooksResponse.data)
+        
+        print("Currently issued books count: \(currentlyIssuedBooks.count)")
+
+        if currentlyIssuedBooks.count >= 5 {
+            print("Member has reached the 5-book limit")
+            await MainActor.run {
+                HapticManager.warning()
+                circulationManager.errorMessage = "Member has already issued 5 books. Please return some books before issuing more."
+                circulationManager.isLoading = false
+            }
+            return false
+        }
+        
+        return true
+    }
+    
+    private func fetchAndValidateBook() async throws -> Book? {
+        print("Proceeding with book issue...")
+        let bookQuery = SupabaseManager.shared.client
+            .from("Books")
+            .select()
+            .eq("isbn", value: isbn)
+            .single()
+
+        let currentBook: Book = try await bookQuery.execute().value
+
+        guard currentBook.availableQuantity > 0 else {
+            await MainActor.run {
+                HapticManager.warning()
+                circulationManager.errorMessage = "Book is not available"
+                circulationManager.isLoading = false
+            }
+            return nil
+        }
+        
+        return currentBook
+    }
+    
+    private func createAndInsertIssue(book: Book) async throws -> issueBooks {
+        let newIssue = issueBooks(
+            id: UUID(),
+            isbn: isbn,
+            memberEmail: smartCardID,
+            issueDate: Date(),
+            returnDate: returnDate,
+            actualReturnedDate: nil
+        )
+
+        let issueResponse = try await SupabaseManager.shared.client
+            .from("issuebooks")
+            .insert(newIssue)
+            .execute()
+            
+        return newIssue
+    }
+    
+    private func updateBookQuantity(book: Book) async throws {
+        let updateResponse = try await SupabaseManager.shared.client
+            .from("Books")
+            .update(["availableQuantity": book.availableQuantity - 1])
+            .eq("isbn", value: isbn)
+            .execute()
+    }
+    
+    private func handleIssueSuccess(_ newIssue: issueBooks) async {
+        await MainActor.run {
+            circulationManager.isLoading = false
+            onIssue(newIssue)
+            showSuccessAlert = true
+        }
+    }
+    
+    private func handleIssueError(_ error: Error) async {
+        await MainActor.run {
+            HapticManager.error()
+            circulationManager.errorMessage = "Failed to issue book: \(error.localizedDescription)"
+            circulationManager.isLoading = false
         }
     }
 }

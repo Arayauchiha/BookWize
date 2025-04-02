@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MembersListView: View {
     @State private var members: [User] = []
@@ -68,29 +69,6 @@ struct MembersListView: View {
                         .padding(.top, 60)
                     } else {
                         LazyVStack(spacing: 16) {
-                            // Members Statistics
-//                            VStack(spacing: 8) {
-//                                Text("Total Members: \(members.count)")
-//                                    .font(.subheadline)
-//                                    .foregroundStyle(.secondary)
-                                
-//                                HStack(spacing: 20) {
-//                                    StatisticView(
-//                                        title: "Active",
-//                                        value: members.filter { $0.fine == 0 }.count,
-//                                        color: .green
-//                                    )
-//                                    
-//                                    StatisticView(
-//                                        title: " Fines",
-//                                        value: members.filter { $0.fine > 0 }.count,
-//                                        color: .red
-//                                    )
-//                                }
-//                            }
-//                            .padding()
-//                            .background(Color(.systemBackground))
-//                            .cornerRadius(12)
                             
                             // Members List
                             ForEach(filteredMembers) { member in
@@ -103,6 +81,7 @@ struct MembersListView: View {
                     }
                 }
                 .refreshable {
+                    HapticManager.mediumImpact()
                     await loadMembers()
                 }
                 .searchable(
@@ -110,34 +89,12 @@ struct MembersListView: View {
                     placement: .navigationBarDrawer(displayMode: .always),
                     prompt: "Search by name or email"
                 )
+                .onChange(of: searchText) { newValue in
+                    HapticManager.lightImpact()
+                }
                 .navigationTitle("Library Members")
                 .navigationBarTitleDisplayMode(.large)
-//                .toolbar {
-//                    ToolbarItem(placement: .navigationBarTrailing) {
-//                        Menu {
-//                            Button {
-//                                // Sort by name
-//                            } label: {
-//                                Label("Sort by Name", systemImage: "textformat")
-//                            }
-//                            
-//                            Button {
-//                                // Sort by date
-//                            } label: {
-//                                Label("Sort by Join Date", systemImage: "calendar")
-//                            }
-//                            
-//                            Button {
-//                                // Filter with fines
-//                            } label: {
-//                                Label("Show Members with Fines", systemImage: "dollarsign.circle")
-//                            }
-//                        } label: {
-//                            Image(systemName: "line.3.horizontal.decrease.circle")
-//                                .foregroundStyle(.blue)
-//                        }
-//                    }
-//                }
+
             }
         }
         .task {
@@ -145,11 +102,15 @@ struct MembersListView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshMembers"))) { _ in
             Task {
+                HapticManager.mediumImpact()
                 await loadMembers()
             }
         }
         .alert("Error", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") { errorMessage = nil }
+            Button("OK") {
+                HapticManager.lightImpact()
+                errorMessage = nil
+            }
         } message: {
             Text(errorMessage ?? "")
         }
@@ -160,35 +121,18 @@ struct MembersListView: View {
         do {
             await FineCalculator.shared.calculateAndUpdateFines()
             members = (await fetchMembers()) ?? []
+            if members.isEmpty {
+                HapticManager.warning()
+            } else {
+                HapticManager.success()
+            }
         } catch {
+            HapticManager.error()
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 }
-
-//struct StatisticView: View {
-//    let title: String
-//    let value: Int
-//    let color: Color
-//    
-//    var body: some View {
-//        VStack(spacing: 4) {
-//            Text(title)
-//                .font(.caption)
-//                .foregroundStyle(.secondary)
-//            
-//            Text("\(value)")
-//                .font(.title2)
-//                .fontWeight(.semibold)
-//                .foregroundStyle(color)
-//        }
-//        .frame(maxWidth: .infinity)
-//        .padding(.vertical, 8)
-//        .background(color.opacity(0.1))
-//        .cornerRadius(8)
-//    }
-//}
 
 #Preview {
     MembersListView()

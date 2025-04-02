@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import UIKit
 
 struct LibrarianDashboard: View {
     @StateObject private var dashboardManager = DashboardManager()
@@ -7,129 +8,160 @@ struct LibrarianDashboard: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // First Row
-                    HStack(spacing: 16) {
-                        DashboardCard(
-                            title: "Total Books",
-                            value: "\(dashboardManager.totalBooksCount)",
-                            icon: "book.fill",
-                            color: .blue
-                        )
-                        
-                        DashboardCard(
-                            title: "Issued Books",
-                            value: "\(dashboardManager.issuedBooksCount)",
-                            icon: "book.circle.fill",
-                            color: .green
-                        )
-                    }
-                    .padding(.horizontal)
-                    
-                    // Second Row
-                    HStack(spacing: 16) {
-                        DashboardCard(
-                            title: "Members with Overdue Fines",
-                            value: "\(dashboardManager.overdueMembersCount)",
-                            icon: "exclamationmark.triangle.fill",
-                            color: .red
-                        )
-                        
-                        DashboardCard(
-                            title: "Total Members",
-                            value: "\(dashboardManager.totalMembersCount)",
-                            icon: "person.3.fill",
-                            color: .purple
-                        )
-                    }
-                    .padding(.horizontal)
-                    
-                    // Analytics Section
-                    Group {
-                        Text("Analytics")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.top)
-                            .padding(.horizontal)
-                        
-                        HStack(spacing: 16) {
-                            if let mostPopularGenre = getPopularGenres().first {
-                                PopularGenreCard(
-                                    title: "Popular Genres",
-                                    genre: mostPopularGenre.0,
-                                    color: .orange
-                                )
-                            }
-                            
-                            GenreStatsCard(
-                                title: "Genre-wise Issued",
-                                genres: getGenreWiseIssues(),
-                                color: .teal
-                            )
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Overdue Books Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Overdues")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            
-                            Spacer()
-                            
-                            NavigationLink(destination: OverdueBooksListView()) {
-                                Text("See All")
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                        .padding(.horizontal)
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(dashboardManager.overdueFines > 0 ? "₹\(String(format: "%.2f", dashboardManager.overdueFines))" : "₹0.00")")
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.red)
-                                
-                                Text("Total Overdue Fines")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                           
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                        .padding(.horizontal)
-                    }
-                    .padding(.top)
-                }
-                .padding(.vertical)
+                DashboardContent(dashboardManager: dashboardManager)
             }
             .navigationTitle("Dashboard")
             .refreshable {
+                HapticManager.mediumImpact()
                 await dashboardManager.fetchDashboardData()
+            }
+            .onAppear {
+                HapticManager.lightImpact()
+            }
+            .onChange(of: dashboardManager.overdueFines) { newValue in
+                if newValue > 0 {
+                    HapticManager.warning()
+                }
             }
         }
     }
+}
+
+struct DashboardContent: View {
+    @ObservedObject var dashboardManager: DashboardManager
     
-    private func getPopularGenres() -> [(String, Int)] {
-        return dashboardManager.getPopularGenres()
-    }
-    
-    private func getGenreWiseIssues() -> [(String, Int)] {
-        return dashboardManager.getGenreWiseIssues()
-    }
-    
-    private func calculateTotalFine() -> Double {
-        return dashboardManager.overdueFines
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // First Row
+            DashboardRow(
+                firstCard: DashboardCard(
+                    title: "Total Books",
+                    value: "\(dashboardManager.totalBooksCount)",
+                    icon: "book.fill",
+                    color: .blue
+                ),
+                secondCard: DashboardCard(
+                    title: "Issued Books",
+                    value: "\(dashboardManager.issuedBooksCount)",
+                    icon: "book.circle.fill",
+                    color: .green
+                )
+            )
+            
+            // Second Row
+            DashboardRow(
+                firstCard: DashboardCard(
+                    title: "Members with Overdue Fines",
+                    value: "\(dashboardManager.overdueMembersCount)",
+                    icon: "exclamationmark.triangle.fill",
+                    color: .red
+                ),
+                secondCard: DashboardCard(
+                    title: "Total Members",
+                    value: "\(dashboardManager.totalMembersCount)",
+                    icon: "person.3.fill",
+                    color: .purple
+                )
+            )
+            
+            // Analytics Section
+            AnalyticsSection(dashboardManager: dashboardManager)
+            
+            // Overdue Books Section
+            OverdueSection(dashboardManager: dashboardManager)
+        }
+        .padding(.vertical)
     }
 }
 
+struct DashboardRow: View {
+    let firstCard: DashboardCard
+    let secondCard: DashboardCard
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            firstCard
+            secondCard
+        }
+        .padding(.horizontal)
+    }
+}
+
+struct AnalyticsSection: View {
+    @ObservedObject var dashboardManager: DashboardManager
+    
+    var body: some View {
+        Group {
+            Text("Analytics")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.top)
+                .padding(.horizontal)
+            
+            HStack(spacing: 16) {
+                if let mostPopularGenre = dashboardManager.getPopularGenres().first {
+                    PopularGenreCard(
+                        title: "Popular Genres",
+                        genre: mostPopularGenre.0,
+                        color: .orange
+                    )
+                }
+                
+                GenreStatsCard(
+                    title: "Genre-wise Issued",
+                    genres: dashboardManager.getGenreWiseIssues(),
+                    color: .teal
+                )
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
+struct OverdueSection: View {
+    @ObservedObject var dashboardManager: DashboardManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Overdues")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                NavigationLink(destination: OverdueBooksListView()) {
+                    Text("See All")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+                .onTapGesture {
+                    HapticManager.mediumImpact()
+                }
+            }
+            .padding(.horizontal)
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(dashboardManager.overdueFines > 0 ? "₹\(String(format: "%.2f", dashboardManager.overdueFines))" : "₹0.00")")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+                    
+                    Text("Total Overdue Fines")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+            .padding(.horizontal)
+        }
+        .padding(.top)
+    }
+}
 
 struct OverdueSummaryCard: View {
     let overdueCount: Int

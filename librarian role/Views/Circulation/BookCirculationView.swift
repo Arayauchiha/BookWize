@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct BookCirculationView: View {
     @StateObject private var circulationManager = IssuedBookManager.shared
@@ -14,6 +15,9 @@ struct BookCirculationView: View {
                     options: CirculationTab.allCases
                 )
                 .padding()
+                .onChange(of: activeTab) { newValue in
+                    HapticManager.lightImpact()
+                }
                 
                 switch activeTab {
                 case .Issue:
