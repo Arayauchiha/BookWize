@@ -424,7 +424,38 @@ struct DashboardView: View {
                         }
                         .padding()
                     } else {
-                        // Your Reads Section
+                        // Monthly Reading Goal Section (moved up)
+                        VStack(alignment: .leading, spacing: 8) {
+                            NavigationLink(destination: ReadingProgressDetailView(
+                                monthlyGoal: user?.monthlyGoal ?? 0,
+                                issuedBooks: issuedBooks,
+                                updatePagesRead: updatePagesRead,
+                                updateGoal: updateMonthlyGoal
+                            )) {
+                                HStack {
+                                    Text("Reading Progress")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            // Reading Progress Card
+                            ReadingProgressCard(
+                                monthlyGoal: user?.monthlyGoal ?? 0,
+                                completedBooks: completedBooksCount,
+                                issuedBooks: issuedBooks.count,
+                                onTap: {}
+                            )
+                            .padding(.horizontal)
+                        }
+                        
+                        // Your Reads Section (moved down)
                         VStack(alignment: .leading, spacing: 8) {
                             NavigationLink(destination: BookManagementView()
                                 .environmentObject(booksManager)) {
@@ -466,37 +497,6 @@ struct DashboardView: View {
                                 .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                                 .padding(.horizontal)
                             }
-                        }
-                        
-                        // Monthly Reading Goal Section
-                        VStack(alignment: .leading, spacing: 8) {
-                            NavigationLink(destination: ReadingProgressDetailView(
-                                monthlyGoal: user?.monthlyGoal ?? 0,
-                                issuedBooks: issuedBooks,
-                                updatePagesRead: updatePagesRead,
-                                updateGoal: updateMonthlyGoal
-                            )) {
-                                HStack {
-                                    Text("Reading Progress")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Reading Progress Card
-                            ReadingProgressCard(
-                                monthlyGoal: user?.monthlyGoal ?? 0,
-                                completedBooks: completedBooksCount,
-                                issuedBooks: issuedBooks.count,
-                                onTap: {}
-                            )
-                            .padding(.horizontal)
                         }
                     }
                 }
