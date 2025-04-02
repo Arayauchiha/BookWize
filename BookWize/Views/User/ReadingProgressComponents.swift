@@ -85,7 +85,9 @@ struct ReadingProgressCard: View {
                 
                 // Status message
                 if monthlyGoal > 0 {
-                    Text(completedBooks >= monthlyGoal 
+                    Text(completedBooks > monthlyGoal 
+                         ? "Wow! You've surpassed your monthly goal by \(completedBooks - monthlyGoal) \(completedBooks - monthlyGoal == 1 ? "book" : "books")!" 
+                         : completedBooks == monthlyGoal 
                          ? "Amazing! You've reached your monthly goal! Keep reading to surpass it!" 
                          : "Keep reading to reach your monthly goal!")
                         .font(.subheadline)
@@ -223,7 +225,9 @@ struct ReadingProgressDetailView: View {
                     
                     // Status text
                     if monthlyGoal > 0 {
-                        Text(completedBooksCount >= monthlyGoal 
+                        Text(completedBooksCount > monthlyGoal 
+                             ? "Congratulations! You've surpassed your monthly goal by \(completedBooksCount - monthlyGoal) \(completedBooksCount - monthlyGoal == 1 ? "book" : "books")!" 
+                             : completedBooksCount >= monthlyGoal 
                              ? "Congratulations! You've reached your monthly goal of \(monthlyGoal) books!" 
                              : "You're making progress towards your monthly goal of \(monthlyGoal) books!")
                             .font(.headline)
