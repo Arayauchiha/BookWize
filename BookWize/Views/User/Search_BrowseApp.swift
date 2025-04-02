@@ -161,7 +161,7 @@ struct Search_BrowseApp: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
-            UserDashboardView()
+            DashboardView()
                 .tabItem {
                     Label("Dashboard", systemImage: "rectangle.3.group")
                 }
