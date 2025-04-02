@@ -492,7 +492,7 @@ struct DashboardView: View {
                 print("✅ Pages update response: \(jsonString)")
             }
             
-            // Update locally
+            // Update locally without forcing a refresh
             await MainActor.run {
                 if let index = issuedBooks.firstIndex(where: { $0.issueBook.id == bookId }) {
                     var updatedIssueBook = issuedBooks[index].issueBook
@@ -505,8 +505,8 @@ struct DashboardView: View {
                 }
             }
             
-            // Refresh data to ensure UI consistency
-            await fetchUserData()
+            // Don't refresh data to maintain card positions
+            // await fetchUserData()
         } catch {
             print("❌ Error updating pages read: \(error)")
         }

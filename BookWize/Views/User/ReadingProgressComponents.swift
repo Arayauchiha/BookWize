@@ -40,36 +40,40 @@ struct ReadingProgressCard: View {
                     
                     // Statistics
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack {
+                        HStack(alignment: .center) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
+                                .frame(width: 20)
                             Text("\(completedBooks) completed")
                                 .font(.subheadline)
                         }
                         
-                        HStack {
+                        HStack(alignment: .center) {
                             Image(systemName: "book.fill")
                                 .foregroundColor(.blue)
+                                .frame(width: 20)
                             Text("\(issuedBooks) borrowed")
                                 .font(.subheadline)
                         }
                         
-                        HStack {
+                        HStack(alignment: .center) {
                             Image(systemName: "target")
                                 .foregroundColor(.orange)
+                                .frame(width: 20)
                             Text("Goal: \(monthlyGoal) books")
                                 .font(.subheadline)
                         }
                         
                         if monthlyGoal > 0 {
-                            HStack {
+                            HStack(alignment: .center) {
                                 Image(systemName: completedBooks >= monthlyGoal ? "star.fill" : "hourglass")
                                     .foregroundColor(completedBooks >= monthlyGoal ? .yellow : .gray)
+                                    .frame(width: 20)
                                 Text(completedBooks >= monthlyGoal 
-                                     ? "Goal achieved! 🎉" 
+                                     ? "Goal achieved!" 
                                      : "\(monthlyGoal - completedBooks) more to go!")
                                     .font(.subheadline)
-                                    .foregroundColor(completedBooks >= monthlyGoal ? .green : .secondary)
+                                    .foregroundColor(completedBooks >= monthlyGoal ? .primary : .secondary)
                             }
                         }
                     }
@@ -85,7 +89,8 @@ struct ReadingProgressCard: View {
                          ? "Amazing! You've reached your monthly goal! Keep reading to surpass it!" 
                          : "Keep reading to reach your monthly goal!")
                         .font(.subheadline)
-                        .foregroundColor(completedBooks >= monthlyGoal ? .green : .secondary)
+                        .fontWeight(completedBooks >= monthlyGoal ? .bold : .regular)
+                        .foregroundColor(completedBooks >= monthlyGoal ? .primary : .secondary)
                         .padding(.top, 5)
                 } else {
                     Text("Set a monthly reading goal to track your progress")
@@ -172,6 +177,15 @@ struct ReadingProgressDetailView: View {
     let updatePagesRead: (UUID, Int) async -> Void
     @State private var showingGoalSheet = false
     let updateGoal: (Int) async -> Void
+    @State private var completedBooksCount: Int
+    
+    init(monthlyGoal: Int, issuedBooks: [IssueBookInfo], updatePagesRead: @escaping (UUID, Int) async -> Void, updateGoal: @escaping (Int) async -> Void) {
+        self.monthlyGoal = monthlyGoal
+        self.issuedBooks = issuedBooks
+        self.updatePagesRead = updatePagesRead
+        self.updateGoal = updateGoal
+        self._completedBooksCount = State(initialValue: issuedBooks.filter { $0.isCompleted }.count)
+    }
     
     var body: some View {
         ScrollView {
@@ -190,6 +204,7 @@ struct ReadingProgressDetailView: View {
                             .stroke(style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round))
                             .foregroundColor(Color.blue)
                             .rotationEffect(Angle(degrees: 270.0))
+                            .animation(.linear(duration: 0.3), value: completedBooksCount)
                         
                         VStack {
                             Text("\(completedBooksCount)")
@@ -262,7 +277,24 @@ struct ReadingProgressDetailView: View {
                                     pageCount: book.pageCount ?? 0,
                                     pagesRead: issueInfo.issueBook.pagesRead ?? 0,
                                     bookId: issueInfo.issueBook.id,
-                                    updatePagesRead: updatePagesRead
+                                    updatePagesRead: { id, pages in
+                                        Task {
+                                            // Update completed books count immediately based on the new pages
+                                            let newProgress = Double(pages) / Double(book.pageCount ?? 0)
+                                            let wasCompleted = issueInfo.isCompleted
+                                            let isNowCompleted = newProgress == 1.0
+                                            
+                                            if wasCompleted != isNowCompleted {
+                                                if isNowCompleted {
+                                                    completedBooksCount += 1
+                                                } else {
+                                                    completedBooksCount -= 1
+                                                }
+                                            }
+                                            
+                                            await updatePagesRead(id, pages)
+                                        }
+                                    }
                                 )
                                 .padding(.horizontal)
                             }
@@ -285,13 +317,6 @@ struct ReadingProgressDetailView: View {
             print("📚 Total books completed: \(completedBooksCount) of \(issuedBooks.count) books")
         }
     }
-    
-    // Calculated completed books count
-    var completedBooksCount: Int {
-        let completed = issuedBooks.filter { $0.isCompleted }.count
-        print("📚 Calculating completed books: \(completed) books are 100% complete")
-        return completed
-    }
 }
 
 // MARK: - Detailed Book Progress Row
@@ -305,6 +330,24 @@ struct DetailedBookProgressRow: View {
     let updatePagesRead: (UUID, Int) async -> Void
     @State private var showingUpdateAlert = false
     @State private var pagesReadInput = ""
+    @State private var currentProgress: Double
+    @State private var currentPagesRead: Int
+    @State private var showingCongrats = false
+    @State private var showingResetAlert = false
+    @State private var showingErrorAlert = false
+    @State private var errorMessage = ""
+    
+    init(title: String, author: String, progress: Double, pageCount: Int, pagesRead: Int, bookId: UUID, updatePagesRead: @escaping (UUID, Int) async -> Void) {
+        self.title = title
+        self.author = author
+        self.progress = progress
+        self.pageCount = pageCount
+        self.pagesRead = pagesRead
+        self.bookId = bookId
+        self.updatePagesRead = updatePagesRead
+        self._currentProgress = State(initialValue: progress)
+        self._currentPagesRead = State(initialValue: pagesRead)
+    }
     
     var body: some View {
         HStack(spacing: 20) {
@@ -313,20 +356,21 @@ struct DetailedBookProgressRow: View {
                 Circle()
                     .stroke(lineWidth: 8)
                     .opacity(0.3)
-                    .foregroundColor(progress == 1.0 ? .green : .blue)
+                    .foregroundColor(currentProgress == 1.0 ? .green : .blue)
                 
                 Circle()
-                    .trim(from: 0.0, to: CGFloat(progress))
+                    .trim(from: 0.0, to: CGFloat(currentProgress))
                     .stroke(style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round))
-                    .foregroundColor(progress == 1.0 ? .green : .blue)
+                    .foregroundColor(currentProgress == 1.0 ? .green : .blue)
                     .rotationEffect(Angle(degrees: 270.0))
+                    .animation(.linear(duration: 0.3), value: currentProgress)
                 
                 VStack(spacing: 2) {
-                    Text("\(Int(progress * 100))%")
+                    Text("\(Int(currentProgress * 100))%")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(progress == 1.0 ? .green : .primary)
+                        .foregroundColor(currentProgress == 1.0 ? .green : .primary)
                     
-                    Text("\(pagesRead)/\(pageCount)")
+                    Text("\(currentPagesRead)/\(pageCount)")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
@@ -347,16 +391,28 @@ struct DetailedBookProgressRow: View {
                 
                 HStack {
                     Spacer()
-                    Button("Update") {
-                        pagesReadInput = "\(pagesRead)"
-                        showingUpdateAlert = true
+                    if currentProgress == 1.0 {
+                        Button("Reset") {
+                            showingResetAlert = true
+                        }
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.red)
+                        .cornerRadius(8)
+                    } else {
+                        Button("Update") {
+                            pagesReadInput = "\(currentPagesRead)"
+                            showingUpdateAlert = true
+                        }
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue)
+                        .cornerRadius(8)
                     }
-                    .font(.subheadline.bold())
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.blue)
-                    .cornerRadius(8)
                 }
             }
         }
@@ -371,15 +427,80 @@ struct DetailedBookProgressRow: View {
             Button("Cancel", role: .cancel) { }
             
             Button("Update") {
-                if let newPagesRead = Int(pagesReadInput), newPagesRead >= 0, newPagesRead <= pageCount {
-                    Task {
-                        print("📝 Updating pages read from \(pagesRead) to \(newPagesRead) for book: \(title)")
-                        await updatePagesRead(bookId, newPagesRead)
-                    }
-                }
+                validateAndUpdatePages()
             }
         } message: {
             Text("Enter the number of pages you've read (out of \(pageCount))")
+        }
+        .alert("Invalid Input", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
+        }
+        .alert("Reset Progress", isPresented: $showingResetAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                Task {
+                    print("🔄 Resetting progress for book: \(title)")
+                    currentProgress = 0
+                    currentPagesRead = 0
+                    await updatePagesRead(bookId, 0)
+                }
+            }
+        } message: {
+            Text("Are you sure you want to reset your progress for \(title)?")
+        }
+        .alert("Congratulations! 🎉", isPresented: $showingCongrats) {
+            Button("Thank you!", role: .cancel) { }
+        } message: {
+            Text("You've completed reading \(title)! Great job!")
+        }
+    }
+    
+    private func validateAndUpdatePages() {
+        // Check if input is empty
+        if pagesReadInput.isEmpty {
+            errorMessage = "Please enter a number"
+            showingErrorAlert = true
+            return
+        }
+        
+        // Check if input contains only numbers
+        if !pagesReadInput.allSatisfy({ $0.isNumber }) {
+            errorMessage = "Please enter only numbers"
+            showingErrorAlert = true
+            return
+        }
+        
+        // Convert to integer and validate range
+        if let newPagesRead = Int(pagesReadInput) {
+            if newPagesRead < 0 {
+                errorMessage = "Pages read cannot be negative"
+                showingErrorAlert = true
+                return
+            }
+            
+            if newPagesRead > pageCount {
+                errorMessage = "Pages read cannot exceed total pages (\(pageCount))"
+                showingErrorAlert = true
+                return
+            }
+            
+            // Valid input, proceed with update
+            Task {
+                print("📝 Updating pages read from \(currentPagesRead) to \(newPagesRead) for book: \(title)")
+                currentProgress = Double(newPagesRead) / Double(pageCount)
+                currentPagesRead = newPagesRead
+                
+                if newPagesRead == pageCount {
+                    showingCongrats = true
+                }
+                
+                await updatePagesRead(bookId, newPagesRead)
+            }
+        } else {
+            errorMessage = "Please enter a valid number"
+            showingErrorAlert = true
         }
     }
 }
