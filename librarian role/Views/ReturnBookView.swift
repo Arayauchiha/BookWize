@@ -432,7 +432,7 @@ struct ReturnBookFormView: View {
                 let currentBook: Book = try await bookQuery.execute().value
                 
                 let updateData = ReturnBookUpdate(
-                    returnDate: Date(),
+                    actual_returned_date: Date(),
                     bookCondition: selectedCondition.rawValue,
                     fineAmount: selectedCondition == .damaged ? Double(fineAmount) : nil,
                     duesFine: duesFine
@@ -442,7 +442,7 @@ struct ReturnBookFormView: View {
                     .from("issuebooks")
                     .update(updateData)
                     .eq("isbn", value: isbn)
-                    .eq("memberEmail", value: smartCardID)
+                    .eq("member_email", value: smartCardID)
                     .execute()
                 
                 let bookUpdateResponse = try await SupabaseManager.shared.client
@@ -600,7 +600,7 @@ enum BookCondition: String, CaseIterable, Codable {
 }
 
 struct ReturnBookUpdate: Encodable {
-    let returnDate: Date
+    let actual_returned_date: Date
     let bookCondition: String
     let fineAmount: Double?
     let duesFine: Double
