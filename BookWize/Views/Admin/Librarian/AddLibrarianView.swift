@@ -110,7 +110,7 @@ struct AddLibrarianView: View {
                             .textFieldStyle(CustomTextFieldStyle())
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
-                            .onChange(of: email) { newValue in
+                            .onChange(of: email) { _, newValue in
                                 emailError = ValidationUtils.getEmailError(newValue)
                             }
                         

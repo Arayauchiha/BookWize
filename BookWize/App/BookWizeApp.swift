@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-
 @main
 struct BookWizeApp: App {
     let persistenceController: PersistenceController = .shared

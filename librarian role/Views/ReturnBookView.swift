@@ -8,10 +8,48 @@
 import SwiftUI
 import Supabase
 
+struct ReturnissueBooks: Identifiable, Codable {
+    let id: UUID
+    let isbn: String
+    let member_email: String
+    let issue_date: Date
+    let return_date: Date?
+    let actual_returned_date: Date?
+}
+
 struct ReturnBookView: View {
     @StateObject private var circulationManager = IssuedBookManager.shared
     @State private var searchText = ""
     @State private var showingReturnForm = false
+    @State private var returnBookData: [ReturnissueBooks] = []
+    @State private var returnBookWithFilter: [ReturnissueBooks] = []
+    
+    private func fetchReturn() async {
+        do {
+            // Get email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                return
+            }
+            
+            print("Fetching member with email: \(userEmail)")
+            
+            let response: [ReturnissueBooks] = try await SupabaseManager.shared.client
+                .from("issuebooks")
+                .select("*")
+                .execute()
+                .value
+            
+            DispatchQueue.main.async {
+                self.returnBookData = response
+                self.returnBookWithFilter = returnBookData.filter({$0.actual_returned_date != nil })
+                print("Successfully fetched returbbooks: \(returnBookWithFilter)")
+            }
+        } catch {
+            print("Error fetching member: \(error)")
+        }
+    }
+
     
     var body: some View {
         VStack(spacing: 0) {
@@ -19,16 +57,16 @@ struct ReturnBookView: View {
                 if circulationManager.isLoading {
                     ProgressView()
                         .padding()
-                } else if circulationManager.loans.isEmpty {
+                } else if returnBookWithFilter.isEmpty {
                     EmptyStateView(
                         icon: "book.closed",
-                        title: "No Books to Return",
-                        message: "There are no books currently issued"
+                        title: "No Books Returned",
+                        message: "There are no returned books to display"
                     )
                 } else {
                     LazyVStack(spacing: 16) {
-                        ForEach(circulationManager.loans) { loan in
-                            LoanCard(issuedBooks: loan)
+                        ForEach(returnBookWithFilter) { book in
+                            ReturnedBookCard(book: book)
                         }
                     }
                     .padding()
@@ -60,6 +98,7 @@ struct ReturnBookView: View {
         }
         .task {
             await circulationManager.fetchIssuedBooks()
+            await fetchReturn()
         }
         .alert("Error", isPresented: .constant(circulationManager.errorMessage != nil)) {
             Button("OK") {
@@ -71,8 +110,8 @@ struct ReturnBookView: View {
     }
 }
 
-struct LoanCard: View {
-    let issuedBooks: issueBooks
+struct ReturnedBookCard: View {
+    let book: ReturnissueBooks
     @State private var bookCoverURL: URL?
     @State private var isLoadingCover = true
     
@@ -112,11 +151,11 @@ struct LoanCard: View {
                 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Label("ISBN: \(issuedBooks.isbn)", systemImage: "barcode")
+                        Label("ISBN: \(book.isbn)", systemImage: "barcode")
                             .font(.subheadline)
                     }
                     
-                    Text("Member Email: \(issuedBooks.memberEmail)")
+                    Text("Member Email: \(book.member_email)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -131,7 +170,7 @@ struct LoanCard: View {
                     Text("Issue Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(issuedBooks.issueDate, style: .date)
+                    Text(book.issue_date, style: .date)
                         .font(.subheadline)
                 }
                 
@@ -141,13 +180,10 @@ struct LoanCard: View {
                     Text("Return Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    if let returnDate = issuedBooks.returnDate {
+                    if let returnDate = book.actual_returned_date {
                         Text(returnDate, style: .date)
                             .font(.subheadline)
-                    } else {
-                        Text("Not Returned")
-                            .font(.subheadline)
-                            .foregroundColor(.red)
+                            .foregroundColor(.green)
                     }
                 }
             }
@@ -162,7 +198,7 @@ struct LoanCard: View {
     }
     
     private func fetchBookCover() async {
-        let coverURL = "https://covers.openlibrary.org/b/isbn/\(issuedBooks.isbn)-M.jpg"
+        let coverURL = "https://covers.openlibrary.org/b/isbn/\(book.isbn)-M.jpg"
         bookCoverURL = URL(string: coverURL)
     }
 }
@@ -396,7 +432,7 @@ struct ReturnBookFormView: View {
                 let currentBook: Book = try await bookQuery.execute().value
                 
                 let updateData = ReturnBookUpdate(
-                    returnDate: Date(),
+                    actual_returned_date: Date(),
                     bookCondition: selectedCondition.rawValue,
                     fineAmount: selectedCondition == .damaged ? Double(fineAmount) : nil,
                     duesFine: duesFine
@@ -406,7 +442,7 @@ struct ReturnBookFormView: View {
                     .from("issuebooks")
                     .update(updateData)
                     .eq("isbn", value: isbn)
-                    .eq("memberEmail", value: smartCardID)
+                    .eq("member_email", value: smartCardID)
                     .execute()
                 
                 let bookUpdateResponse = try await SupabaseManager.shared.client
@@ -554,6 +590,7 @@ struct ReturnBookFormView: View {
                 isLoading = false
             }
         }
+        
     }
 }
 
@@ -563,7 +600,7 @@ enum BookCondition: String, CaseIterable, Codable {
 }
 
 struct ReturnBookUpdate: Encodable {
-    let returnDate: Date
+    let actual_returned_date: Date
     let bookCondition: String
     let fineAmount: Double?
     let duesFine: Double
