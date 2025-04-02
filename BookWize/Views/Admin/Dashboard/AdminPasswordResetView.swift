@@ -5,6 +5,7 @@ struct AdminPasswordResetView: View {
     @Binding var newPassword: String
     @Binding var confirmPassword: String
     @Binding var isNewPasswordVisible: Bool
+    @State private var currentPassword = ""
     @FocusState private var focusedField: Field?
     
     let email: String
@@ -26,8 +27,10 @@ struct AdminPasswordResetView: View {
     // Add state for showing error alert
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showSuccess = false
     
     private enum Field {
+        case currentPassword
         case newPassword
         case confirmPassword
     }
@@ -40,6 +43,28 @@ struct AdminPasswordResetView: View {
     // Add update password function
     private func updatePassword() async {
         print("Attempting to update password for admin email: \(email)")
+        
+        // Validate passwords match
+        guard newPassword == confirmPassword else {
+            errorMessage = "New passwords do not match"
+            showError = true
+            return
+        }
+        
+        // Validate new password is different
+        guard newPassword != currentPassword else {
+            errorMessage = "New password must be different from current password"
+            showError = true
+            return
+        }
+        
+        // Validate password requirements
+        guard passwordValidation.isValid else {
+            errorMessage = "New password does not meet requirements"
+            showError = true
+            return
+        }
+        
         do {
             let userData = FetchData(email: email, password: newPassword)
             print("Sending update request to Users table with data:", userData)
@@ -54,7 +79,7 @@ struct AdminPasswordResetView: View {
             
             DispatchQueue.main.async {
                 print("Password successfully updated for admin:", email)
-                onSave()
+                showSuccess = true
             }
         } catch {
             print("Error updating password:", error)
@@ -75,6 +100,22 @@ struct AdminPasswordResetView: View {
                     .multilineTextAlignment(.center)
                 
                 VStack(alignment: .leading, spacing: 16) {
+                    // Current password field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Current Password")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.6))
+                        
+                        SecureField("Enter current password", text: $currentPassword)
+                            .textContentType(.password)
+                            .textInputAutocapitalization(.never)
+                            .focused($focusedField, equals: .currentPassword)
+                            .padding()
+                            .background(Color.customInputBackground)
+                            .cornerRadius(8)
+                    }
+                    .padding(.bottom, 8)
+                    
                     // New password field
                     VStack(alignment: .leading, spacing: 8) {
                         Text("New Password")
@@ -213,8 +254,8 @@ struct AdminPasswordResetView: View {
                             .fill(Color.customButton)
                     )
                     .padding(.top, 16)
-                    .disabled(newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword)
-                    .opacity(newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword ? 0.7 : 1)
+                    .disabled(currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword)
+                    .opacity(currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword ? 0.7 : 1)
                 }
                 .padding(.horizontal, 24)
                 
@@ -236,8 +277,15 @@ struct AdminPasswordResetView: View {
             } message: {
                 Text(errorMessage)
             }
+            .alert("Success", isPresented: $showSuccess) {
+                Button("OK") {
+                    onSave()
+                }
+            } message: {
+                Text("Your password has been updated successfully")
+            }
             .onAppear { 
-                focusedField = .newPassword
+                focusedField = .currentPassword
                 print("AdminPasswordResetView appeared for email:", email)
             }
         }

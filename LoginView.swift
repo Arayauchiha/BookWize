@@ -23,6 +23,7 @@ struct LoginView: View {
     @State private var errorMessage = ""
     @State private var isLoading = false
     @State private var emailError: String?
+    @State private var showingForgotPassword = false
     @FocusState private var focusedField: Field?
     
     // For first-time librarian login
@@ -95,90 +96,72 @@ struct LoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    ModifiedContent(content: EmptyView(), modifier: CustomPasswordFieldStyle(
-                        text: $password,
-                        isVisible: $isPasswordVisible,
-                        placeholder: "Enter your password"
-                    ))
+                    HStack {
+                        Group {
+                            if isPasswordVisible {
+                                TextField("Enter your password", text: $password)
+                                    .textFieldStyle(CustomTextFieldStyle())
+                                    .textContentType(.password)
+                                    .textInputAutocapitalization(.never)
+                                    .disableAutocorrection(true)
+                                    .customTextField()
+                            } else {
+                                SecureField("Enter your password", text: $password)
+                                    .textFieldStyle(CustomTextFieldStyle())
+                                    .textContentType(.password)
+                                    .textInputAutocapitalization(.never)
+                                    .disableAutocorrection(true)
+                                    .customTextField()
+                            }
+                        }
+                        
+                        Button(action: { isPasswordVisible.toggle() }) {
+                            Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                .foregroundStyle(Color.customButton.opacity(Color.secondaryIconOpacity))
+                        }
+                    }
                 }
                 
                 if !errorMessage.isEmpty {
                     Text(errorMessage)
-                        .foregroundColor(.red)
+                        .foregroundStyle(Color.red)
                         .font(.caption)
                 }
                 
-                // Sign In Button
                 Button(action: login) {
                     if isLoading {
-                        HStack {
-                            Spacer()
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            Spacer()
-                        }
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
                         Text("Sign In")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
+                            .font(.system(size: 17, weight: .semibold))
                     }
                 }
-                .padding(.vertical, 15)
-                .background(!email.isEmpty && !password.isEmpty && isEmailValid ? Color.customButton : Color.gray)
-                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(isFormValid ? roleColor : Color.gray)
+                .foregroundStyle(.white)
                 .cornerRadius(12)
-                .disabled(isLoading || email.isEmpty || password.isEmpty || !isEmailValid)
-                .padding(.top, 8)
+                .disabled(!isFormValid || isLoading)
                 
-                //                if userRole == .member {
-                //                    HStack {
-                //                        NavigationLink("Create Account") {
-                //                            SignUp()
-                //                        }
-                //                        .foregroundColor(Color.customButton)
-                //
-                //                        Spacer()
-                //
-                //                        Button("Forgot Password?") {
-                //                            // Handle password reset
-                //                            if !email.isEmpty {
-                //                                sendVerificationOTP()
-                //                            } else {
-                //                                errorMessage = "Please enter your email first"
-                //                            }
-                //                        }
-                //                        .foregroundColor(Color.customButton)
-                //                    }
-                //                    .padding(.top, 12)
-                //                }
+                if userRole == .librarian {
+                    Button("Forgot Password?") {
+                        if !email.isEmpty && isEmailValid {
+                            // Send OTP and show OTP view first
+                            sendVerificationOTP()
+                            showingOTPView = true
+                        } else {
+                            errorMessage = "Please enter a valid email address first"
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(Color.customButton)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                }
             }
             .padding(.horizontal, 24)
-            .padding(.top, 60)
-            .padding(.bottom, 40)
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Image("library_logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 30)
-            }
-        }
-        //        .background(Color.customBackground)
-        //        .sheet(isPresented: $showingOTPView) {
-        //            // Use the consistent OTP verification view
-        //            OTPVerificationView(
-        //                email: email,
-        //                otp: $otpCode,
-        //                onVerify: {
-        //                    verifyOTP()
-        //                },
-        //                onCancel: {
-        //                    showingOTPView = false
-        //                }
-        //            )
-        //        }
         .background(Color.customBackground)
         .sheet(isPresented: $showingPasswordChangeView) {
             // Password change sheet for librarian first login
@@ -201,15 +184,86 @@ struct LoginView: View {
                         return
                     }
                     
-                    // Update password would happen here in a real app
-                    password = newPassword
-                    showingPasswordChangeView = false
-                    
-                    // Send verification email after password change
-                    sendVerificationOTP()
+                    // Update password in Supabase
+                    Task {
+                        do {
+                            let userData: [String: String] = ["password": newPassword, "vis": "true"]
+                            try await SupabaseManager.shared.client
+                                .from("Users")
+                                .update(userData)
+                                .eq("email", value: email)
+                                .execute()
+                            
+                            // Update status to working after password reset
+                            let statusData: [String: String] = ["status": "working"]
+                            try await SupabaseManager.shared.client
+                                .from("Users")
+                                .update(statusData)
+                                .eq("email", value: email)
+                                .execute()
+                            
+                            DispatchQueue.main.async {
+                                password = newPassword
+                                showingPasswordChangeView = false
+                                isLibrarianLoggedIn = true
+                                UserDefaults.standard.set(email, forKey: "currentMemberEmail")
+                            }
+                        } catch {
+                            DispatchQueue.main.async {
+                                errorMessage = "Failed to update password: \(error.localizedDescription)"
+                            }
+                        }
+                    }
                 },
                 onCancel: {
                     showingPasswordChangeView = false
+                }
+            )
+        }
+        .sheet(isPresented: $showingForgotPassword) {
+            PasswordResetView(
+                newPassword: $newPassword,
+                confirmPassword: $confirmPassword,
+                isNewPasswordVisible: $isNewPasswordVisible,
+                email: email,
+                title: "Reset Password",
+                message: "Please enter a new password for your account",
+                buttonTitle: "Reset Password",
+                onSave: {
+                    if newPassword.isEmpty || confirmPassword.isEmpty {
+                        errorMessage = "Passwords cannot be empty"
+                        return
+                    }
+                    
+                    if newPassword != confirmPassword {
+                        errorMessage = "Passwords don't match"
+                        return
+                    }
+                    
+                    // Update password in Supabase
+                    Task {
+                        do {
+                            let userData: [String: String] = ["password": newPassword]
+                            try await SupabaseManager.shared.client
+                                .from("Users")
+                                .update(userData)
+                                .eq("email", value: email)
+                                .execute()
+                            
+                            DispatchQueue.main.async {
+                                showingForgotPassword = false
+                                errorMessage = "Password has been reset successfully. Please login with your new password."
+                                password = ""
+                            }
+                        } catch {
+                            DispatchQueue.main.async {
+                                errorMessage = "Failed to reset password: \(error.localizedDescription)"
+                            }
+                        }
+                    }
+                },
+                onCancel: {
+                    showingForgotPassword = false
                 }
             )
         }
@@ -218,10 +272,20 @@ struct LoginView: View {
                 email: email,
                 otp: $otpCode,
                 onVerify: {
-                    verifyOTP()
+                    if showingForgotPassword {
+                        // For forgot password flow
+                        showingOTPView = false
+                        showingForgotPassword = true
+                    } else {
+                        // For normal login flow
+                        verifyOTP()
+                    }
                 },
                 onCancel: {
                     showingOTPView = false
+                    if showingForgotPassword {
+                        showingForgotPassword = false
+                    }
                 }
             )
         }
@@ -321,25 +385,19 @@ struct LoginView: View {
         if EmailService.shared.verifyOTP(email: email, code: otpCode) {
             // OTP verified
             EmailService.shared.clearOTP(for: email)
-            isLibrarianLoggedIn = true
-            UserDefaults.standard.set(email, forKey: "currentMemberEmail")
-            showingOTPView = false
             
             // Set login state based on role
             switch userRole {
             case .admin:
                 isAdminLoggedIn = true
+                showingOTPView = false
             case .librarian:
-                Task {
-                    try! await SupabaseManager.shared.client
-                        .from("Users")
-                        .update(["status": "working"])
-                        .eq("email", value: email)
-                        .execute()
-                }
-                isLibrarianLoggedIn = true
+                // For librarian, show password reset view first
+                showingOTPView = false
+                showingPasswordChangeView = true
             case .member:
                 isMemberLoggedIn = true
+                showingOTPView = false
             }
         }
     }
