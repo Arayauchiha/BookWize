@@ -210,10 +210,22 @@ struct DashboardView: View {
                         
                         // Monthly Reading Goal Section
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Monthly Reading Goal")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .padding(.horizontal)
+                            Button(action: {
+                                showReadingTracker = true
+                            }) {
+                                HStack {
+                                    Text("Reading Progress")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .contentShape(Rectangle())
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.horizontal)
                             
                             ReadingProgressCard(
                                 monthlyGoal: user?.monthlyGoal ?? 0,
@@ -518,17 +530,6 @@ struct ReadingProgressCard: View {
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 15) {
-                HStack {
-                    Text("Monthly Reading Goal")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.secondary)
-                }
-                
                 HStack(spacing: 20) {
                     // Progress Ring
                     ZStack {
@@ -592,6 +593,8 @@ struct ReadingProgressCard: View {
                         }
                     }
                     .padding(.leading, 10)
+                    
+                    Spacer() // Add this spacer to stretch content horizontally
                 }
                 .padding(.vertical, 10)
                 
@@ -611,6 +614,7 @@ struct ReadingProgressCard: View {
                 }
             }
             .padding()
+            .frame(maxWidth: .infinity, alignment: .leading) // Add this to stretch container
             .background(Color(.systemBackground))
             .cornerRadius(12)
             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
