@@ -15,6 +15,11 @@ enum BookStatus: String {
         }
     }
 }
+struct Member: Identifiable , Codable {
+    let id: String
+    let email: String
+    let name: String
+}
 
 struct BorrowedBook: Identifiable {
     let id: String
@@ -68,16 +73,271 @@ struct BookData: Identifiable, Codable {
 // MARK: - View Models
 class BorrowedBooksManager: ObservableObject {
     @Published var borrowedBooks: [BorrowedBook] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    private var timer: Timer?
     
-    func fetchBorrowedBooks() {
-        // TODO: Implement API call to fetch borrowed books
-        // For now, using sample data with different due dates
-        borrowedBooks = [
-            BorrowedBook(id: "1", title: "The Great Gatsby", author: "F. Scott Fitzgerald", coverImage: "book.fill", issueDate: Date().addingTimeInterval(-10*24*60*60), dueDate: Date().addingTimeInterval(-2*24*60*60), progress: 0.6, status: .borrowed),
-            BorrowedBook(id: "2", title: "1984", author: "George Orwell", coverImage: "book.fill", issueDate: Date(), dueDate: Date().addingTimeInterval(5*24*60*60), progress: 0.3, status: .borrowed),
-            BorrowedBook(id: "3", title: "To Kill a Mockingbird", author: "Harper Lee", coverImage: "book.fill", issueDate: Date(), dueDate: Date().addingTimeInterval(7*24*60*60), progress: 0.8, status: .borrowed),
-            BorrowedBook(id: "4", title: "The Hobbit", author: "J.R.R. Tolkien", coverImage: "book.fill", issueDate: Date(), dueDate: Date().addingTimeInterval(10*60*60), progress: 0.4, status: .borrowed)
-        ]
+    
+    
+    deinit {
+        timer?.invalidate()
+    }
+    
+    
+    func refreshBorrowedBooks() async {
+        await fetchBorrowedBooks()
+    }
+    
+    func fetchBorrowedBooks() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Get the current user's email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                errorMessage = "User email not found"
+                isLoading = false
+                return
+            }
+            
+            print("Fetching borrowed books for user: \(userEmail)")
+            
+            // First, fetch the issued books
+            let issueBooksResponse: [issueBooks] = try await SupabaseManager.shared.client
+                .from("issuebooks")
+                .select("*")
+                .eq("member_email", value: userEmail)
+                .is("actual_returned_date", value: nil)
+                .execute()
+                .value
+            
+            print("Fetched \(issueBooksResponse.count) issued books")
+            
+            // Convert to BorrowedBook objects
+            var books: [BorrowedBook] = []
+            
+            // Fetch book details for each issued book
+            for issue in issueBooksResponse {
+                do {
+                    // Fetch book details using ISBN
+                    let bookResponse: [Book] = try await SupabaseManager.shared.client
+                        .from("Books")
+                        .select("*")
+                        .eq("isbn", value: issue.isbn)
+                        .execute()
+                        .value
+                    
+                    if let book = bookResponse.first {
+                        let borrowedBook = BorrowedBook(
+                            id: issue.id.uuidString,
+                            title: book.title,
+                            author: book.author,
+                            coverImage: book.imageURL ?? "book.fill",
+                            issueDate: issue.issueDate,
+                            dueDate: issue.returnDate!,
+                            progress: Double(issue.pagesRead ?? 0) / Double(book.pageCount ?? 1),
+                            status: .borrowed
+                        )
+                        books.append(borrowedBook)
+                    } else {
+                        print("Book not found for ISBN: \(issue.isbn)")
+                    }
+                } catch {
+                    print("Error fetching book details for ISBN \(issue.isbn): \(error)")
+                }
+            }
+            
+            await MainActor.run {
+                self.borrowedBooks = books
+                self.isLoading = false
+                print("Updated borrowed books: \(books.count)")
+            }
+            
+        } catch {
+            print("Error fetching borrowed books: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load borrowed books: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
+    }
+}
+
+// Add this after BorrowedBooksManager class
+class ReturnedBooksManager: ObservableObject {
+    @Published var returnedBooks: [ReturnedBook] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    func refreshReturnedBooks() async {
+        await fetchReturnedBooks()
+    }
+    
+    func fetchReturnedBooks() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Get the current user's email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                errorMessage = "User email not found"
+                isLoading = false
+                return
+            }
+            
+            print("Fetching returned books for user: \(userEmail)")
+            
+            // Fetch returned books
+            let issueBooksResponse: [issueBooks] = try await SupabaseManager.shared.client
+                .from("issuebooks")
+                .select("*")
+                .eq("member_email", value: userEmail)
+                .execute()
+                .value
+            
+            print("Fetched \(issueBooksResponse.count) books")
+            
+            // Filter returned books in Swift code
+            let returnedBooks = issueBooksResponse.filter { $0.actualReturnedDate != nil }
+            print("Found \(returnedBooks.count) returned books")
+            
+            // Convert to ReturnedBook objects
+            var books: [ReturnedBook] = []
+            
+            // Fetch book details for each returned book
+            for issue in returnedBooks {
+                do {
+                    // Fetch book details using ISBN
+                    let bookResponse: [Book] = try await SupabaseManager.shared.client
+                        .from("Books")
+                        .select("*")
+                        .eq("isbn", value: issue.isbn)
+                        .execute()
+                        .value
+                    
+                    if let book = bookResponse.first {
+                        let returnedBook = ReturnedBook(
+                            id: issue.id.uuidString,
+                            title: book.title,
+                            author: book.author,
+                            coverImage: book.imageURL ?? "book.fill",
+                            issueDate: issue.issueDate,
+                            dueDate: issue.returnDate!,
+                            returnDate: issue.actualReturnedDate!,
+                            progress: Double(issue.pagesRead ?? 0) / Double(book.pageCount ?? 1)
+                        )
+                        books.append(returnedBook)
+                    } else {
+                        print("Book not found for ISBN: \(issue.isbn)")
+                    }
+                } catch {
+                    print("Error fetching book details for ISBN \(issue.isbn): \(error)")
+                }
+            }
+            
+            await MainActor.run {
+                self.returnedBooks = books
+                self.isLoading = false
+                print("Updated returned books: \(books.count)")
+            }
+            
+        } catch {
+            print("Error fetching returned books: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load returned books: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
+    }
+}
+
+// Add this after BorrowedBook struct
+struct ReturnedBook: Identifiable {
+    let id: String
+    let title: String
+    let author: String
+    let coverImage: String
+    let issueDate: Date
+    let dueDate: Date
+    let returnDate: Date
+    let progress: Double
+}
+
+// Add this after the ReturnedBooksManager class
+class ReservedBooksManager: ObservableObject {
+    @Published var reservedBooks: [ReservationRecord] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    private var timer: Timer?
+    
+    deinit {
+        timer?.invalidate()
+    }
+    
+    func refreshReservedBooks() async {
+        await fetchReservedBooks()
+    }
+    
+    func fetchReservedBooks() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Get the current user's email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                errorMessage = "User email not found"
+                isLoading = false
+                return
+            }
+            
+            print("Fetching reserved books for user: \(userEmail)")
+            
+            // First, get the user's ID from their email
+            let memberResponse: [Member] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("*")
+                .eq("email", value: userEmail)
+                .execute()
+                .value
+            
+            guard let memberId = memberResponse.first?.id else {
+                print("Member not found for email: \(userEmail)")
+                errorMessage = "Member not found"
+                isLoading = false
+                return
+            }
+            
+            // Fetch reservations with joined book data
+            let reservationsResponse: [ReservationRecord] = try await SupabaseManager.shared.client
+                .from("BookReservation")
+                .select("""
+                    *,
+                    member:Members(*),
+                    book:Books(*)
+                    """)
+                .eq("member_id", value: memberId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            
+            print("Fetched \(reservationsResponse.count) reservations")
+            
+            await MainActor.run {
+                self.reservedBooks = reservationsResponse
+                self.isLoading = false
+                print("Updated reserved books: \(reservationsResponse.count)")
+            }
+            
+        } catch {
+            print("Error fetching reserved books: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load reserved books: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
     }
 }
 
@@ -166,9 +426,8 @@ struct DashboardView: View {
                     } else {
                         // Your Reads Section
                         VStack(alignment: .leading, spacing: 8) {
-                            Button(action: {
-                                showingBookManagement = true
-                            }) {
+                            NavigationLink(destination: BookManagementView()
+                                .environmentObject(booksManager)) {
                                 HStack {
                                     Text("Your Reads")
                                         .font(.title2)
@@ -187,6 +446,7 @@ struct DashboardView: View {
                                 TabView(selection: $currentIndex) {
                                     BorrowedBookRow(book: urgentBook)
                                         .tag(0)
+                                        .padding(.horizontal)
                                 }
                                 .tabViewStyle(.page(indexDisplayMode: .never))
                                 .frame(height: 200)
@@ -246,12 +506,18 @@ struct DashboardView: View {
             .onAppear {
                 Task {
                     await fetchUserData()
-                    booksManager.fetchBorrowedBooks()
+                    await booksManager.fetchBorrowedBooks()
                 }
             }
-            .sheet(isPresented: $showingBookManagement) {
-                BookManagementView()
-                    .environmentObject(booksManager)
+
+            .sheet(isPresented: $showReadingTracker) {
+                ReadingProgressDetailView(
+                    monthlyGoal: user?.monthlyGoal ?? 0,
+                    issuedBooks: issuedBooks,
+                    updatePagesRead: updatePagesRead,
+                    updateGoal: updateMonthlyGoal
+                )
+
             }
             .sheet(isPresented: $showingGoalSheet) {
                 MonthlyGoalSheet(
@@ -521,65 +787,53 @@ struct BookManagementView: View {
     @State private var selectedSegment = 0
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Custom Segmented Control
-                HStack(spacing: 0) {
-                    ForEach(0..<3) { index in
-                        Button(action: {
-                            withAnimation {
-                                selectedSegment = index
-                            }
-                        }) {
-                            VStack(spacing: 8) {
-                                Text(segmentTitle(for: index))
-                                    .font(.subheadline)
-                                    .fontWeight(selectedSegment == index ? .semibold : .regular)
-                                
-                                Rectangle()
-                                    .fill(selectedSegment == index ? Color.blue : Color.clear)
-                                    .frame(height: 3)
-                            }
-                            .foregroundColor(selectedSegment == index ? .blue : .gray)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+        VStack(spacing: 0) {
+            // Custom Segmented Control
+            HStack(spacing: 0) {
+                ForEach(0..<3) { index in
+                    Button(action: {
+                        withAnimation {
+                            selectedSegment = index
                         }
+                    }) {
+                        VStack(spacing: 8) {
+                            Text(segmentTitle(for: index))
+                                .font(.subheadline)
+                                .fontWeight(selectedSegment == index ? .semibold : .regular)
+                            
+                            Rectangle()
+                                .fill(selectedSegment == index ? Color.blue : Color.clear)
+                                .frame(height: 3)
+                        }
+                        .foregroundColor(selectedSegment == index ? .blue : .gray)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
                     }
                 }
-                .background(Color(.systemBackground))
-                .overlay(
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 1),
-                    alignment: .bottom
-                )
+            }
+            .background(Color(.systemBackground))
+            .overlay(
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 1),
+                alignment: .bottom
+            )
+            
+            // Content based on selected segment
+            TabView(selection: $selectedSegment) {
+                BorrowedBooksView()
+                    .tag(0)
                 
-                // Content based on selected segment
-                TabView(selection: $selectedSegment) {
-                    BorrowedBooksView()
-                        .tag(0)
-                    
-                    ReservedBooksView()
-                        .tag(1)
-                    
-                    ReturnedBooksView()
-                        .tag(2)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                ReservedBooksView()
+                    .tag(1)
+                
+                ReturnedBooksView()
+                    .tag(2)
             }
-            .navigationTitle("My Books")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
+        .navigationTitle("Your Reads")
+        .navigationBarTitleDisplayMode(.large)
     }
     
     private func segmentTitle(for index: Int) -> String {
@@ -621,7 +875,11 @@ struct BorrowedBooksView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                if booksManager.borrowedBooks.isEmpty {
+                if booksManager.isLoading {
+                    ProgressView("Loading books...")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if booksManager.borrowedBooks.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "book.closed")
                             .font(.system(size: 40))
@@ -629,6 +887,15 @@ struct BorrowedBooksView: View {
                         Text("No borrowed books")
                             .font(.headline)
                             .foregroundColor(.gray)
+                        Button(action: {
+                            Task {
+                                await booksManager.refreshBorrowedBooks()
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -641,6 +908,12 @@ struct BorrowedBooksView: View {
             .padding()
         }
         .background(Color(.systemGroupedBackground))
+        .refreshable {
+            await booksManager.refreshBorrowedBooks()
+        }
+        .task {
+            await booksManager.refreshBorrowedBooks()
+        }
     }
 }
 
@@ -709,7 +982,7 @@ struct BorrowedBookRow: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
-                // Book Cover
+                // Book Cover with AsyncImage
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(LinearGradient(
@@ -720,9 +993,33 @@ struct BorrowedBookRow: View {
                         .frame(width: 80, height: 100)
                         .shadow(color: Color.blue.opacity(0.2), radius: 4, x: 0, y: 2)
                     
-                    Image(systemName: book.coverImage)
-                        .font(.system(size: 30))
-                        .foregroundColor(.blue)
+                    if book.coverImage != "book.fill" {
+                        AsyncImage(url: URL(string: book.coverImage)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 50, height: 50)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 70, height: 90)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            @unknown default:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    } else {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.blue)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -808,49 +1105,76 @@ struct BorrowedBookRow: View {
 }
 
 struct ReservedBooksView: View {
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                ForEach(0..<2) { _ in
-                    ReservedBookRow()
-                }
-            }
-            .padding()
+    @StateObject private var booksManager = ReservedBooksManager()
+    
+    var sortedBooks: [ReservationRecord] {
+        booksManager.reservedBooks.sorted { book1, book2 in
+            let expirationDate1 = Calendar.current.date(byAdding: .hour, value: 24, to: book1.created_at) ?? Date()
+            let expirationDate2 = Calendar.current.date(byAdding: .hour, value: 24, to: book2.created_at) ?? Date()
+            return expirationDate1 < expirationDate2 // Sort by earliest expiration first
         }
-        .background(Color(.systemGroupedBackground))
     }
-}
-
-struct ReturnedBooksView: View {
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                ForEach(0..<5) { _ in
-                    ReturnedBookRow()
+                if booksManager.isLoading {
+                    ProgressView("Loading books...")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if booksManager.reservedBooks.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        Text("No reserved books")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        Button(action: {
+                            Task {
+                                await booksManager.refreshReservedBooks()
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                } else {
+                    ForEach(sortedBooks) { reservation in
+                        ReservedBookRow(reservation: reservation)
+                    }
                 }
             }
             .padding()
         }
         .background(Color(.systemGroupedBackground))
+        .refreshable {
+            await booksManager.refreshReservedBooks()
+        }
+        .task {
+            await booksManager.refreshReservedBooks()
+        }
     }
 }
 
 struct ReservedBookRow: View {
-    // Sample data - in real app, this would come from a model
-    let reservationDate = Date().addingTimeInterval(-12*60*60) // 12 hours ago
-    let holdUntilDate = Date().addingTimeInterval(12*60*60) // 12 hours remaining
+    let reservation: ReservationRecord
     
     var remainingHours: Int {
+        let expirationDate = Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
         let calendar = Calendar.current
         let now = Date()
-        let components = calendar.dateComponents([.hour], from: now, to: holdUntilDate)
+        let components = calendar.dateComponents([.hour], from: now, to: expirationDate)
         return components.hour ?? 0
     }
     
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
-                // Book Cover
+                // Book Cover with AsyncImage
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(LinearGradient(
@@ -861,14 +1185,39 @@ struct ReservedBookRow: View {
                         .frame(width: 80, height: 100)
                         .shadow(color: Color.blue.opacity(0.2), radius: 4, x: 0, y: 2)
                     
-                    Image(systemName: "book.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(.blue)
+                    if let imageURL = reservation.book?.imageURL,
+                       let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 50, height: 50)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 70, height: 90)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            @unknown default:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    } else {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.blue)
+                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("1984")
+                        Text(reservation.book?.title ?? "Unknown Book")
                             .font(.headline)
                             .lineLimit(1)
                         
@@ -885,7 +1234,7 @@ struct ReservedBookRow: View {
                             .cornerRadius(8)
                     }
                     
-                    Text("George Orwell")
+                    Text(reservation.book?.author ?? "Unknown Author")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
@@ -907,7 +1256,7 @@ struct ReservedBookRow: View {
                 }
             }
             
-            // Reservation Details and Actions
+            // Reservation Details
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
@@ -918,7 +1267,7 @@ struct ReservedBookRow: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
-                    Text(reservationDate.formatted(date: .abbreviated, time: .omitted))
+                    Text(reservation.created_at.formatted(date: .abbreviated, time: .omitted))
                         .font(.subheadline)
                         .foregroundColor(.primary)
                 }
@@ -934,24 +1283,9 @@ struct ReservedBookRow: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
-                    Text(holdUntilDate.formatted(date: .abbreviated, time: .omitted))
+                    Text(Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at)?.formatted(date: .abbreviated, time: .omitted) ?? "")
                         .font(.subheadline)
                         .foregroundColor(.primary)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    // Add cancel reservation action
-                }) {
-                    Text("Cancel")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .cornerRadius(8)
                 }
             }
         }
@@ -962,11 +1296,74 @@ struct ReservedBookRow: View {
     }
 }
 
+struct ReturnedBooksView: View {
+    @StateObject private var booksManager = ReturnedBooksManager()
+    
+    var sortedBooks: [ReturnedBook] {
+        booksManager.returnedBooks.sorted { book1, book2 in
+            book1.returnDate > book2.returnDate // Most recently returned first
+        }
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                if booksManager.isLoading {
+                    ProgressView("Loading books...")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if booksManager.returnedBooks.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        Text("No returned books")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        Button(action: {
+                            Task {
+                                await booksManager.refreshReturnedBooks()
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                } else {
+                    ForEach(sortedBooks) { book in
+                        ReturnedBookRow(book: book)
+                    }
+                }
+            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+        .refreshable {
+            await booksManager.refreshReturnedBooks()
+        }
+        .task {
+            await booksManager.refreshReturnedBooks()
+        }
+    }
+}
+
 struct ReturnedBookRow: View {
+    let book: ReturnedBook
+    
+    var daysSinceReturn: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let components = calendar.dateComponents([.day], from: book.returnDate, to: now)
+        return components.day ?? 0
+    }
+    
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
-                // Book Cover with Enhanced Visual
+                // Book Cover with AsyncImage
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(LinearGradient(
@@ -977,12 +1374,29 @@ struct ReturnedBookRow: View {
                         .frame(width: 80, height: 100)
                         .shadow(color: Color.blue.opacity(0.2), radius: 4, x: 0, y: 2)
                     
-                    // Book Icon with Background
-                    ZStack {
-                        Circle()
-                            .fill(Color.blue.opacity(0.1))
-                            .frame(width: 50, height: 50)
-                        
+                    if book.coverImage != "book.fill" {
+                        AsyncImage(url: URL(string: book.coverImage)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 50, height: 50)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 70, height: 90)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            @unknown default:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    } else {
                         Image(systemName: "book.fill")
                             .font(.system(size: 30))
                             .foregroundColor(.blue)
@@ -991,13 +1405,13 @@ struct ReturnedBookRow: View {
                 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("To Kill a Mockingbird")
+                        Text(book.title)
                             .font(.headline)
                             .lineLimit(1)
                         
                         Spacer()
                         
-                        // Enhanced Status Badge
+                        // Status Badge
                         Text("Returned")
                             .font(.caption)
                             .fontWeight(.medium)
@@ -1010,11 +1424,11 @@ struct ReturnedBookRow: View {
                             .foregroundColor(.green)
                     }
                     
-                    Text("Harper Lee")
+                    Text(book.author)
                         .font(.subheadline)
                         .foregroundColor(.gray)
                     
-                    // Enhanced Return Info
+                    // Return Info
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Return Status")
                             .font(.caption)
@@ -1024,7 +1438,7 @@ struct ReturnedBookRow: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
                                 .foregroundColor(.green)
-                            Text("Returned 2 days ago")
+                            Text(daysSinceReturn == 0 ? "Returned today" : "Returned \(daysSinceReturn) day\(daysSinceReturn == 1 ? "" : "s") ago")
                                 .font(.subheadline)
                                 .foregroundColor(.green)
                         }
@@ -1032,7 +1446,7 @@ struct ReturnedBookRow: View {
                 }
             }
             
-            // Enhanced Return Details
+            // Return Details
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
@@ -1043,7 +1457,7 @@ struct ReturnedBookRow: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
-                    Text("Mar 16, 2024")
+                    Text(book.returnDate.formatted(date: .abbreviated, time: .omitted))
                         .font(.subheadline)
                         .foregroundColor(.primary)
                 }
@@ -1059,7 +1473,7 @@ struct ReturnedBookRow: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
-                    Text("Mar 22, 2024")
+                    Text(book.dueDate.formatted(date: .abbreviated, time: .omitted))
                         .font(.subheadline)
                         .foregroundColor(.primary)
                 }
