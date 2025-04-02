@@ -68,16 +68,82 @@ struct BookData: Identifiable, Codable {
 // MARK: - View Models
 class BorrowedBooksManager: ObservableObject {
     @Published var borrowedBooks: [BorrowedBook] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
     
-    func fetchBorrowedBooks() {
-        // TODO: Implement API call to fetch borrowed books
-        // For now, using sample data with different due dates
-        borrowedBooks = [
-            BorrowedBook(id: "1", title: "The Great Gatsby", author: "F. Scott Fitzgerald", coverImage: "book.fill", issueDate: Date().addingTimeInterval(-10*24*60*60), dueDate: Date().addingTimeInterval(-2*24*60*60), progress: 0.6, status: .borrowed),
-            BorrowedBook(id: "2", title: "1984", author: "George Orwell", coverImage: "book.fill", issueDate: Date(), dueDate: Date().addingTimeInterval(5*24*60*60), progress: 0.3, status: .borrowed),
-            BorrowedBook(id: "3", title: "To Kill a Mockingbird", author: "Harper Lee", coverImage: "book.fill", issueDate: Date(), dueDate: Date().addingTimeInterval(7*24*60*60), progress: 0.8, status: .borrowed),
-            BorrowedBook(id: "4", title: "The Hobbit", author: "J.R.R. Tolkien", coverImage: "book.fill", issueDate: Date(), dueDate: Date().addingTimeInterval(10*60*60), progress: 0.4, status: .borrowed)
-        ]
+    func fetchBorrowedBooks() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Get the current user's email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                errorMessage = "User email not found"
+                isLoading = false
+                return
+            }
+            
+            print("Fetching borrowed books for user: \(userEmail)")
+            
+            // First, fetch the issued books
+            let issueBooksResponse: [issueBooks] = try await SupabaseManager.shared.client
+                .from("issuebooks")
+                .select("*")
+                .eq("member_email", value: userEmail)
+                .is("actual_returned_date", value: nil)
+                .execute()
+                .value
+            
+            print("Fetched \(issueBooksResponse.count) issued books")
+            
+            // Convert to BorrowedBook objects
+            var books: [BorrowedBook] = []
+            
+            // Fetch book details for each issued book
+            for issue in issueBooksResponse {
+                do {
+                    // Fetch book details using ISBN
+                    let bookResponse: [Book] = try await SupabaseManager.shared.client
+                        .from("Books")
+                        .select("*")
+                        .eq("isbn", value: issue.isbn)
+                        .execute()
+                        .value
+                    
+                    if let book = bookResponse.first {
+                        let borrowedBook = BorrowedBook(
+                            id: issue.id.uuidString,
+                            title: book.title,
+                            author: book.author,
+                            coverImage: book.imageURL ?? "book.fill",
+                            issueDate: issue.issueDate,
+                            dueDate: issue.returnDate!,
+                            progress: Double(issue.pagesRead ?? 0) / Double(book.pageCount ?? 1),
+                            status: .borrowed
+                        )
+                        books.append(borrowedBook)
+                    } else {
+                        print("Book not found for ISBN: \(issue.isbn)")
+                    }
+                } catch {
+                    print("Error fetching book details for ISBN \(issue.isbn): \(error)")
+                }
+            }
+            
+            await MainActor.run {
+                self.borrowedBooks = books
+                self.isLoading = false
+                print("Updated borrowed books: \(books.count)")
+            }
+            
+        } catch {
+            print("Error fetching borrowed books: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load borrowed books: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
     }
 }
 
@@ -243,7 +309,7 @@ struct DashboardView: View {
             .onAppear {
                 Task {
                     await fetchUserData()
-                    booksManager.fetchBorrowedBooks()
+                    await booksManager.fetchBorrowedBooks()
                 }
             }
             .sheet(isPresented: $showingBookManagement) {
