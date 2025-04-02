@@ -180,11 +180,21 @@ struct AdminDashboardView: View {
                         }
                         .padding(.vertical)
                     }
-                    .navigationTitle("Dashboard")
                     .refreshable {
-                        await fetchBookRequests()
-                        await fetchAnalytics()
+                        do {
+                            errorMessage = nil // Clear any previous errors
+                            async let requests = fetchBookRequests()
+                            async let analytics = fetchAnalytics()
+                            _ = try await (requests, analytics)
+                        } catch {
+                            // Only show error if it's not a cancellation
+                            if (error as NSError).domain != NSURLErrorDomain || 
+                               (error as NSError).code != NSURLErrorCancelled {
+                                errorMessage = "Failed to refresh: \(error.localizedDescription)"
+                            }
+                        }
                     }
+                    .navigationTitle("Dashboard")
                 }
                 .tabItem {
                     Label("Dashboard", systemImage: "chart.bar.fill")
@@ -279,16 +289,7 @@ struct AdminDashboardView: View {
         defer { isLoading = false }
         
         do {
-            print("Fetching book requests...")
             let client = SupabaseManager.shared.client
-            let rawResponse = try await client
-                .from("BookRequest")
-                .select()
-                .order("created_at", ascending: false)
-                .limit(5)
-                .execute()
-            print("Raw book requests response: \(String(describing: rawResponse.data))")
-            
             let response: [BookRequest] = try await client
                 .from("BookRequest")
                 .select()
@@ -296,20 +297,15 @@ struct AdminDashboardView: View {
                 .limit(5)
                 .execute()
                 .value
-            print("Decoded book requests: \(response)")
-            bookRequests = response
+            
+            await MainActor.run {
+                bookRequests = response
+            }
         } catch {
-            print("Book requests error details: \(error)")
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case .keyNotFound(let key, _):
-                    errorMessage = "Column not found in BookRequest: \(key)"
-                case .typeMismatch(_, let context):
-                    errorMessage = "Type mismatch in BookRequest: \(context.debugDescription)"
-                default:
-                    errorMessage = "Decoding error in BookRequest: \(decodingError.localizedDescription)"
-                }
-            } else {
+            print("Book requests error: \(error.localizedDescription)")
+            // Only show error if it's not a cancellation
+            if (error as NSError).domain != NSURLErrorDomain || 
+               (error as NSError).code != NSURLErrorCancelled {
                 errorMessage = "Failed to load requests: \(error.localizedDescription)"
             }
         }
@@ -319,36 +315,32 @@ struct AdminDashboardView: View {
         do {
             let client = SupabaseManager.shared.client
             
-            // First, let's print raw JSON for membership fee
-            print("Fetching membership fee...")
-            let membershipRawResponse = try await client
-                .from("FineAndMembershipSet")
-                .select("*")
-                .execute()
-            print("Raw membership response: \(String(describing: membershipRawResponse.data))")
-            
-            struct MembershipSetting: Codable, Hashable {
+            // Define the required structs
+            struct MembershipSetting: Codable {
                 let Membership: Double?
                 let PerDayFine: Double?
                 let FineSet_id: UUID?
             }
             
+            struct Fine: Codable {
+                let fineAmount: Double?
+                let id: UUID?
+            }
+            
+            struct LibrarianUser: Codable {
+                var email: String
+                var roleFetched: String
+                var status: String
+            }
+            
+            // Fetch membership fee and members count
             let membershipFeeResponse: [MembershipSetting] = try await client
                 .from("FineAndMembershipSet")
                 .select("*")
                 .execute()
                 .value
             
-            print("Decoded membership response: \(membershipFeeResponse)")
             let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
-            
-            // Print raw JSON for members
-            print("Fetching members count...")
-            let membersRawResponse = try await client
-                .from("Members")
-                .select("*")
-                .execute()
-            print("Raw members response: \(String(describing: membersRawResponse.data))")
             
             let membersCount: Int = try await client
                 .from("Members")
@@ -356,112 +348,60 @@ struct AdminDashboardView: View {
                 .execute()
                 .count ?? 0
             
-            print("Members count: \(membersCount)")
             let membershipRevenue = Double(membersCount) * membershipFee
             
-            // Print raw JSON for fines
-            print("Fetching fines...")
-            let finesRawResponse = try await client
-                .from("issuebooks")
-                .select("*")
-                .execute()
-            print("Raw fines response: \(String(describing: finesRawResponse.data))")
-            
-            struct Fine: Codable {
-                let fineAmount: Double?
-                let id: UUID?
-            }
-            
+            // Fetch fines
             let finesResponse: [Fine] = try await client
                 .from("issuebooks")
                 .select("fineAmount, id")
                 .execute()
                 .value
             
-            print("Decoded fines: \(finesResponse)")
-            let totalFines = finesResponse.reduce(0) { $0 + ($1.fineAmount ?? 0) }
+            let totalFines = finesResponse.reduce(0.0) { sum, fine in
+                sum + (fine.fineAmount ?? 0)
+            }
             
             // Calculate total revenue
             let totalAmount = membershipRevenue + totalFines
-            totalRevenue = String(format: "$%.2f", totalAmount)
-            overdueFines = String(format: "$%.2f", totalFines)
             
-            // Print raw JSON for librarians
-            print("----------------------------------------")
-            print("DEBUGGING LIBRARIAN COUNT")
-            print("----------------------------------------")
-            
-            print("Fetching librarians count...")
-            struct LibrarianUser: Codable {
-                var email: String
-                var roleFetched: String
-                var status: String
-            }
-            
-            do {
-                // Use the exact same approach as in LibrarianManagementView.swift
-                let librarians: [LibrarianUser]? = try await client
-                    .from("Users")
-                    .select("email, roleFetched, status")
-                    .eq("roleFetched", value: "librarian")
-                    .eq("status", value: "working")
-                    .execute()
-                    .value
-                
-                let count = librarians?.count ?? 0
-                print("Librarians found: \(count)")
-                activeLibrarians = "\(count)"
-            } catch {
-                print("Error fetching librarians: \(error)")
-                activeLibrarians = "0" // Default to 0 on error
-            }
-            
-            activeMembers = "\(membersCount)"
-            
-            // Print raw JSON for books
-            print("Fetching books count...")
-            let booksRawResponse = try await client
-                .from("Books")
-                .select("*")
-                .execute()
-            print("Raw books response: \(String(describing: booksRawResponse.data))")
-            
+            // Fetch books count
             let booksCount: Int = try await client
                 .from("Books")
                 .select("*", head: true)
                 .execute()
                 .count ?? 0
             
-            totalBooks = "\(booksCount)"
-            
-            // Print raw JSON for issued books
-            print("Fetching issued books count...")
-            let issuedRawResponse = try await client
-                .from("issuebooks")
-                .select("*")
-                .execute()
-            print("Raw issued books response: \(String(describing: issuedRawResponse.data))")
-            
+            // Fetch issued books count
             let issuedCount: Int = try await client
                 .from("issuebooks")
                 .select("*", head: true)
                 .execute()
                 .count ?? 0
             
-            issuedBooks = "\(issuedCount)"
+            // Fetch librarians count
+            let librarians: [LibrarianUser] = try await client
+                .from("Users")
+                .select("email, roleFetched, status")
+                .eq("roleFetched", value: "librarian")
+                .eq("status", value: "working")
+                .execute()
+                .value
+            
+            // Update all UI values at once on the main thread
+            await MainActor.run {
+                totalRevenue = String(format: "$%.2f", totalAmount)
+                overdueFines = String(format: "$%.2f", totalFines)
+                activeLibrarians = "\(librarians.count)"
+                activeMembers = "\(membersCount)"
+                totalBooks = "\(booksCount)"
+                issuedBooks = "\(issuedCount)"
+            }
             
         } catch {
-            print("Analytics error details: \(error)")
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case .keyNotFound(let key, _):
-                    errorMessage = "Column not found: \(key)"
-                case .typeMismatch(_, let context):
-                    errorMessage = "Type mismatch: \(context.debugDescription)"
-                default:
-                    errorMessage = "Decoding error: \(decodingError.localizedDescription)"
-                }
-            } else {
+            print("Analytics error: \(error.localizedDescription)")
+            // Only show error if it's not a cancellation
+            if (error as NSError).domain != NSURLErrorDomain || 
+               (error as NSError).code != NSURLErrorCancelled {
                 errorMessage = "Failed to load analytics: \(error.localizedDescription)"
             }
         }
