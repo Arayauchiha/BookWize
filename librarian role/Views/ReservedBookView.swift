@@ -13,6 +13,9 @@ struct ReservedBookView: View {
     @State private var issuedReservationId: UUID?
     @State private var showSuccessAlert = false
     
+    // MARK: - Cleanup timer
+    @State private var cleanupTimer: Timer?
+    
     private let supabase = SupabaseConfig.client
     
     var filteredReservations: [ReservationRecord] {
@@ -31,11 +34,18 @@ struct ReservedBookView: View {
             .refreshable {
                 isLoading = true
                 await fetchReservations()
+                await checkExpiredReservations()
             }
             .onAppear {
                 Task {
                     await fetchReservations()
+                    await checkExpiredReservations()
+                    startCleanupTimer()
                 }
+            }
+            .onDisappear {
+                cleanupTimer?.invalidate()
+                cleanupTimer = nil
             }
             .onChange(of: searchText) { _ in
                 Task {
@@ -86,6 +96,18 @@ struct ReservedBookView: View {
             }
     }
     
+    // MARK: - Timer Functions
+    
+    private func startCleanupTimer() {
+        cleanupTimer?.invalidate()
+        // Check for expired reservations every 5 minutes
+        cleanupTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { _ in
+            Task {
+                await checkExpiredReservations()
+            }
+        }
+    }
+    
     // MARK: - Extracted View Components
     
     private var mainContent: some View {
@@ -93,7 +115,11 @@ struct ReservedBookView: View {
             if isLoading {
                 LoadingView()
             } else if reservations.isEmpty {
-                EmptyView()
+                EmptyStateView(
+                    icon: "clock.badge.exclamationmark",
+                    title: "No Reservations Found",
+                    message: "Reservations expire automatically after 24 hours if not processed. Check back later or refresh the page."
+                )
             } else {
                 reservationsList
             }
@@ -121,6 +147,8 @@ struct ReservedBookView: View {
         }
     }
     
+    // MARK: - Data Fetching and Processing
+    
     func fetchReservations() async {
         do {
             let response: [ReservationRecord] = try await supabase.database
@@ -145,6 +173,89 @@ struct ReservedBookView: View {
                 errorMessage = "Failed to load reservations"
                 isLoading = false
             }
+        }
+    }
+    
+    // Check for and process expired reservations
+    func checkExpiredReservations() async {
+        print("Checking for expired reservations...")
+        
+        var expiredReservations: [ReservationRecord] = []
+        let now = Date()
+        
+        // Identify expired reservations (older than 24 hours)
+        for reservation in reservations {
+            let expirationDate = Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
+            if now > expirationDate {
+                expiredReservations.append(reservation)
+            }
+        }
+        
+        if expiredReservations.isEmpty {
+            print("No expired reservations found.")
+            return
+        }
+        
+        print("Found \(expiredReservations.count) expired reservations. Processing...")
+        
+        // Process each expired reservation
+        for reservation in expiredReservations {
+            await processExpiredReservation(reservation)
+        }
+        
+        // Refresh the reservations list
+        await fetchReservations()
+    }
+    
+    // Process a single expired reservation
+    private func processExpiredReservation(_ reservation: ReservationRecord) async {
+        guard let book = reservation.book, let isbn = book.isbn else {
+            print("Missing book information for reservation \(reservation.id)")
+            return
+        }
+        
+        do {
+            // Start a transaction
+            try await SupabaseManager.shared.client.rpc("begin_transaction")
+            
+            // First, get the current book quantities
+            let response = try await SupabaseManager.shared.client
+                .from("Books")
+                .select("availableQuantity, quantity")
+                .eq("isbn", value: isbn)
+                .single()
+                .execute()
+            
+            guard let data = response.data as? [[String: Any]],
+                  let firstBook = data.first,
+                  let availableQuantity = firstBook["availableQuantity"] as? Int,
+                  let quantity = firstBook["quantity"] as? Int else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get book quantity"])
+            }
+            
+            // Update book quantities (increment availableQuantity by 1)
+            try await SupabaseManager.shared.client
+                .from("Books")
+                .update(["availableQuantity": availableQuantity + 1])
+                .eq("isbn", value: isbn)
+                .execute()
+            
+            // Delete the reservation
+            try await SupabaseManager.shared.client
+                .from("BookReservation")
+                .delete()
+                .eq("id", value: reservation.id.uuidString)
+                .execute()
+            
+            // Commit the transaction
+            try await SupabaseManager.shared.client.rpc("commit_transaction")
+            
+            print("Successfully processed expired reservation \(reservation.id) for book: \(book.title)")
+            
+        } catch {
+            // Rollback the transaction if it was started
+            try? await SupabaseManager.shared.client.rpc("rollback_transaction")
+            print("Error processing expired reservation \(reservation.id): \(error.localizedDescription)")
         }
     }
     
@@ -329,6 +440,33 @@ struct ReservedBookView: View {
     struct ReservationCard: View {
         let reservation: ReservationRecord
         let issueAction: () -> Void
+        @State private var timeRemaining: TimeInterval = 0
+        @State private var timer: Timer?
+        
+        var formattedTimeRemaining: String {
+            if timeRemaining <= 0 {
+                return "Expired"
+            }
+            
+            let hours = Int(timeRemaining) / 3600
+            let minutes = Int(timeRemaining) % 3600 / 60
+            
+            if hours > 0 {
+                return "\(hours)h \(minutes)m remaining"
+            } else {
+                return "\(minutes)m remaining"
+            }
+        }
+        
+        var timeRemainingColor: Color {
+            if timeRemaining <= 0 {
+                return .red
+            } else if timeRemaining < 3600 { // Less than 1 hour
+                return .orange
+            } else {
+                return .blue
+            }
+        }
         
         var body: some View {
             VStack(spacing: 0) {
@@ -373,13 +511,25 @@ struct ReservedBookView: View {
                                 .foregroundColor(.secondary)
                         }
                         
-                        // Reservation Date
-                        HStack {
-                            Image(systemName: "calendar")
-                                .foregroundColor(.gray)
-                            Text(reservation.created_at.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        // Reservation Date and Time Remaining
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(.gray)
+                                Text(reservation.created_at.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            // Countdown Timer
+                            HStack {
+                                Image(systemName: "timer")
+                                    .foregroundColor(timeRemainingColor)
+                                Text(formattedTimeRemaining)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(timeRemainingColor)
+                            }
                         }
                     }
                     .padding(.vertical, 8)
@@ -397,11 +547,36 @@ struct ReservedBookView: View {
                         .cornerRadius(8)
                 }
                 .padding(.top, 12)
+                .disabled(timeRemaining <= 0)
+                .opacity(timeRemaining <= 0 ? 0.5 : 1)
             }
             .padding(16)
             .background(Color(UIColor.systemBackground))
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+            .onAppear {
+                calculateTimeRemaining()
+                startTimer()
+            }
+            .onDisappear {
+                timer?.invalidate()
+                timer = nil
+            }
+        }
+        
+        private func calculateTimeRemaining() {
+            let expirationDate = Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
+            timeRemaining = expirationDate.timeIntervalSince(Date())
+            if timeRemaining < 0 {
+                timeRemaining = 0
+            }
+        }
+        
+        private func startTimer() {
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                calculateTimeRemaining()
+            }
         }
     }
     
@@ -409,6 +584,37 @@ struct ReservedBookView: View {
         let reservation: ReservationRecord
         let issueAction: () -> Void
         @Environment(\.dismiss) private var dismiss
+        @State private var timeRemaining: TimeInterval = 0
+        @State private var timer: Timer?
+        
+        private var expirationDate: Date {
+            Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
+        }
+        
+        var formattedTimeRemaining: String {
+            if timeRemaining <= 0 {
+                return "Expired"
+            }
+            
+            let hours = Int(timeRemaining) / 3600
+            let minutes = Int(timeRemaining) % 3600 / 60
+            
+            if hours > 0 {
+                return "\(hours) hours \(minutes) minutes remaining"
+            } else {
+                return "\(minutes) minutes remaining"
+            }
+        }
+        
+        var timeRemainingColor: Color {
+            if timeRemaining <= 0 {
+                return .red
+            } else if timeRemaining < 3600 { // Less than 1 hour
+                return .orange
+            } else {
+                return .blue
+            }
+        }
         
         var body: some View {
             NavigationView {
@@ -448,11 +654,63 @@ struct ReservedBookView: View {
                                 title: "Reserved On",
                                 value: reservation.created_at.formatted(date: .long, time: .shortened)
                             )
+                            
+                            DetailItem(
+                                title: "Expires On",
+                                value: expirationDate.formatted(date: .long, time: .shortened),
+                                valueColor: timeRemaining > 0 ? .primary : .red
+                            )
+                            
+                            DetailItem(
+                                title: "Time Left",
+                                value: formattedTimeRemaining,
+                                valueColor: timeRemainingColor
+                            )
+                            
                             DetailItem(
                                 title: "Status",
-                                value: "Reserved",
-                                valueColor: .blue
+                                value: timeRemaining > 0 ? "Reserved" : "Expired",
+                                valueColor: timeRemaining > 0 ? .blue : .red
                             )
+                        }
+                        
+                        // Expiration Notice
+                        if timeRemaining > 0 {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundColor(.orange)
+                                    Text("Reservation Expiration Policy")
+                                        .font(.headline)
+                                        .foregroundColor(.orange)
+                                }
+                                
+                                Text("This reservation will automatically expire in \(formattedTimeRemaining) if not processed. Once expired, the book will become available for others to reserve.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding()
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(12)
+                        } else {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Image(systemName: "xmark.circle")
+                                        .foregroundColor(.red)
+                                    Text("Reservation Expired")
+                                        .font(.headline)
+                                        .foregroundColor(.red)
+                                }
+                                
+                                Text("This reservation has expired and will be automatically removed. The book is now available for others to reserve.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(12)
                         }
                         
                         // Action Button
@@ -462,10 +720,11 @@ struct ReservedBookView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.blue)
+                                .background(timeRemaining > 0 ? Color.blue : Color.gray)
                                 .cornerRadius(12)
                         }
                         .padding(.top)
+                        .disabled(timeRemaining <= 0)
                     }
                     .padding()
                 }
@@ -476,6 +735,28 @@ struct ReservedBookView: View {
                         Button("Done") { dismiss() }
                     }
                 }
+                .onAppear {
+                    calculateTimeRemaining()
+                    startTimer()
+                }
+                .onDisappear {
+                    timer?.invalidate()
+                    timer = nil
+                }
+            }
+        }
+        
+        private func calculateTimeRemaining() {
+            timeRemaining = expirationDate.timeIntervalSince(Date())
+            if timeRemaining < 0 {
+                timeRemaining = 0
+            }
+        }
+        
+        private func startTimer() {
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                calculateTimeRemaining()
             }
         }
     }
@@ -536,6 +817,39 @@ struct ReservedBookView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(UIColor.systemBackground))
+        }
+    }
+    
+    struct EmptyStateView: View {
+        var icon: String
+        var title: String
+        var message: String
+
+        var body: some View {
+            VStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue.opacity(0.7))
+                
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                
+                Text("Expired reservations are automatically removed and the book quantities are updated.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+                    .padding(.top, 8)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
