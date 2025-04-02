@@ -121,10 +121,10 @@ struct RequestRow: View {
             Spacer()
             Text(request.Request_status.rawValue.capitalized)
                 .font(.caption)
-                .foregroundColor(.white)
+                .foregroundColor(statusColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(statusColor)
+                .background(statusColor.opacity(0.1))
                 .cornerRadius(6)
         }
         .padding()
@@ -136,7 +136,7 @@ struct RequestRow: View {
     private var statusColor: Color {
         switch request.Request_status {
         case .pending: return .orange
-        case .approved: return Color.librarianColor
+        case .approved: return .green
         case .rejected: return .red
         }
     }
@@ -279,7 +279,16 @@ struct AdminDashboardView: View {
         defer { isLoading = false }
         
         do {
+            print("Fetching book requests...")
             let client = SupabaseManager.shared.client
+            let rawResponse = try await client
+                .from("BookRequest")
+                .select()
+                .order("created_at", ascending: false)
+                .limit(5)
+                .execute()
+            print("Raw book requests response: \(String(describing: rawResponse.data))")
+            
             let response: [BookRequest] = try await client
                 .from("BookRequest")
                 .select()
@@ -287,9 +296,22 @@ struct AdminDashboardView: View {
                 .limit(5)
                 .execute()
                 .value
+            print("Decoded book requests: \(response)")
             bookRequests = response
         } catch {
-            errorMessage = "Failed to load requests: \(error.localizedDescription)"
+            print("Book requests error details: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, _):
+                    errorMessage = "Column not found in BookRequest: \(key)"
+                case .typeMismatch(_, let context):
+                    errorMessage = "Type mismatch in BookRequest: \(context.debugDescription)"
+                default:
+                    errorMessage = "Decoding error in BookRequest: \(decodingError.localizedDescription)"
+                }
+            } else {
+                errorMessage = "Failed to load requests: \(error.localizedDescription)"
+            }
         }
     }
     
@@ -365,22 +387,35 @@ struct AdminDashboardView: View {
             overdueFines = String(format: "$%.2f", totalFines)
             
             // Print raw JSON for librarians
+            print("----------------------------------------")
+            print("DEBUGGING LIBRARIAN COUNT")
+            print("----------------------------------------")
+            
             print("Fetching librarians count...")
-            let librariansRawResponse = try await client
-                .from("Users")
-                .select("*")
-                .eq("roleFetched", value: "librarian")
-                .execute()
-            print("Raw librarians response: \(String(describing: librariansRawResponse.data))")
+            struct LibrarianUser: Codable {
+                var email: String
+                var roleFetched: String
+                var status: String
+            }
             
-            let librariansCount: Int = try await client
-                .from("Users")
-                .select("*", head: true)
-                .eq("roleFetched", value: "librarian")
-                .execute()
-                .count ?? 0
+            do {
+                // Use the exact same approach as in LibrarianManagementView.swift
+                let librarians: [LibrarianUser]? = try await client
+                    .from("Users")
+                    .select("email, roleFetched, status")
+                    .eq("roleFetched", value: "librarian")
+                    .eq("status", value: "working")
+                    .execute()
+                    .value
+                
+                let count = librarians?.count ?? 0
+                print("Librarians found: \(count)")
+                activeLibrarians = "\(count)"
+            } catch {
+                print("Error fetching librarians: \(error)")
+                activeLibrarians = "0" // Default to 0 on error
+            }
             
-            activeLibrarians = "\(librariansCount)"
             activeMembers = "\(membersCount)"
             
             // Print raw JSON for books
