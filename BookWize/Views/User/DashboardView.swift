@@ -210,9 +210,12 @@ struct DashboardView: View {
                         
                         // Monthly Reading Goal Section
                         VStack(alignment: .leading, spacing: 8) {
-                            Button(action: {
-                                showReadingTracker = true
-                            }) {
+                            NavigationLink(destination: ReadingProgressDetailView(
+                                monthlyGoal: user?.monthlyGoal ?? 0,
+                                issuedBooks: issuedBooks,
+                                updatePagesRead: updatePagesRead,
+                                updateGoal: updateMonthlyGoal
+                            )) {
                                 HStack {
                                     Text("Reading Progress")
                                         .font(.title2)
@@ -221,17 +224,17 @@ struct DashboardView: View {
                                     Image(systemName: "chevron.right")
                                         .foregroundColor(.gray)
                                 }
-                                .contentShape(Rectangle())
                                 .padding(.vertical, 8)
+                                .padding(.horizontal)
                             }
                             .buttonStyle(PlainButtonStyle())
-                            .padding(.horizontal)
                             
+                            // Reading Progress Card
                             ReadingProgressCard(
                                 monthlyGoal: user?.monthlyGoal ?? 0,
                                 completedBooks: completedBooksCount,
                                 issuedBooks: issuedBooks.count,
-                                onTap: { showReadingTracker = true }
+                                onTap: {}
                             )
                             .padding(.horizontal)
                         }
@@ -249,14 +252,6 @@ struct DashboardView: View {
             .sheet(isPresented: $showingBookManagement) {
                 BookManagementView()
                     .environmentObject(booksManager)
-            }
-            .sheet(isPresented: $showReadingTracker) {
-                ReadingProgressDetailView(
-                    monthlyGoal: user?.monthlyGoal ?? 0,
-                    issuedBooks: issuedBooks,
-                    updatePagesRead: updatePagesRead,
-                    updateGoal: updateMonthlyGoal
-                )
             }
             .sheet(isPresented: $showingGoalSheet) {
                 MonthlyGoalSheet(

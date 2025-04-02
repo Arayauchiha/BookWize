@@ -174,117 +174,115 @@ struct ReadingProgressDetailView: View {
     let updateGoal: (Int) async -> Void
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Progress Summary
-                    VStack(spacing: 10) {
-                        // Large progress ring
-                        ZStack {
-                            Circle()
-                                .stroke(lineWidth: 15)
-                                .opacity(0.3)
-                                .foregroundColor(Color.blue)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Progress Summary
+                VStack(spacing: 10) {
+                    // Large progress ring
+                    ZStack {
+                        Circle()
+                            .stroke(lineWidth: 15)
+                            .opacity(0.3)
+                            .foregroundColor(Color.blue)
+                        
+                        Circle()
+                            .trim(from: 0.0, to: monthlyGoal > 0 ? CGFloat(min(Double(completedBooksCount) / Double(monthlyGoal), 1.0)) : 0)
+                            .stroke(style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round))
+                            .foregroundColor(Color.blue)
+                            .rotationEffect(Angle(degrees: 270.0))
+                        
+                        VStack {
+                            Text("\(completedBooksCount)")
+                                .font(.system(size: 40, weight: .bold))
                             
-                            Circle()
-                                .trim(from: 0.0, to: monthlyGoal > 0 ? CGFloat(min(Double(completedBooksCount) / Double(monthlyGoal), 1.0)) : 0)
-                                .stroke(style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round))
-                                .foregroundColor(Color.blue)
-                                .rotationEffect(Angle(degrees: 270.0))
+                            Text("of \(monthlyGoal)")
+                                .font(.headline)
                             
-                            VStack {
-                                Text("\(completedBooksCount)")
-                                    .font(.system(size: 40, weight: .bold))
-                                
-                                Text("of \(monthlyGoal)")
-                                    .font(.headline)
-                                
-                                Text("Books Complete")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .frame(width: 200, height: 200)
-                        .padding(.bottom, 10)
-                        
-                        // Status text
-                        if monthlyGoal > 0 {
-                            Text(completedBooksCount >= monthlyGoal 
-                                 ? "Congratulations! You've reached your monthly goal of \(monthlyGoal) books!" 
-                                 : "You're making progress towards your monthly goal of \(monthlyGoal) books!")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(completedBooksCount >= monthlyGoal ? .green : .primary)
-                                .padding(.horizontal)
-                        } else {
-                            Text("Set a monthly reading goal to track your progress")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                        }
-                        
-                        Button(action: {
-                            showingGoalSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "target")
-                                Text("Set Reading Goal")
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundColor(.blue)
-                            .cornerRadius(20)
-                        }
-                        .padding(.top, 5)
-                    }
-                    .padding()
-                    
-                    // Reading Progress List
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Reading Progress")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-                        
-                        if issuedBooks.isEmpty {
-                            Text("You don't have any borrowed books")
+                            Text("Books Complete")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding()
-                        } else {
-                            ForEach(issuedBooks) { issueInfo in
-                                if let book = issueInfo.book {
-                                    DetailedBookProgressRow(
-                                        title: book.title,
-                                        author: book.author,
-                                        progress: issueInfo.progress,
-                                        pageCount: book.pageCount ?? 0,
-                                        pagesRead: issueInfo.issueBook.pagesRead ?? 0,
-                                        bookId: issueInfo.issueBook.id,
-                                        updatePagesRead: updatePagesRead
-                                    )
-                                    .padding(.horizontal)
-                                }
+                        }
+                    }
+                    .frame(width: 200, height: 200)
+                    .padding(.bottom, 10)
+                    
+                    // Status text
+                    if monthlyGoal > 0 {
+                        Text(completedBooksCount >= monthlyGoal 
+                             ? "Congratulations! You've reached your monthly goal of \(monthlyGoal) books!" 
+                             : "You're making progress towards your monthly goal of \(monthlyGoal) books!")
+                            .font(.headline)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(completedBooksCount >= monthlyGoal ? .green : .primary)
+                            .padding(.horizontal)
+                    } else {
+                        Text("Set a monthly reading goal to track your progress")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
+                    }
+                    
+                    Button(action: {
+                        showingGoalSheet = true
+                    }) {
+                        HStack {
+                            Image(systemName: "target")
+                            Text("Set Reading Goal")
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(20)
+                    }
+                    .padding(.top, 5)
+                }
+                .padding()
+                
+                // Reading Progress List
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Your Borrowed Books")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal)
+                    
+                    if issuedBooks.isEmpty {
+                        Text("You don't have any borrowed books")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding()
+                    } else {
+                        ForEach(issuedBooks) { issueInfo in
+                            if let book = issueInfo.book {
+                                DetailedBookProgressRow(
+                                    title: book.title,
+                                    author: book.author,
+                                    progress: issueInfo.progress,
+                                    pageCount: book.pageCount ?? 0,
+                                    pagesRead: issueInfo.issueBook.pagesRead ?? 0,
+                                    bookId: issueInfo.issueBook.id,
+                                    updatePagesRead: updatePagesRead
+                                )
+                                .padding(.horizontal)
                             }
                         }
                     }
                 }
-                .padding(.vertical)
             }
-            .navigationTitle("Reading Progress")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showingGoalSheet) {
-                MonthlyGoalSheet(
-                    currentGoal: monthlyGoal,
-                    updateGoal: updateGoal
-                )
-            }
-            .onAppear {
-                print("📊 Reading Progress View appeared with monthly goal: \(monthlyGoal)")
-                print("📚 Total books completed: \(completedBooksCount) of \(issuedBooks.count) books")
-            }
+            .padding(.vertical)
+        }
+        .navigationTitle("Reading Progress")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingGoalSheet) {
+            MonthlyGoalSheet(
+                currentGoal: monthlyGoal,
+                updateGoal: updateGoal
+            )
+        }
+        .onAppear {
+            print("📊 Reading Progress View appeared with monthly goal: \(monthlyGoal)")
+            print("📚 Total books completed: \(completedBooksCount) of \(issuedBooks.count) books")
         }
     }
     
