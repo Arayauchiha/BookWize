@@ -149,6 +149,9 @@ struct AdminDashboardView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     
+    // Task management
+    @State private var currentTask: Task<Void, Never>?
+    
     // Analytics State
     @State private var totalRevenue = "$0"
     @State private var overdueFines = "$0"
@@ -181,18 +184,25 @@ struct AdminDashboardView: View {
                         .padding(.vertical)
                     }
                     .refreshable {
-                        do {
-                            errorMessage = nil // Clear any previous errors
-                            async let requests = fetchBookRequests()
-                            async let analytics = fetchAnalytics()
-                            _ = try await (requests, analytics)
-                        } catch {
-                            // Only show error if it's not a cancellation
-                            if (error as NSError).domain != NSURLErrorDomain || 
-                               (error as NSError).code != NSURLErrorCancelled {
-                                errorMessage = "Failed to refresh: \(error.localizedDescription)"
+                        // Cancel any existing task before starting a new one
+                        currentTask?.cancel()
+                        
+                        // Create a new task for the refresh
+                        currentTask = Task {
+                            do {
+                                errorMessage = nil // Clear any previous errors
+                                async let requests = fetchBookRequests()
+                                async let analytics = fetchAnalytics()
+                                try await (requests, analytics)
+                            } catch {
+                                if !Task.isCancelled {
+                                    print("Refresh error (not cancellation): \(error)")
+                                }
                             }
                         }
+                        
+                        // Wait for the task to complete
+                        await currentTask?.value
                     }
                     .navigationTitle("Dashboard")
                 }
@@ -244,10 +254,16 @@ struct AdminDashboardView: View {
             }
             .onAppear {
                 configureTabBar()
-                Task {
+                // Initial data load
+                currentTask = Task {
                     await fetchBookRequests()
                     await fetchAnalytics()
                 }
+            }
+            .onDisappear {
+                // Clean up any running task when view disappears
+                currentTask?.cancel()
+                currentTask = nil
             }
         }
     }
@@ -285,6 +301,7 @@ struct AdminDashboardView: View {
     }
 
     private func fetchBookRequests() async {
+        guard !Task.isCancelled else { return }
         isLoading = true
         defer { isLoading = false }
         
@@ -298,20 +315,22 @@ struct AdminDashboardView: View {
                 .execute()
                 .value
             
-            await MainActor.run {
-                bookRequests = response
+            // Only update if the task hasn't been cancelled
+            if !Task.isCancelled {
+                await MainActor.run {
+                    bookRequests = response
+                }
             }
         } catch {
-            print("Book requests error: \(error.localizedDescription)")
-            // Only show error if it's not a cancellation
-            if (error as NSError).domain != NSURLErrorDomain || 
-               (error as NSError).code != NSURLErrorCancelled {
-                errorMessage = "Failed to load requests: \(error.localizedDescription)"
+            if !Task.isCancelled {
+                print("Book requests error: \(error.localizedDescription)")
             }
         }
     }
     
     private func fetchAnalytics() async {
+        guard !Task.isCancelled else { return }
+        
         do {
             let client = SupabaseManager.shared.client
             
@@ -387,22 +406,21 @@ struct AdminDashboardView: View {
                 .execute()
                 .value
             
-            // Update all UI values at once on the main thread
-            await MainActor.run {
-                totalRevenue = String(format: "$%.2f", totalAmount)
-                overdueFines = String(format: "$%.2f", totalFines)
-                activeLibrarians = "\(librarians.count)"
-                activeMembers = "\(membersCount)"
-                totalBooks = "\(booksCount)"
-                issuedBooks = "\(issuedCount)"
+            // Only update UI if the task hasn't been cancelled
+            if !Task.isCancelled {
+                await MainActor.run {
+                    totalRevenue = String(format: "$%.2f", totalAmount)
+                    overdueFines = String(format: "$%.2f", totalFines)
+                    activeLibrarians = "\(librarians.count)"
+                    activeMembers = "\(membersCount)"
+                    totalBooks = "\(booksCount)"
+                    issuedBooks = "\(issuedCount)"
+                }
             }
             
         } catch {
-            print("Analytics error: \(error.localizedDescription)")
-            // Only show error if it's not a cancellation
-            if (error as NSError).domain != NSURLErrorDomain || 
-               (error as NSError).code != NSURLErrorCancelled {
-                errorMessage = "Failed to load analytics: \(error.localizedDescription)"
+            if !Task.isCancelled {
+                print("Analytics error: \(error.localizedDescription)")
             }
         }
     }
