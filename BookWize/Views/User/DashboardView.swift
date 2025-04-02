@@ -75,6 +75,7 @@ struct DashboardView: View {
                   let totalPages = book?.pageCount else {
                 return false
             }
+            // Only count as completed if 100% of pages are read
             return pagesRead >= totalPages
         }
         
@@ -209,20 +210,10 @@ struct DashboardView: View {
                         
                         // Monthly Reading Goal Section
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Monthly Reading Goal")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                Spacer()
-                                Button(action: {
-                                    showingGoalSheet = true
-                                }) {
-                                    Text("Set Goal")
-                                        .font(.subheadline)
-                                        .foregroundColor(.blue)
-                                }
-                            }
-                            .padding(.horizontal)
+                            Text("Monthly Reading Goal")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .padding(.horizontal)
                             
                             ReadingProgressCard(
                                 monthlyGoal: user?.monthlyGoal ?? 0,
@@ -269,7 +260,66 @@ struct DashboardView: View {
         issuedBooks.filter { $0.isCompleted }.count
     }
     
-    // Fetch user data and borrowed books
+    // Update monthly reading goal
+    private func updateMonthlyGoal(_ goal: Int) async {
+        do {
+            guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
+            }
+            
+            print("📊 Updating monthly goal to: \(goal) for user: \(userId)")
+            
+            // Update in Supabase
+            let updateResponse = try await SupabaseManager.shared.client
+                .from("Members")
+                .update(["monthly_goal": goal])
+                .eq("id", value: userId)
+                .execute()
+            
+            if let jsonString = String(data: updateResponse.data, encoding: .utf8) {
+                print("✅ Goal update response: \(jsonString)")
+            }
+            
+            // Immediately update the UI
+            await MainActor.run {
+                if var updatedUser = self.user {
+                    updatedUser.monthlyGoal = goal
+                    self.user = updatedUser
+                }
+                self.goalSliderValue = Double(goal)
+            }
+            
+            // Force refresh data to ensure consistency
+            await fetchUserData()
+            
+        } catch {
+            print("❌ Error updating monthly goal: \(error)")
+        }
+    }
+    
+    // Add a debugging function to help diagnose the User decoding issue
+    private func printDecodingError<T>(_ data: Data, type: T.Type) where T: Decodable {
+        do {
+            _ = try JSONDecoder().decode(type, from: data)
+            print("✅ Successfully decoded \(type)")
+        } catch let DecodingError.keyNotFound(key, context) {
+            print("❌ Key '\(key.stringValue)' not found: \(context.debugDescription)")
+            print("📍 codingPath: \(context.codingPath)")
+        } catch let DecodingError.valueNotFound(type, context) {
+            print("❌ Value '\(type)' not found: \(context.debugDescription)")
+            print("📍 codingPath: \(context.codingPath)")
+        } catch let DecodingError.typeMismatch(type, context) {
+            print("❌ Type '\(type)' mismatch: \(context.debugDescription)")
+            print("📍 codingPath: \(context.codingPath)")
+        } catch let DecodingError.dataCorrupted(context) {
+            print("❌ Data corrupted: \(context.debugDescription)")
+            print("📍 codingPath: \(context.codingPath)")
+        } catch {
+            print("❌ Other decoding error: \(error.localizedDescription)")
+        }
+    }
+    
+    // Fix the User struct or its decoding in fetchUserData
     private func fetchUserData() async {
         isLoading = true
         errorMessage = nil
@@ -281,63 +331,112 @@ struct DashboardView: View {
                 throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
             }
             
-            // Fetch user data from Supabase with explicit monthly_goal selection
-            let response = try await SupabaseManager.shared.client
+            print("🔍 Fetching user data for ID: \(userId), Email: \(userEmail)")
+            
+            // Explicit query to ensure monthly_goal is fetched properly
+            let memberResponse = try await SupabaseManager.shared.client
                 .from("Members")
-                .select("*, monthly_goal")
-                .eq("email", value: userEmail)
+                .select("id, email, name, monthly_goal")
+                .eq("id", value: userId)
                 .execute()
             
-            // Decode the response
-            let jsonData = response.data
+            // Debug the raw response
+            if let jsonString = String(data: memberResponse.data, encoding: .utf8) {
+                print("📋 Raw member data: \(jsonString)")
+            }
+            
+            // Since we can't modify the User struct directly, use a simpler approach
+            // Parse the JSON manually to extract the monthly_goal
+            if let jsonString = String(data: memberResponse.data, encoding: .utf8),
+               let jsonData = jsonString.data(using: .utf8) {
+                
+                // Print any decoding errors to debug
+                printDecodingError(jsonData, type: [User].self)
+                
+                // Try to manually extract the monthly_goal using JSONSerialization
+                do {
+                    if let jsonArray = try JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                       let firstUser = jsonArray.first {
+                        
+                        let userId = UUID(uuidString: firstUser["id"] as? String ?? "") ?? UUID()
+                        let email = firstUser["email"] as? String ?? ""
+                        let name = firstUser["name"] as? String ?? ""
+                        let monthlyGoal = firstUser["monthly_goal"] as? Int ?? 0
+                        
+                        print("✅ Manually parsed user - name: \(name), email: \(email), monthly_goal: \(monthlyGoal)")
+                        
+                        // Create a User instance manually with the parsed values
+                        let user = User(
+                            id: userId,
+                            email: email,
+                            name: name,
+                            gender: .other, // Default value since we don't have this
+                            password: "",  // Default value since we don't have this
+                            selectedLibrary: "", // Default value since we don't have this
+                            monthlyGoal: monthlyGoal
+                        )
+                        
+                        // Update UI with user info
+                        await MainActor.run {
+                            self.user = user
+                            self.goalSliderValue = Double(monthlyGoal)
+                        }
+                    }
+                } catch {
+                    print("❌ Error parsing JSON manually: \(error.localizedDescription)")
+                }
+            }
+            
+            // Now fetch issued books for this member
+            let issueBooksResponse = try await SupabaseManager.shared.client
+                .from("issuebooks")
+                .select("*")
+                .eq("member_email", value: userEmail)
+                .execute()
+            
+            // Parse the response to get issued books
+            let issueBooksData = issueBooksResponse.data
+            var issueInfoArray: [IssueBookInfo] = []
+            
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             
-            if let jsonString = String(data: jsonData, encoding: .utf8),
-               let userData = jsonString.data(using: .utf8) {
-                let users = try decoder.decode([User].self, from: userData)
+            if let jsonString = String(data: issueBooksData, encoding: .utf8),
+               let jsonData = jsonString.data(using: .utf8) {
                 
-                guard let fetchedUser = users.first else {
-                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not found"])
-                }
-                
-                print("Fetched user with monthly goal: \(String(describing: fetchedUser.monthlyGoal))")
-                
-                // Fetch issued books for this member
-                let issueBooksResponse = try await SupabaseManager.shared.client
-                    .from("issuebooks")
-                    .select("*")
-                    .eq("member_email", value: userEmail)
-                    .execute()
-                
-                // Parse the response to get issued books
-                let issueBooksData = issueBooksResponse.data
-                if let jsonString = String(data: issueBooksData, encoding: .utf8),
-                   let jsonData = jsonString.data(using: .utf8) {
-                    
-                    let issuedBooksArray = try decoder.decode([issueBooks].self, from: jsonData)
-                    var issueInfoArray: [IssueBookInfo] = []
-                    
-                    // Fetch book details for each issued book
-                    for issuedBook in issuedBooksArray {
-                        let bookResponse = try await SupabaseManager.shared.client
-                            .from("Books")
-                            .select("id, title, author, pageCount")
-                            .eq("isbn", value: issuedBook.isbn)
-                            .execute()
+                if jsonString != "[]" {
+                    do {
+                        let issuedBooksArray = try decoder.decode([issueBooks].self, from: jsonData)
                         
-                        let bookData = bookResponse.data
-                        if let bookJsonString = String(data: bookData, encoding: .utf8),
-                           let bookJsonData = bookJsonString.data(using: .utf8) {
+                        // Fetch book details for each issued book
+                        for issuedBook in issuedBooksArray {
+                            let bookResponse = try await SupabaseManager.shared.client
+                                .from("Books")
+                                .select("id, title, author, pageCount")
+                                .eq("isbn", value: issuedBook.isbn)
+                                .execute()
                             
-                            let books = try decoder.decode([BookData].self, from: bookJsonData)
-                            if let firstBook = books.first {
-                                issueInfoArray.append(IssueBookInfo(
-                                    id: issuedBook.id,
-                                    issueBook: issuedBook,
-                                    book: firstBook
-                                ))
+                            let bookData = bookResponse.data
+                            if let bookJsonString = String(data: bookData, encoding: .utf8),
+                               let bookJsonData = bookJsonString.data(using: .utf8),
+                               bookJsonString != "[]" {
+                                
+                                let books = try decoder.decode([BookData].self, from: bookJsonData)
+                                if let firstBook = books.first {
+                                    issueInfoArray.append(IssueBookInfo(
+                                        id: issuedBook.id,
+                                        issueBook: issuedBook,
+                                        book: firstBook
+                                    ))
+                                } else {
+                                    issueInfoArray.append(IssueBookInfo(
+                                        id: issuedBook.id,
+                                        issueBook: issuedBook,
+                                        book: nil
+                                    ))
+                                }
                             } else {
+                                // Book not found but still add the issue record
                                 issueInfoArray.append(IssueBookInfo(
                                     id: issuedBook.id,
                                     issueBook: issuedBook,
@@ -345,18 +444,24 @@ struct DashboardView: View {
                                 ))
                             }
                         }
+                    } catch {
+                        print("❌ Error decoding issued books: \(error.localizedDescription)")
                     }
-                    
-                    await MainActor.run {
-                        self.user = fetchedUser
-                        self.issuedBooks = issueInfoArray
-                        self.goalSliderValue = Double(fetchedUser.monthlyGoal ?? 0)
-                        self.isLoading = false
-                    }
+                } else {
+                    print("📚 No issued books found for user")
                 }
             }
+            
+            await MainActor.run {
+                self.issuedBooks = issueInfoArray
+                self.isLoading = false
+                
+                print("🎯 Monthly goal set to: \(self.user?.monthlyGoal ?? 0)")
+                print("📚 Completed books: \(self.completedBooksCount) of \(self.issuedBooks.count)")
+            }
+            
         } catch {
-            print("Error fetching data: \(error.localizedDescription)")
+            print("❌ Error fetching data: \(error.localizedDescription)")
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
@@ -364,48 +469,21 @@ struct DashboardView: View {
         }
     }
     
-    // Update monthly reading goal
-    private func updateMonthlyGoal(_ goal: Int) async {
-        do {
-            guard let userId = UserDefaults.standard.string(forKey: "currentMemberId") else {
-                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
-            }
-            
-            print("Updating monthly goal to: \(goal) for user: \(userId)")
-            
-            // Update in Supabase with explicit monthly_goal field
-            let updateResponse = try await SupabaseManager.shared.client
-                .from("Members")
-                .update(["monthly_goal": goal])
-                .eq("id", value: userId)
-                .execute()
-            
-            print("Goal update response: \(updateResponse)")
-            
-            // Update locally in memory
-            await MainActor.run {
-                var updatedUser = self.user
-                updatedUser?.monthlyGoal = goal
-                self.user = updatedUser
-            }
-            
-            // Refresh data from server to ensure UI is updated with the latest value
-            await fetchUserData()
-            
-        } catch {
-            print("Error updating monthly goal: \(error)")
-        }
-    }
-    
     // Update pages read for a book
     private func updatePagesRead(for bookId: UUID, pagesRead: Int) async {
         do {
+            print("📝 Sending update to Supabase for book ID: \(bookId), pages read: \(pagesRead)")
+            
             // Update in Supabase
-            try await SupabaseManager.shared.client
+            let updateResponse = try await SupabaseManager.shared.client
                 .from("issuebooks")
                 .update(["pages_read": pagesRead])
                 .eq("id", value: bookId)
                 .execute()
+            
+            if let jsonString = String(data: updateResponse.data, encoding: .utf8) {
+                print("✅ Pages update response: \(jsonString)")
+            }
             
             // Update locally
             await MainActor.run {
@@ -423,7 +501,7 @@ struct DashboardView: View {
             // Refresh data to ensure UI consistency
             await fetchUserData()
         } catch {
-            print("Error updating pages read: \(error)")
+            print("❌ Error updating pages read: \(error)")
         }
     }
 }
@@ -435,6 +513,7 @@ struct ReadingProgressCard: View {
     let completedBooks: Int
     let issuedBooks: Int
     let onTap: () -> Void
+    @State private var showingGoalSheet = false
     
     var body: some View {
         Button(action: onTap) {
@@ -709,25 +788,24 @@ struct ReadingProgressDetailView: View {
             }
             .navigationTitle("Reading Progress")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Set Goal") {
-                        showingGoalSheet = true
-                    }
-                }
-            }
             .sheet(isPresented: $showingGoalSheet) {
                 MonthlyGoalSheet(
                     currentGoal: monthlyGoal,
                     updateGoal: updateGoal
                 )
             }
+            .onAppear {
+                print("📊 Reading Progress View appeared with monthly goal: \(monthlyGoal)")
+                print("📚 Total books completed: \(completedBooksCount) of \(issuedBooks.count) books")
+            }
         }
     }
     
     // Calculated completed books count
     var completedBooksCount: Int {
-        issuedBooks.filter { $0.isCompleted }.count
+        let completed = issuedBooks.filter { $0.isCompleted }.count
+        print("📚 Calculating completed books: \(completed) books are 100% complete")
+        return completed
     }
 }
 
@@ -779,22 +857,17 @@ struct DetailedBookProgressRow: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // Simple label that shows pages read, tappable to open alert
-                Button(action: {
-                    showUpdateAlert()
-                }) {
-                    HStack {
-                        Spacer()
-                        Text("\(pagesRead)")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.primary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(.systemGray5))
-                            )
+                HStack {
+                    Spacer()
+                    Button("Update") {
+                        presentUpdateAlert()
                     }
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue)
+                    .cornerRadius(8)
                 }
             }
         }
@@ -804,73 +877,74 @@ struct DetailedBookProgressRow: View {
         .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
     }
     
-    // Show native iOS alert for entering pages
-    private func showUpdateAlert() {
-        // Create an alert controller
-        let updateAlert = UIAlertController(
+    // Rewritten alert presentation method
+    private func presentUpdateAlert() {
+        guard let rootVC = UIApplication.shared.windows.first?.rootViewController else {
+            print("❌ Could not find root view controller")
+            return
+        }
+        
+        let alert = UIAlertController(
             title: "Update Reading Progress",
             message: "Enter the number of pages you've read (out of \(pageCount))",
             preferredStyle: .alert
         )
         
-        // Add text field for entering pages
-        updateAlert.addTextField { textField in
+        alert.addTextField { textField in
             textField.keyboardType = .numberPad
             textField.text = "\(pagesRead)"
         }
         
-        // Add cancel action
         let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
         
-        // Add update action
         let updateAction = UIAlertAction(title: "Update", style: .default) { _ in
-            guard let textField = updateAlert.textFields?.first,
-                  let pagesText = textField.text,
-                  let newPagesRead = Int(pagesText) else {
+            guard let textField = alert.textFields?.first,
+                  let text = textField.text,
+                  let newPagesRead = Int(text) else {
                 return
             }
             
-            // Validate input
+            // Validate the input
             if newPagesRead > pageCount {
-                showErrorAlert(message: "Pages read cannot exceed the total page count.")
+                self.presentErrorAlert(message: "Pages read cannot exceed the total page count.")
                 return
             }
             
             if newPagesRead < 0 {
-                showErrorAlert(message: "Pages read cannot be negative.")
+                self.presentErrorAlert(message: "Pages read cannot be negative.")
                 return
             }
             
-            // Update pages read
+            // Update reading progress
             Task {
                 await updatePagesRead(bookId, newPagesRead)
             }
         }
         
-        // Add actions to alert controller
-        updateAlert.addAction(cancelAction)
-        updateAlert.addAction(updateAction)
+        alert.addAction(cancelAction)
+        alert.addAction(updateAction)
         
-        // Present the alert controller
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootViewController = windowScene.windows.first?.rootViewController {
-            rootViewController.present(updateAlert, animated: true)
+        DispatchQueue.main.async {
+            rootVC.present(alert, animated: true)
         }
     }
     
-    // Show error alert
-    private func showErrorAlert(message: String) {
-        let errorAlert = UIAlertController(
+    private func presentErrorAlert(message: String) {
+        guard let rootVC = UIApplication.shared.windows.first?.rootViewController else {
+            print("❌ Could not find root view controller")
+            return
+        }
+        
+        let alert = UIAlertController(
             title: "Invalid Input",
             message: message,
             preferredStyle: .alert
         )
         
-        errorAlert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
         
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootViewController = windowScene.windows.first?.rootViewController {
-            rootViewController.present(errorAlert, animated: true)
+        DispatchQueue.main.async {
+            rootVC.present(alert, animated: true)
         }
     }
 }
@@ -948,6 +1022,7 @@ struct MonthlyGoalSheet: View {
                 
                 Button(action: {
                     Task {
+                        print("📊 Saving monthly goal: \(Int(goalValue))")
                         await updateGoal(Int(goalValue))
                         dismiss()
                     }
