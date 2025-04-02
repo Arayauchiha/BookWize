@@ -152,13 +152,8 @@ struct AdminDashboardView: View {
     // Task management
     @State private var currentTask: Task<Void, Never>?
     
-    // Analytics State
-    @State private var totalRevenue = "$0"
-    @State private var overdueFines = "$0"
-    @State private var activeLibrarians = "0"
-    @State private var activeMembers = "0"
-    @State private var totalBooks = "0"
-    @State private var issuedBooks = "0"
+    // Dashboard Manager
+    @StateObject private var dashboardManager = DashboardManager()
     
     var body: some View {
         NavigationStack {
@@ -167,12 +162,12 @@ struct AdminDashboardView: View {
                     ScrollView {
                         VStack(spacing: 16) {
                             AnalyticsGridView(
-                                totalRevenue: totalRevenue,
-                                overdueFines: overdueFines,
-                                activeLibrarians: activeLibrarians,
-                                activeMembers: activeMembers,
-                                totalBooks: totalBooks,
-                                issuedBooks: issuedBooks
+                                totalRevenue: String(format: "$%.2f", dashboardManager.totalRevenue),
+                                overdueFines: String(format: "$%.2f", dashboardManager.overdueFines),
+                                activeLibrarians: "\(dashboardManager.activeLibrariansCount)",
+                                activeMembers: "\(dashboardManager.totalMembersCount)",
+                                totalBooks: "\(dashboardManager.totalBooksCount)",
+                                issuedBooks: "\(dashboardManager.issuedBooksCount)"
                             )
                             
                             RecentRequestsView(
@@ -192,7 +187,7 @@ struct AdminDashboardView: View {
                             do {
                                 errorMessage = nil // Clear any previous errors
                                 async let requests = fetchBookRequests()
-                                async let analytics = fetchAnalytics()
+                                async let analytics = dashboardManager.fetchDashboardData()
                                 try await (requests, analytics)
                             } catch {
                                 if !Task.isCancelled {
@@ -257,7 +252,6 @@ struct AdminDashboardView: View {
                 // Initial data load
                 currentTask = Task {
                     await fetchBookRequests()
-                    await fetchAnalytics()
                 }
             }
             .onDisappear {
@@ -324,103 +318,6 @@ struct AdminDashboardView: View {
         } catch {
             if !Task.isCancelled {
                 print("Book requests error: \(error.localizedDescription)")
-            }
-        }
-    }
-    
-    private func fetchAnalytics() async {
-        guard !Task.isCancelled else { return }
-        
-        do {
-            let client = SupabaseManager.shared.client
-            
-            // Define the required structs
-            struct MembershipSetting: Codable {
-                let Membership: Double?
-                let PerDayFine: Double?
-                let FineSet_id: UUID?
-            }
-            
-            struct Fine: Codable {
-                let fineAmount: Double?
-                let id: UUID?
-            }
-            
-            struct LibrarianUser: Codable {
-                var email: String
-                var roleFetched: String
-                var status: String
-            }
-            
-            // Fetch membership fee and members count
-            let membershipFeeResponse: [MembershipSetting] = try await client
-                .from("FineAndMembershipSet")
-                .select("*")
-                .execute()
-                .value
-            
-            let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
-            
-            let membersCount: Int = try await client
-                .from("Members")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            
-            let membershipRevenue = Double(membersCount) * membershipFee
-            
-            // Fetch fines
-            let finesResponse: [Fine] = try await client
-                .from("issuebooks")
-                .select("fineAmount, id")
-                .execute()
-                .value
-            
-            let totalFines = finesResponse.reduce(0.0) { sum, fine in
-                sum + (fine.fineAmount ?? 0)
-            }
-            
-            // Calculate total revenue
-            let totalAmount = membershipRevenue + totalFines
-            
-            // Fetch books count
-            let booksCount: Int = try await client
-                .from("Books")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            
-            // Fetch issued books count
-            let issuedCount: Int = try await client
-                .from("issuebooks")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            
-            // Fetch librarians count
-            let librarians: [LibrarianUser] = try await client
-                .from("Users")
-                .select("email, roleFetched, status")
-                .eq("roleFetched", value: "librarian")
-                .eq("status", value: "working")
-                .execute()
-                .value
-            
-            // Only update UI if the task hasn't been cancelled
-            if !Task.isCancelled {
-                await MainActor.run {
-                    totalRevenue = String(format: "$%.2f", totalAmount)
-                    overdueFines = String(format: "$%.2f", totalFines)
-                    activeLibrarians = "\(librarians.count)"
-                    activeMembers = "\(membersCount)"
-                    totalBooks = "\(booksCount)"
-                    issuedBooks = "\(issuedCount)"
-                }
-            }
-            
-        } catch {
-            if !Task.isCancelled {
-                print("Analytics error: \(error.localizedDescription)")
             }
         }
     }

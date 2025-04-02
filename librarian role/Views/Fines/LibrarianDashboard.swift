@@ -2,8 +2,7 @@ import SwiftUI
 import Charts
 
 struct LibrarianDashboard: View {
-    //@StateObject private var fineManager = FineManager()
-    @StateObject private var userManager = LibrarianDashboardManager()
+    @StateObject private var dashboardManager = DashboardManager()
     
     var body: some View {
         NavigationView {
@@ -13,14 +12,14 @@ struct LibrarianDashboard: View {
                     HStack(spacing: 16) {
                         DashboardCard(
                             title: "Total Books",
-                            value: "\(userManager.totalBooks)",
+                            value: "\(dashboardManager.totalBooksCount)",
                             icon: "book.fill",
                             color: .blue
                         )
                         
                         DashboardCard(
                             title: "Issued Books",
-                            value: "\(userManager.totalIssuedCount)",
+                            value: "\(dashboardManager.issuedBooksCount)",
                             icon: "book.circle.fill",
                             color: .green
                         )
@@ -31,14 +30,14 @@ struct LibrarianDashboard: View {
                     HStack(spacing: 16) {
                         DashboardCard(
                             title: "Fine Overdue",
-                            value: String(format: "$%.2f", calculateTotalFine()),
+                            value: String(format: "$%.2f", dashboardManager.overdueFines),
                             icon: "dollarsign.circle.fill",
                             color: .red
                         )
                         
                         DashboardCard(
                             title: "Total Members",
-                            value: "\(userManager.totalMembers)",
+                            value: "\(dashboardManager.totalMembersCount)",
                             icon: "person.3.fill",
                             color: .purple
                         )
@@ -54,7 +53,7 @@ struct LibrarianDashboard: View {
                             .padding(.horizontal)
                         
                         HStack(spacing: 16) {
-                            if let mostPopularGenre = userManager.getPopularGenres().first {
+                            if let mostPopularGenre = getPopularGenres().first {
                                 PopularGenreCard(
                                     title: "Popular Genres",
                                     genre: mostPopularGenre.0,
@@ -64,7 +63,7 @@ struct LibrarianDashboard: View {
                             
                             GenreStatsCard(
                                 title: "Genre-wise Issued",
-                                genres: userManager.getGenreWiseIssues(),
+                                genres: getGenreWiseIssues(),
                                 color: .teal
                             )
                         }
@@ -91,14 +90,23 @@ struct LibrarianDashboard: View {
                 .padding(.vertical)
             }
             .navigationTitle("Dashboard")
+            .refreshable {
+                await dashboardManager.fetchDashboardData()
+            }
         }
     }
     
+    private func getPopularGenres() -> [(String, Int)] {
+        return dashboardManager.getPopularGenres()
+    }
+    
+    private func getGenreWiseIssues() -> [(String, Int)] {
+        return dashboardManager.getGenreWiseIssues()
+    }
+    
     private func calculateTotalFine() -> Double {
-        //return fineManager.overdueBooks.reduce(0) { total, record in
-            //total + record.fineAmount
-        return 0
-        }
+        return dashboardManager.overdueFines
+    }
 }
 
 struct OverdueSummaryCard: View {
