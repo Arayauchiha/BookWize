@@ -1,6 +1,96 @@
 import SwiftUI
 import Supabase
 
+// Add this before extension issueBooks
+class FinePolicyManager {
+    static let shared = FinePolicyManager()
+    
+    // Default fine rate until we fetch from database
+    private(set) var perDayFine: Double = 0.50
+    private var isFetching = false
+    
+    func loadFinePolicy() {
+        if !isFetching {
+            isFetching = true
+            Task {
+                do {
+                    // Fetch the PerDayFine value from FineAndMembershipSet table
+                    let response = try await SupabaseManager.shared.client
+                        .from("FineAndMembershipSet")
+                        .select("*")
+                        .execute()
+                    
+                    if let jsonString = String(data: response.data, encoding: .utf8),
+                       let jsonData = jsonString.data(using: .utf8) {
+                        do {
+                            if let jsonArray = try JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                               let firstRecord = jsonArray.first {
+                                // Try different possible case variations of the column name
+                                if let fetchedFine = firstRecord["perdayfine"] as? Double {
+                                    await MainActor.run {
+                                        self.perDayFine = fetchedFine
+                                        print("Fetched perDayFine from database: \(fetchedFine)")
+                                    }
+                                } else if let fetchedFine = firstRecord["per_day_fine"] as? Double {
+                                    await MainActor.run {
+                                        self.perDayFine = fetchedFine
+                                        print("Fetched per_day_fine from database: \(fetchedFine)")
+                                    }
+                                } else if let fetchedFine = firstRecord["PerDayFine"] as? Double {
+                                    await MainActor.run {
+                                        self.perDayFine = fetchedFine
+                                        print("Fetched PerDayFine from database: \(fetchedFine)")
+                                    }
+                                } else {
+                                    print("Could not find PerDayFine column in: \(firstRecord.keys)")
+                                }
+                            }
+                        } catch {
+                            print("Error parsing PerDayFine JSON: \(error)")
+                        }
+                    }
+                } catch {
+                    print("Error fetching PerDayFine: \(error)")
+                }
+                self.isFetching = false
+            }
+        }
+    }
+}
+
+// Extension to add fineAmount property to issueBooks
+extension issueBooks {
+    var fineAmount: Double {
+        var daysLate = 0
+        
+        if let returnDate = actualReturnedDate, let dueDate = self.returnDate {
+            // Book was returned, check if it was late
+            if returnDate > dueDate {
+                // If returned late by any amount, count as at least 1 day late
+                let calendar = Calendar.current
+                let components = calendar.dateComponents([.day], from: dueDate, to: returnDate)
+                daysLate = max(1, components.day ?? 0)
+            }
+        } else if let dueDate = returnDate {
+            // Book is still checked out, check if overdue
+            let now = Date()
+            if now > dueDate {
+                // If overdue by any amount, count as at least 1 day overdue
+                let calendar = Calendar.current
+                let components = calendar.dateComponents([.day], from: dueDate, to: now)
+                daysLate = max(1, components.day ?? 0)
+            }
+        }
+        
+        // Calculate fine based on days late and per day fine rate
+        if daysLate > 0 {
+            return Double(daysLate) * FinePolicyManager.shared.perDayFine
+        }
+        
+        return 0.0 // No fine
+    }
+}
+
 // MARK: - Models (specific to DashboardView)
 enum BookStatus: String {
     case borrowed = "Borrowed"
@@ -265,6 +355,118 @@ struct ReturnedBook: Identifiable {
     let progress: Double
 }
 
+// MARK: - Overdue Fines Models and Manager
+struct OverdueFine: Identifiable {
+    let id: UUID
+    let bookTitle: String
+    let bookAuthor: String
+    let coverImage: String
+    let dueDate: Date
+    let returnDate: Date?
+    let fineAmount: Double
+    let isbn: String
+}
+
+class OverdueFinesManager: ObservableObject {
+    @Published var overdueFines: [OverdueFine] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    var totalFineAmount: Double {
+        overdueFines.reduce(0) { $0 + $1.fineAmount }
+    }
+    
+    var fineCount: Int {
+        overdueFines.count
+    }
+    
+    func refreshFines() async {
+        // Make sure fine policy is up to date
+        FinePolicyManager.shared.loadFinePolicy()
+        await fetchOverdueFines()
+    }
+    
+    func fetchOverdueFines() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Get the current user's email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                errorMessage = "User email not found"
+                isLoading = false
+                return
+            }
+            
+            print("Fetching overdue fines for user: \(userEmail)")
+            
+            // Fetch books with potential fines from issuebooks table
+            let issueBooksResponse: [issueBooks] = try await SupabaseManager.shared.client
+                .from("issuebooks")
+                .select("*")
+                .eq("member_email", value: userEmail)
+                .execute()
+                .value
+            
+            // Filter to only include books with fines (overdue or returned late)
+            let booksWithFines = issueBooksResponse.filter { issuedBook in
+                // Only include books with a fine amount > 0
+                return issuedBook.fineAmount > 0
+            }
+            
+            print("Fetched \(booksWithFines.count) books with fines")
+            
+            // Convert to OverdueFine objects
+            var fines: [OverdueFine] = []
+            
+            // Fetch book details for each issued book with a fine
+            for issue in booksWithFines {
+                do {
+                    // Fetch book details using ISBN
+                    let bookResponse: [Book] = try await SupabaseManager.shared.client
+                        .from("Books")
+                        .select("*")
+                        .eq("isbn", value: issue.isbn)
+                        .execute()
+                        .value
+                    
+                    if let book = bookResponse.first {
+                        let fine = OverdueFine(
+                            id: issue.id,
+                            bookTitle: book.title,
+                            bookAuthor: book.author,
+                            coverImage: book.imageURL ?? "book.fill",
+                            dueDate: issue.returnDate ?? Date(),
+                            returnDate: issue.actualReturnedDate,
+                            fineAmount: issue.fineAmount,
+                            isbn: issue.isbn
+                        )
+                        fines.append(fine)
+                    } else {
+                        print("Book not found for ISBN: \(issue.isbn)")
+                    }
+                } catch {
+                    print("Error fetching book details for ISBN \(issue.isbn): \(error)")
+                }
+            }
+            
+            await MainActor.run {
+                self.overdueFines = fines
+                self.isLoading = false
+                print("Updated overdue fines: \(fines.count)")
+            }
+            
+        } catch {
+            print("Error fetching overdue fines: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load overdue fines: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
+    }
+}
+
 // Add this after the ReturnedBooksManager class
 class ReservedBooksManager: ObservableObject {
     @Published var reservedBooks: [ReservationRecord] = []
@@ -296,14 +498,29 @@ class ReservedBooksManager: ObservableObject {
             print("Fetching reserved books for user: \(userEmail)")
             
             // First, get the user's ID from their email
-            let memberResponse: [Member] = try await SupabaseManager.shared.client
+            let memberResponseResult = try await SupabaseManager.shared.client
                 .from("Members")
                 .select("*")
                 .eq("email", value: userEmail)
                 .execute()
-                .value
             
-            guard let memberId = memberResponse.first?.id else {
+            // Manual parsing of the memberResponse to get the member ID
+            let memberData = memberResponseResult.data
+            var memberId: String? = nil
+            
+            if let jsonString = String(data: memberData, encoding: .utf8),
+               let jsonData = jsonString.data(using: .utf8) {
+                do {
+                    if let jsonArray = try JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]],
+                       let firstMember = jsonArray.first {
+                        memberId = firstMember["id"] as? String
+                    }
+                } catch {
+                    print("Error parsing member response JSON: \(error)")
+                }
+            }
+            
+            guard let memberIdValue = memberId else {
                 print("Member not found for email: \(userEmail)")
                 errorMessage = "Member not found"
                 isLoading = false
@@ -318,7 +535,7 @@ class ReservedBooksManager: ObservableObject {
                     member:Members(*),
                     book:Books(*)
                     """)
-                .eq("member_id", value: memberId)
+                .eq("member_id", value: memberIdValue)
                 .order("created_at", ascending: false)
                 .execute()
                 .value
@@ -354,6 +571,7 @@ struct DashboardView: View {
     @State private var showingGoalSheet = false
     @State private var showingBookManagement = false
     @State private var currentIndex = 0
+    @StateObject private var finesManager = OverdueFinesManager()
     
     var mostUrgentBook: BorrowedBook? {
         // First, check for overdue books
@@ -498,15 +716,45 @@ struct DashboardView: View {
                                 .padding(.horizontal)
                             }
                         }
+                        
+                        // Overdue Fines Section
+                        VStack(alignment: .leading, spacing: 8) {
+                            NavigationLink(destination: OverdueFinesView()) {
+                                HStack {
+                                    Text("Overdue Books")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
+                            NavigationLink(destination: OverdueFinesView()) {
+                                OverdueFinesCard(
+                                    totalAmount: finesManager.totalFineAmount,
+                                    fineCount: finesManager.fineCount
+                                )
+                                .padding(.horizontal)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
                     }
                 }
                 .padding(.vertical)
             }
             .navigationTitle("Dashboard")
             .onAppear {
+                // Load the fine policy when the view appears
+                FinePolicyManager.shared.loadFinePolicy()
+                
                 Task {
                     await fetchUserData()
                     await booksManager.fetchBorrowedBooks()
+                    await finesManager.fetchOverdueFines()
                 }
             }
 
@@ -833,7 +1081,7 @@ struct BookManagementView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
         .navigationTitle("Your Reads")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
     }
     
     private func segmentTitle(for index: Int) -> String {
@@ -926,17 +1174,13 @@ struct BorrowedBookRow: View {
         let components = calendar.dateComponents([.day, .hour, .minute], from: now, to: book.dueDate)
         
         if let days = components.day {
-            if days < 0 {
-                return "Overdue by \(abs(days)) day\(abs(days) == 1 ? "" : "s")"
+            if days < 0 || book.dueDate < now {
+                // If due date has passed by any amount, count as at least 1 day overdue
+                let overdueDays = max(1, abs(days))
+                return "Overdue by \(overdueDays) day\(overdueDays == 1 ? "" : "s")"
             } else if days == 0 {
-                if let hours = components.hour {
-                    if hours > 0 {
-                        return "\(hours) hour\(hours == 1 ? "" : "s") left"
-                    } else if let minutes = components.minute {
-                        return "\(minutes) minute\(minutes == 1 ? "" : "s") left"
-                    }
-                }
-                return "Less than a minute left"
+                // Due today
+                return "Due today"
             } else {
                 return "\(days) day\(days == 1 ? "" : "s") left"
             }
@@ -945,38 +1189,32 @@ struct BorrowedBookRow: View {
     }
     
     var timeRemainingColor: Color {
-        let calendar = Calendar.current
         let now = Date()
-        let components = calendar.dateComponents([.day, .hour], from: now, to: book.dueDate)
         
-        if let days = components.day {
-            if days < 0 {
-                return .red
-            } else if days == 0 {
-                if let hours = components.hour {
-                    if hours <= 2 {
-                        return .red
-                    } else if hours <= 6 {
-                        return .orange
-                    } else {
-                        return .orange
-                    }
+        // If book is overdue by any amount, show red
+        if book.dueDate < now {
+            return .red
+        } else {
+            // Calculate days until due
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.day], from: now, to: book.dueDate)
+            
+            if let days = components.day {
+                if days == 0 {
+                    return .orange // Due today
+                } else if days <= 1 {
+                    return .orange // Due tomorrow
+                } else {
+                    return .blue // More than a day left
                 }
-                return .red
-            } else if days <= 1 {
-                return .orange
-            } else {
-                return .blue
             }
         }
         return .gray
     }
     
     var isOverdue: Bool {
-        let calendar = Calendar.current
-        let now = Date()
-        let components = calendar.dateComponents([.day], from: now, to: book.dueDate)
-        return (components.day ?? 0) < 0
+        // Book is overdue if due date is in the past
+        return book.dueDate < Date()
     }
     
     var body: some View {
@@ -1485,6 +1723,307 @@ struct ReturnedBookRow: View {
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
         )
+    }
+}
+
+struct OverdueFinesView: View {
+    @StateObject private var finesManager = OverdueFinesManager()
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                if finesManager.isLoading {
+                    ProgressView("Loading fines...")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if finesManager.overdueFines.isEmpty {
+                    // Empty state
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.green.opacity(0.1))
+                                .frame(width: 100, height: 100)
+                            
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 50))
+                                .foregroundColor(.green)
+                        }
+                        .padding(.top, 20)
+                        
+                        Text("No overdue books")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                            .padding(.top, 10)
+                        
+                        Text("You don't have any overdue books at the moment.")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                            .padding(.bottom, 10)
+                        
+                        Button(action: {
+                            Task {
+                                await finesManager.refreshFines()
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .background(Color.blue.opacity(0.1))
+                                .foregroundColor(.blue)
+                                .cornerRadius(20)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                } else {
+                    // List of books with fines
+                    ForEach(finesManager.overdueFines) { fine in
+                        FineDetailRow(fine: fine)
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Overdue Books")
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+            await finesManager.refreshFines()
+        }
+        .task {
+            // Load the fine policy when the view appears
+            FinePolicyManager.shared.loadFinePolicy()
+            await finesManager.fetchOverdueFines()
+        }
+    }
+}
+
+struct FineDetailRow: View {
+    let fine: OverdueFine
+    
+    var daysOverdue: Int {
+        if let returnDate = fine.returnDate {
+            // If the book has been returned, check if it was late
+            if returnDate > fine.dueDate {
+                // If returned late by any amount, count as at least 1 day late
+                let calendar = Calendar.current
+                let components = calendar.dateComponents([.day], from: fine.dueDate, to: returnDate)
+                return max(1, components.day ?? 0)
+            }
+            return 0
+        } else {
+            // Book not returned yet, check if overdue
+            let now = Date()
+            if now > fine.dueDate {
+                // If overdue by any amount, count as at least 1 day overdue
+                let calendar = Calendar.current
+                let components = calendar.dateComponents([.day], from: fine.dueDate, to: now)
+                return max(1, components.day ?? 0)
+            }
+            return 0
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 16) {
+                // Book Cover with AsyncImage
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(LinearGradient(
+                            colors: [Color.red.opacity(0.2), Color.red.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 80, height: 100)
+                        .shadow(color: Color.red.opacity(0.2), radius: 4, x: 0, y: 2)
+                    
+                    if fine.coverImage != "book.fill" {
+                        AsyncImage(url: URL(string: fine.coverImage)) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 50, height: 50)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 70, height: 90)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.red)
+                            @unknown default:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    } else {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.red)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(fine.bookTitle)
+                            .font(.headline)
+                            .lineLimit(1)
+                        
+                        Spacer()
+                        
+                        // Fine Badge
+                        Text("$\(fine.fineAmount, specifier: "%.2f")")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.red.opacity(0.2))
+                            .foregroundColor(.red)
+                            .cornerRadius(8)
+                    }
+                    
+                    Text(fine.bookAuthor)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    
+                    // Overdue Status
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(fine.returnDate != nil ? "Return Status" : "Current Status")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: fine.returnDate != nil ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(fine.returnDate != nil ? .orange : .red)
+                            if fine.returnDate != nil {
+                                Text("Returned \(daysOverdue) day\(daysOverdue == 1 ? "" : "s") late")
+                                    .font(.subheadline)
+                                    .foregroundColor(.orange)
+                            } else {
+                                Text("Overdue by \(daysOverdue) day\(daysOverdue == 1 ? "" : "s")")
+                                    .font(.subheadline)
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Return Dates
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        Text("Due Date")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Text(fine.dueDate.formatted(date: .abbreviated, time: .omitted))
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+                
+                if let returnDate = fine.returnDate {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                            Text("Returned On")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        Text(returnDate.formatted(date: .abbreviated, time: .omitted))
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            Text("Not Returned")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        Text("Still overdue")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(15)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+    }
+}
+
+struct OverdueFinesCard: View {
+    let totalAmount: Double
+    let fineCount: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header row with amount and status
+            HStack(alignment: .center) {
+                // Label "Total Fine Amount"
+                Text("Total Fine Amount")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                // Amount displayed prominently
+                Text("$\(totalAmount, specifier: "%.2f")")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(totalAmount > 0 ? .red : .green)
+            }
+            
+            Divider()
+            
+            // Status information
+            HStack {
+                // Icon based on status
+                Image(systemName: totalAmount > 0 ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(totalAmount > 0 ? .red : .green)
+                    .frame(width: 24)
+                
+                // Status text
+                if totalAmount > 0 {
+                    Text("Due on \(fineCount) book\(fineCount == 1 ? "" : "s")")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("You have no overdue books!")
+                        .font(.subheadline)
+                        .foregroundColor(.green)
+                }
+                
+                Spacer()
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .cornerRadius(15)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 } 
 
