@@ -13,6 +13,7 @@ struct issueBooks: Identifiable, Codable {
     let memberEmail: String
     let issueDate: Date
     let returnDate: Date?
+    let actualReturnedDate: Date?
     
     // Coding keys to handle potential differences in JSON keys
     enum CodingKeys: String, CodingKey {
@@ -21,6 +22,7 @@ struct issueBooks: Identifiable, Codable {
         case memberEmail = "member_email"
         case issueDate = "issue_date"
         case returnDate = "return_date"
+        case actualReturnedDate = "actual_returned_date"
     }
 }
 

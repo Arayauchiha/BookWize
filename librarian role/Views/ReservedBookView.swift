@@ -257,7 +257,8 @@ struct ReservedBookView: View {
                 isbn: book.isbn ?? "",
                 memberEmail: member.email,
                 issueDate: issueDate,
-                returnDate: returnDate
+                returnDate: returnDate,
+                actualReturnedDate: nil
             )
             
             // Start a transaction using the same client

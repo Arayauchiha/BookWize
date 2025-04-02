@@ -8,28 +8,19 @@
 import SwiftUI
 import Supabase
 
-struct issueBooksCorrect: Identifiable, Codable {
-    let id: UUID
-    let isbn: String
-    let member_email: String
-    let issue_date: Date
-    let return_date: Date?
-    let actual_returned_date: Date?
-}
-
 struct IssueBookView: View {
     @StateObject private var circulationManager = IssuedBookManager.shared
     @State private var searchText = ""
     @State private var showingIssueForm = false
 
-    var filteredLoans: [issueBooksCorrect] {
+    var filteredLoans: [issueBooks] {
         if searchText.isEmpty {
-            return circulationManager.loans.filter { $0.actual_returned_date == nil }
+            return circulationManager.loans.filter { $0.actualReturnedDate == nil }
         }
         return circulationManager.loans.filter { loan in
             (loan.isbn.localizedCaseInsensitiveContains(searchText) ||
-            loan.member_email.localizedCaseInsensitiveContains(searchText)) &&
-            loan.actual_returned_date == nil
+            loan.memberEmail.localizedCaseInsensitiveContains(searchText)) &&
+            loan.actualReturnedDate == nil
         }
     }
 
@@ -99,7 +90,7 @@ struct IssueBookView: View {
 
 // ADD: Enhanced loan card with book cover
 struct EnhancedLoanCard: View {
-    let issuedBooks: issueBooksCorrect
+    let issuedBooks: issueBooks
     @State private var bookCoverURL: URL?
     @State private var isLoadingCover = true
     
@@ -145,7 +136,7 @@ struct EnhancedLoanCard: View {
                             .font(.subheadline)
                     }
                     
-                    Text("Member Email: \(issuedBooks.member_email)")
+                    Text("Member Email: \(issuedBooks.memberEmail)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -160,7 +151,7 @@ struct EnhancedLoanCard: View {
                     Text("Issue Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(issuedBooks.issue_date, style: .date)
+                    Text(issuedBooks.issueDate, style: .date)
                         .font(.subheadline)
                 }
                 
@@ -170,7 +161,7 @@ struct EnhancedLoanCard: View {
                     Text("Return Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    if let returnDate = issuedBooks.return_date {
+                    if let returnDate = issuedBooks.returnDate {
                         Text(returnDate, style: .date)
                             .font(.subheadline)
                     } else {
@@ -212,7 +203,7 @@ struct IssueBookFormView: View {
     @State private var errorMessage: String?
     @State private var showSuccessAlert = false
     
-    let onIssue: (issueBooksCorrect) -> Void
+    let onIssue: (issueBooks) -> Void
     
     // Auto-filled issue & return dates
     private let issueDate = Date()
@@ -435,13 +426,13 @@ struct IssueBookFormView: View {
         circulationManager.errorMessage = nil
 
         Task {
-            let newIssue = issueBooksCorrect(
+            let newIssue = issueBooks(
                 id: UUID(),
                 isbn: isbn,
-                member_email: smartCardID,
-                issue_date: issueDate,
-                return_date: returnDate,
-                actual_returned_date: nil
+                memberEmail: smartCardID,
+                issueDate: issueDate,
+                returnDate: returnDate,
+                actualReturnedDate: nil
             )
             do {
                 // First, fetch the current book to get its current available quantity
