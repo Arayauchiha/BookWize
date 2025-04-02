@@ -349,6 +349,93 @@ struct ReservedBookView: View {
 //            }
 //        }
 //    }
+//    
+//    func issueReservedBook(reservation: ReservationRecord) async {
+//        guard let book = reservation.book, let member = reservation.member else {
+//            errorMessage = "Missing book or member information"
+//            return
+//        }
+//        
+//        isLoading = true
+//        
+//        do {
+//            // Create the issueBooks object
+//            let issueDate = Date()
+//            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
+//            
+//            let newIssue = issueBooks(
+//                id: UUID(),
+//                isbn: book.isbn ?? "",
+//                memberEmail: member.email,
+//                issueDate: issueDate,
+//                returnDate: returnDate,
+//                actualReturnedDate: nil
+//            )
+//            
+//            // Start a transaction using the same client
+//            try await supabase.rpc("begin_transaction")
+//            
+//            // Insert the issued book record
+//            try await supabase
+//                .from("issuebooks")
+//                .insert(newIssue)
+//                .execute()
+//            
+//            // Query current quantity (we still need this to keep track)
+//            struct BookQuantity: Codable {
+//                let availableQuantity: Int
+//            }
+//            
+//            let response: BookQuantity = try await supabase
+//                .from("Books")
+//                .select("availableQuantity")
+//                .eq("id", value: book.id.uuidString)
+//                .single()
+//                .execute()
+//                .value
+//            
+//            let currentQuantity = response.availableQuantity
+//            
+//            // Update the available quantity only if it's greater than 0
+//            // This prevents negative quantities but allows issuing reserved books
+//            if currentQuantity > 0 {
+//                try await supabase
+//                    .from("Books")
+//                    .update(["availableQuantity": currentQuantity - 1])
+//                    .eq("id", value: book.id.uuidString)
+//                    .execute()
+//            }
+//            
+//            // Delete the reservation
+//            try await supabase
+//                .from("BookReservation")
+//                .delete()
+//                .eq("id", value: reservation.id.uuidString)
+//                .execute()
+//            
+//            // Commit the transaction
+//            try await supabase.rpc("commit_transaction")
+//            
+//            await MainActor.run {
+//                isLoading = false
+//                issuedReservationId = reservation.id
+//                showSuccessAlert = true
+//                
+//                // Remove the issued book from the local array
+//                reservations.removeAll(where: { $0.id == reservation.id })
+//            }
+//        } catch {
+//            // Rollback the transaction if it was started
+//            try? await supabase.rpc("rollback_transaction")
+//            
+//            await MainActor.run {
+//                print("Error issuing book: \(error)")
+//                errorMessage = "Failed to issue book: \(error.localizedDescription)"
+//                isLoading = false
+//            }
+//        }
+//    }
+//    
     
     func issueReservedBook(reservation: ReservationRecord) async {
         guard let book = reservation.book, let member = reservation.member else {
@@ -359,6 +446,26 @@ struct ReservedBookView: View {
         isLoading = true
         
         do {
+            // Check how many books the member has already issued
+            // Using filter() to check for null values
+            let countResponse = try await supabase
+                .from("issuebooks")
+                .select("id", count: .exact)
+                .eq("member_email", value: member.email)
+                .filter("actual_returned_date", operator: "is", value: "null") // Correct syntax for null check
+                .execute()
+            
+            let currentlyIssuedCount = countResponse.count ?? 0
+            
+            // Check if the member has reached the limit
+            if currentlyIssuedCount >= 5 {
+                await MainActor.run {
+                    errorMessage = "Member has reached the maximum limit of 5 issued books"
+                    isLoading = false
+                }
+                return
+            }
+            
             // Create the issueBooks object
             let issueDate = Date()
             let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
@@ -435,8 +542,6 @@ struct ReservedBookView: View {
             }
         }
     }
-    
-    
     struct ReservationCard: View {
         let reservation: ReservationRecord
         let issueAction: () -> Void
