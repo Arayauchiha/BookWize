@@ -96,28 +96,33 @@ struct LoginView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.customText.opacity(0.7))
                     
-                    HStack {
+                    ZStack(alignment: .trailing) {
                         Group {
                             if isPasswordVisible {
                                 TextField("Enter your password", text: $password)
-                                    .textFieldStyle(CustomTextFieldStyle())
                                     .textContentType(.password)
                                     .textInputAutocapitalization(.never)
                                     .disableAutocorrection(true)
-                                    .customTextField()
                             } else {
                                 SecureField("Enter your password", text: $password)
-                                    .textFieldStyle(CustomTextFieldStyle())
                                     .textContentType(.password)
                                     .textInputAutocapitalization(.never)
                                     .disableAutocorrection(true)
-                                    .customTextField()
                             }
                         }
+                        .padding()
+                        .background(.white)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 2)
                         
                         Button(action: { isPasswordVisible.toggle() }) {
                             Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                .foregroundStyle(Color.customButton.opacity(Color.secondaryIconOpacity))
+                                .foregroundStyle(Color.blue.opacity(0.6))
+                                .padding(.trailing, 12)
                         }
                     }
                 }
@@ -148,6 +153,7 @@ struct LoginView: View {
                     Button("Forgot Password?") {
                         if !email.isEmpty && isEmailValid {
                             // Send OTP and show OTP view first
+                            showingForgotPassword = true
                             sendVerificationOTP()
                             showingOTPView = true
                         } else {
@@ -220,6 +226,27 @@ struct LoginView: View {
                 }
             )
         }
+        .sheet(isPresented: $showingOTPView) {
+            OTPVerificationView(
+                email: email,
+                otp: $otpCode,
+                onVerify: {
+                    if showingForgotPassword {
+                        // For forgot password flow
+                        verifyOTP()
+                    } else {
+                        // For normal login flow
+                        verifyOTP()
+                    }
+                },
+                onCancel: {
+                    showingOTPView = false
+                    if showingForgotPassword {
+                        showingForgotPassword = false
+                    }
+                }
+            )
+        }
         .sheet(isPresented: $showingForgotPassword) {
             PasswordResetView(
                 newPassword: $newPassword,
@@ -264,28 +291,6 @@ struct LoginView: View {
                 },
                 onCancel: {
                     showingForgotPassword = false
-                }
-            )
-        }
-        .sheet(isPresented: $showingOTPView) {
-            OTPVerificationView(
-                email: email,
-                otp: $otpCode,
-                onVerify: {
-                    if showingForgotPassword {
-                        // For forgot password flow
-                        showingOTPView = false
-                        showingForgotPassword = true
-                    } else {
-                        // For normal login flow
-                        verifyOTP()
-                    }
-                },
-                onCancel: {
-                    showingOTPView = false
-                    if showingForgotPassword {
-                        showingForgotPassword = false
-                    }
                 }
             )
         }
@@ -347,9 +352,11 @@ struct LoginView: View {
                     } else {
                         let fetchedData = data[0]
                         if !fetchedData.vis {
+                            // Only show password change for first-time login
                             isLoading = false
                             showingPasswordChangeView = true
                         } else {
+                            // For normal login, proceed with OTP verification
                             sendVerificationOTP()
                         }
                     }
@@ -392,13 +399,22 @@ struct LoginView: View {
                 isAdminLoggedIn = true
                 showingOTPView = false
             case .librarian:
-                // For librarian, show password reset view first
-                showingOTPView = false
-                showingPasswordChangeView = true
+                if showingForgotPassword {
+                    // For forgot password flow, show password reset view
+                    showingOTPView = false
+                    showingForgotPassword = true
+                } else {
+                    // For normal login, just set logged in state
+                    isLibrarianLoggedIn = true
+                    UserDefaults.standard.set(email, forKey: "currentMemberEmail")
+                    showingOTPView = false
+                }
             case .member:
                 isMemberLoggedIn = true
                 showingOTPView = false
             }
+        } else {
+            errorMessage = "Invalid verification code"
         }
     }
 }

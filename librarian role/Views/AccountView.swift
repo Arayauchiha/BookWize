@@ -142,12 +142,17 @@ struct ChangePasswordView: View {
         NavigationView {
             Form {
                 Section(header: Text("Current Password")) {
-                    SecureField("Enter current password", text: $currentPassword)
-                        .focused($focusedField, equals: .currentPassword)
+                    ZStack(alignment: .trailing) {
+                        SecureField("Enter current password", text: $currentPassword)
+                            .focused($focusedField, equals: .currentPassword)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                    }
                 }
                 
                 Section(header: Text("New Password")) {
-                    HStack {
+                    ZStack(alignment: .trailing) {
                         Group {
                             if isNewPasswordVisible {
                                 TextField("Enter new password", text: $newPassword)
@@ -167,10 +172,14 @@ struct ChangePasswordView: View {
                                     }
                             }
                         }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
                         
                         Button(action: { isNewPasswordVisible.toggle() }) {
                             Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                 .foregroundStyle(Color.secondary)
+                                .padding(.trailing, 12)
                         }
                     }
                     
@@ -224,10 +233,30 @@ struct ChangePasswordView: View {
                 }
                 
                 Section(header: Text("Confirm New Password")) {
-                    SecureField("Confirm new password", text: $confirmPassword)
-                        .textContentType(.newPassword)
-                        .textInputAutocapitalization(.never)
-                        .focused($focusedField, equals: .confirmPassword)
+                    ZStack(alignment: .trailing) {
+                        Group {
+                            if isNewPasswordVisible {
+                                TextField("Confirm new password", text: $confirmPassword)
+                                    .textContentType(.newPassword)
+                                    .textInputAutocapitalization(.never)
+                                    .focused($focusedField, equals: .confirmPassword)
+                            } else {
+                                SecureField("Confirm new password", text: $confirmPassword)
+                                    .textContentType(.newPassword)
+                                    .textInputAutocapitalization(.never)
+                                    .focused($focusedField, equals: .confirmPassword)
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(10)
+                        
+                        Button(action: { isNewPasswordVisible.toggle() }) {
+                            Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                .foregroundStyle(Color.secondary)
+                                .padding(.trailing, 12)
+                        }
+                    }
                 }
                 
                 Section {
@@ -265,27 +294,6 @@ struct ChangePasswordView: View {
     }
     
     private func updatePassword() {
-        // Validate passwords match
-        guard newPassword == confirmPassword else {
-            errorMessage = "New passwords do not match"
-            showingError = true
-            return
-        }
-        
-        // Validate new password is different
-        guard newPassword != currentPassword else {
-            errorMessage = "New password must be different from current password"
-            showingError = true
-            return
-        }
-        
-        // Validate password requirements
-        guard passwordValidation.isValid else {
-            errorMessage = "New password does not meet requirements"
-            showingError = true
-            return
-        }
-        
         // Get current user email
         guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
             errorMessage = "User email not found"
@@ -293,9 +301,55 @@ struct ChangePasswordView: View {
             return
         }
         
-        // Update password in Supabase
+        // First verify current password
         Task {
             do {
+                // First verify the current password
+                let data: [FetchAdmin] = try await SupabaseManager.shared.client
+                    .from("Users")
+                    .select("*")
+                    .eq("email", value: userEmail)
+                    .eq("password", value: currentPassword)
+                    .eq("roleFetched", value: "librarian")
+                    .execute()
+                    .value
+                
+                if data.isEmpty {
+                    DispatchQueue.main.async {
+                        errorMessage = "Current password is incorrect"
+                        showingError = true
+                    }
+                    return
+                }
+                
+                // Validate passwords match
+                guard newPassword == confirmPassword else {
+                    DispatchQueue.main.async {
+                        errorMessage = "New passwords do not match"
+                        showingError = true
+                    }
+                    return
+                }
+                
+                // Validate new password is different
+                guard newPassword != currentPassword else {
+                    DispatchQueue.main.async {
+                        errorMessage = "New password must be different from current password"
+                        showingError = true
+                    }
+                    return
+                }
+                
+                // Validate password requirements
+                guard passwordValidation.isValid else {
+                    DispatchQueue.main.async {
+                        errorMessage = "New password does not meet requirements"
+                        showingError = true
+                    }
+                    return
+                }
+                
+                // Update password in Supabase
                 let userData = ["email": userEmail, "password": newPassword]
                 let response = try await SupabaseManager.shared.client
                     .from("Users")
