@@ -3,7 +3,7 @@ import SwiftUI
 struct BookCirculationView: View {
     @StateObject private var circulationManager = IssuedBookManager.shared
     
-    @State private var activeTab = CirculationTab.issue
+    @State private var activeTab = CirculationTab.Issue
     @State private var showingScanner = false
     
     var body: some View {
@@ -16,11 +16,11 @@ struct BookCirculationView: View {
                 .padding()
                 
                 switch activeTab {
-                case .issue:
+                case .Issue:
                     IssueBookView()
-                case .returned:
+                case .Returned:
                     ReturnBookView()
-                case .reserved:
+                case .Reserved:
                     ReservedBookView()
                     
                 }
@@ -31,9 +31,9 @@ struct BookCirculationView: View {
 }
 
 enum CirculationTab: String, CaseIterable {
-    case issue = "Issue Book"
-    case returned = "Return Book"
-    case reserved = "Reserved Book"
+    case Issue = "Issue Book"
+    case Returned = "Return Book"
+    case Reserved = "Reserved Book"
 }
 
 struct CustomSegmentedControl<T: Hashable>: View {

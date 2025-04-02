@@ -5,7 +5,10 @@ struct LibrarianManagementView: View {
     @State private var librarians: [LibrarianData] = []
     @State private var selectedSegment = 0
     @State private var isloading = false
+    @State private var showProfile = false
     private let segments = ["Librarians", "Fines & Fees"]
+    
+    var onProfileTap: (() -> Void)? = nil
     
     func  fetchLibrarians(){
         isloading = true
@@ -90,12 +93,34 @@ struct LibrarianManagementView: View {
                 }
             }
             .background(Color.customBackground)
-            .navigationTitle(segments[selectedSegment])
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Management")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { 
+                        if let onProfileTap = onProfileTap {
+                            onProfileTap()
+                        } else {
+                            showProfile = true
+                        }
+                    }) {
+                        Image(systemName: "person.circle")
+                            .font(.system(size: 22))
+                    }
+                }
+            }
             .sheet(isPresented: $showAddLibrarian) {
                 AddLibrarianView { newLibrarian in
                     librarians.append(newLibrarian)
                 }
+            }
+            .sheet(isPresented: $showProfile) {
+                NavigationStack {
+                    AdminProfileView()
+                        .navigationTitle("Profile")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationDragIndicator(.visible)
             }
             .task {
                 librarians = (await fetchLibrarian()) ?? []

@@ -10,11 +10,13 @@ class FineCalculator {
         let id: UUID
         let memberEmail: String
         let returnDate: String?
+        let actualReturnedDate: String?
         
         enum CodingKeys: String, CodingKey {
             case id
             case memberEmail = "member_email"
             case returnDate = "return_date"
+            case actualReturnedDate = "actual_returned_date"
         }
     }
     
@@ -38,8 +40,6 @@ class FineCalculator {
                 .execute()
                 .value
             
-            print("Fine settings raw response:", fineSettings)
-            
             guard let perDayFine = fineSettings.first?.perDayFine else {
                 print("No fine settings found")
                 return
@@ -47,15 +47,14 @@ class FineCalculator {
             
             print("Per day fine: \(perDayFine)")
             
-            // 2. Get all issue books with return dates
+            // 2. Get all issue books (both returned and unreturned)
             let issueBooks: [IssueBook] = try await SupabaseManager.shared.client
                 .from("issuebooks")
-                .select("id, member_email, return_date")
+                .select("id, member_email, return_date, actual_returned_date")
                 .execute()
                 .value
             
-//            print("Issue books raw response:", issueBooks)
-//            print("Fetched \(issueBooks.count) issue books")
+            print("Found \(issueBooks.count) books")
             
             // 3. Calculate fines for each member
             var memberFines: [String: Double] = [:]
@@ -75,92 +74,121 @@ class FineCalculator {
             let dateFormatter3 = DateFormatter()
             dateFormatter3.dateFormat = "yyyy-MM-dd"
             
-            print("Current date for comparison:", currentDate)
-            
             for book in issueBooks {
-                print("\nProcessing book:", book.id)
-                print("Member Email:", book.memberEmail)
-                print("Return date string:", book.returnDate ?? "nil")
+                print("\nProcessing book ID: \(book.id)")
+                print("Member Email: \(book.memberEmail)")
+                print("Return Date String: \(book.returnDate ?? "nil")")
+                print("Actual Return Date String: \(book.actualReturnedDate ?? "nil")")
                 
                 guard let returnDateString = book.returnDate else {
-                    print("Skipping book - no return date")
+                    print("Skipping - No return date")
                     continue
                 }
                 
-                // Try to parse the date with different formatters
+                // Try to parse the return date
                 var returnDate: Date?
-                
-                // Try ISO8601 formatter first
                 if let date = isoFormatter.date(from: returnDateString) {
                     returnDate = date
-                    print("Successfully parsed date with ISO8601 formatter")
-                }
-                // Try other formatters if ISO8601 failed
-                else if let date = dateFormatter1.date(from: returnDateString) {
+                    print("Parsed return date with ISO formatter")
+                } else if let date = dateFormatter1.date(from: returnDateString) {
                     returnDate = date
-                    print("Successfully parsed date with formatter 1")
-                }
-                else if let date = dateFormatter2.date(from: returnDateString) {
+                    print("Parsed return date with formatter 1")
+                } else if let date = dateFormatter2.date(from: returnDateString) {
                     returnDate = date
-                    print("Successfully parsed date with formatter 2")
-                }
-                else if let date = dateFormatter3.date(from: returnDateString) {
+                    print("Parsed return date with formatter 2")
+                } else if let date = dateFormatter3.date(from: returnDateString) {
                     returnDate = date
-                    print("Successfully parsed date with formatter 3")
+                    print("Parsed return date with formatter 3")
                 }
                 
                 guard let returnDate = returnDate else {
-                    print("Failed to parse return date with any formatter")
+                    print("Failed to parse return date")
                     continue
                 }
                 
-                print("Parsed return date:", returnDate)
+                // Determine the end date for fine calculation
+                let endDate: Date
+                if let actualReturnedDateString = book.actualReturnedDate {
+                    print("Book has actual return date: \(actualReturnedDateString)")
+                    // If book is returned, use actual return date
+                    var actualReturnDate: Date?
+                    if let date = isoFormatter.date(from: actualReturnedDateString) {
+                        actualReturnDate = date
+                        print("Parsed actual return date with ISO formatter")
+                    } else if let date = dateFormatter1.date(from: actualReturnedDateString) {
+                        actualReturnDate = date
+                        print("Parsed actual return date with formatter 1")
+                    } else if let date = dateFormatter2.date(from: actualReturnedDateString) {
+                        actualReturnDate = date
+                        print("Parsed actual return date with formatter 2")
+                    } else if let date = dateFormatter3.date(from: actualReturnedDateString) {
+                        actualReturnDate = date
+                        print("Parsed actual return date with formatter 3")
+                    }
+                    
+                    if let actualReturnDate = actualReturnDate {
+                        endDate = actualReturnDate
+                        print("Using actual return date for fine calculation")
+                    } else {
+                        print("Failed to parse actual return date, skipping book")
+                        continue
+                    }
+                } else {
+                    endDate = currentDate
+                    print("Using current date for fine calculation")
+                }
                 
                 // Calculate extra days
-                let components = calendar.dateComponents([.day], from: returnDate, to: currentDate)
+                let components = calendar.dateComponents([.day], from: returnDate, to: endDate)
                 let days = components.day ?? 0
-                print("Date components:", components)
-                print("Extra days calculated:", days)
+                
+                print("Return date: \(returnDate)")
+                print("End date: \(endDate)")
+                print("Days difference: \(days)")
                 
                 if days > 0 {
                     let fine = Double(days) * perDayFine
                     let previousFine = memberFines[book.memberEmail] ?? 0
                     memberFines[book.memberEmail] = previousFine + fine
+                    print("Calculated fine: \(fine)")
                     print("Previous fine: \(previousFine)")
-                    print("Added fine: \(fine)")
-                    print("Total fine now: \(memberFines[book.memberEmail] ?? 0)")
+                    print("Total fine for member: \(previousFine + fine)")
                 } else {
                     print("No fine needed - not overdue")
                 }
             }
             
-            print("\nFinal member fines:", memberFines)
-            print("Number of members with fines:", memberFines.count)
+            print("\nFinal member fines:")
+            for (email, fine) in memberFines {
+                print("\(email): \(fine)")
+            }
             
-            // 4. Update fines in Members table
-            for (memberEmail, fine) in memberFines {
-                print("\nUpdating member with email:", memberEmail)
-                print("Setting fine to:", fine)
-                
+            // 4. Get all members first
+            let members: [User] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select()
+                .execute()
+                .value
+            
+            // 5. Update fines for each member
+            for member in members {
+                let fine = memberFines[member.email] ?? 0.0
                 do {
-                    let updateResponse = try await SupabaseManager.shared.client
+                    try await SupabaseManager.shared.client
                         .from("Members")
                         .update(["fine": fine])
-                        .eq("email", value: memberEmail)
+                        .eq("email", value: member.email)
                         .execute()
-                    
-                    print("Update response for member \(memberEmail):", updateResponse)
+                    print("Updated fine for \(member.email) to \(fine)")
                 } catch {
-                    print("Error updating member \(memberEmail):", error)
-                    print("Error details:", error.localizedDescription)
+                    print("Error updating member \(member.email):", error)
                 }
             }
             
-            print("\nFine calculation completed successfully")
+            print("Fine calculation completed successfully")
             
         } catch {
             print("Error in fine calculation process:", error)
-            print("Error details:", error.localizedDescription)
         }
     }
 }
@@ -171,4 +199,4 @@ extension DateFormatter {
         block(self)
         return self
     }
-} 
+}

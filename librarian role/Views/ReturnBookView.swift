@@ -24,6 +24,16 @@ struct ReturnBookView: View {
     @State private var returnBookData: [ReturnissueBooks] = []
     @State private var returnBookWithFilter: [ReturnissueBooks] = []
     
+    var filteredReturnBooks: [ReturnissueBooks] {
+        if searchText.isEmpty {
+            return returnBookWithFilter
+        }
+        return returnBookWithFilter.filter { book in
+            book.isbn.localizedCaseInsensitiveContains(searchText) ||
+            book.member_email.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
     private func fetchReturn() async {
         do {
             // Get email from UserDefaults
@@ -63,9 +73,15 @@ struct ReturnBookView: View {
                         title: "No Books Returned",
                         message: "There are no returned books to display"
                     )
+                } else if !searchText.isEmpty && filteredReturnBooks.isEmpty {
+                    EmptyStateView(
+                        icon: "magnifyingglass",
+                        title: "No Results Found",
+                        message: "Try searching with different keywords"
+                    )
                 } else {
                     LazyVStack(spacing: 16) {
-                        ForEach(returnBookWithFilter) { book in
+                        ForEach(filteredReturnBooks) { book in
                             ReturnedBookCard(book: book)
                         }
                     }
@@ -88,7 +104,7 @@ struct ReturnBookView: View {
                 .padding(.vertical, 8)
             }
         }
-        .searchable(text: $searchText, prompt: "Search transactions...")
+        .searchable(text: $searchText, prompt: "Search Returned Books")
         .sheet(isPresented: $showingReturnForm) {
             ReturnBookFormView { returnedBook in
                 Task {
