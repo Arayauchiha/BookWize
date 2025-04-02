@@ -8,32 +8,37 @@ struct StatCard: View {
     let color: Color
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 22))
-                .foregroundColor(color)
-                .frame(width: 35)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
+        VStack(alignment: .leading, spacing: 8) {
+            // Icon and Title in top row
+            HStack(alignment: .top, spacing: 12) {
+                // Icon with simpler styling
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(color)
+                    .frame(width: 28)
                 
-                Text(value)
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                // Title - now with text wrapping
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
             }
             
             Spacer()
+            
+            // Value in bottom row
+            Text(value)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(.primary)
         }
-        .frame(height: 70)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color(UIColor.systemBackground))
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }
 
@@ -48,8 +53,8 @@ struct AnalyticsGridView: View {
     
     var body: some View {
         LazyVGrid(columns: [
-            GridItem(.flexible()),
-            GridItem(.flexible())
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
         ], spacing: 16) {
             StatCard(title: "Total Revenue", value: totalRevenue,
                     icon: "dollarsign.circle.fill", color: .green)
@@ -82,12 +87,14 @@ struct RecentRequestsView: View {
                 HStack {
                     Text("Recent Requests")
                         .font(.title2.bold())
+                        .foregroundColor(.primary)
                     Spacer()
                     Image(systemName: "chevron.right")
-                        .foregroundColor(Color.customButton.opacity(Color.secondaryIconOpacity))
+                        .foregroundColor(.secondary)
                         .font(.system(size: 14))
                 }
                 .padding(.horizontal)
+                .padding(.top, 6)
                 
                 if isLoading {
                     ProgressView()
@@ -107,8 +114,8 @@ struct RecentRequestsView: View {
                     }
                 }
             }
-            .foregroundColor(Color.customText)
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -119,26 +126,27 @@ struct RequestRow: View {
     var body: some View {
         HStack {
             Image(systemName: "book.fill")
-                .foregroundColor(.blue)
+                .foregroundStyle(Color.memberColor)
             VStack(alignment: .leading) {
                 Text(request.title)
                     .font(.headline)
+                    .foregroundStyle(.primary)
                 Text(request.author)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             Text(request.Request_status.rawValue.capitalized)
                 .font(.caption)
-                .foregroundColor(statusColor)
+                .foregroundStyle(statusColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(statusColor.opacity(0.1))
                 .cornerRadius(6)
         }
         .padding()
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(10)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(12)
         .padding(.horizontal)
     }
     
@@ -181,6 +189,8 @@ struct AdminDashboardView: View {
                     }
                     .padding(.vertical)
                 }
+                .background(Color(.systemGroupedBackground))
+                .ignoresSafeArea(edges: .bottom)
                 .refreshable {
                     currentTask?.cancel()
                     currentTask = Task {
@@ -207,17 +217,9 @@ struct AdminDashboardView: View {
             
             // Librarians Tab
             NavigationStack {
-                LibrarianManagementView()
-                    .navigationTitle("Librarians")
+                LibrarianManagementView(onProfileTap: { showProfile = true })
+                    .navigationTitle("Management")
                     .navigationBarTitleDisplayMode(.large)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button(action: { showProfile = true }) {
-                                Image(systemName: "person.circle")
-                                    .font(.system(size: 22))
-                            }
-                        }
-                    }
             }
             .tabItem {
                 Label("Librarians", systemImage: "person.2.fill")

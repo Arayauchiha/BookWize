@@ -45,7 +45,7 @@ struct FinanceView: View {
                 Section {
                     // Search Bar
                     SearchBarPayouts(text: $searchText)
-                        .padding()
+                        .padding(.horizontal)
                     
                     // Category Segmented Control
                     if searchText.isEmpty {
@@ -270,32 +270,27 @@ struct SearchBarPayouts: View {
     
     var body: some View {
         HStack {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Color.customText.opacity(0.6))
-                    .font(.system(size: 17))
-                
-                TextField("Search payouts...", text: $text)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .font(.system(size: 17))
-                    .foregroundStyle(Color.customText)
-                
-                if !text.isEmpty {
-                    Button(action: { text = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Color.customText.opacity(0.6))
-                            .font(.system(size: 17))
-                    }
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .padding(.leading, 6)
+            
+            TextField("Search", text: $text)
+                .font(.body)
+            
+            if !text.isEmpty {
+                Button(action: { text = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
                 }
+            } else {
+                Image(systemName: "mic.fill")
+                    .foregroundStyle(.secondary)
+                    .padding(.trailing, 6)
             }
-            .padding(12)
-            .background(Color.customCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.customText.opacity(0.1), lineWidth: 1)
-            )
         }
+        .padding(.vertical, 8)
+        .background(Color(.systemGray5))
+        .cornerRadius(10)
     }
 }
 
@@ -309,13 +304,13 @@ struct ExpenseRow: View {
             VStack(alignment: .leading) {
                 Text(expense.title)
                     .font(.headline)
-                    .foregroundStyle(Color.customText)
+                    .foregroundStyle(Color.primary)
                 HStack {
                     Text(expense.category)
                         .font(.subheadline)
-                        .foregroundStyle(Color.customText.opacity(0.6))
+                        .foregroundStyle(Color.secondary)
                     Text("•")
-                        .foregroundStyle(Color.customText.opacity(0.6))
+                        .foregroundStyle(Color.secondary)
                     Text(expense.status)
                         .font(.subheadline)
                         .foregroundStyle(expense.status == "Pending" ? .orange : .green)
@@ -327,16 +322,15 @@ struct ExpenseRow: View {
             VStack(alignment: .trailing) {
                 Text("₹\(expense.amount, specifier: "%.2f")")
                     .font(.headline)
-                    .foregroundStyle(Color.customText)
+                    .foregroundStyle(Color.primary)
                 Text(expense.date.formatted(.dateTime.day().month().year()))
                     .font(.caption)
-                    .foregroundStyle(Color.customText.opacity(0.6))
+                    .foregroundStyle(Color.secondary)
             }
         }
         .padding(16)
-        .background(Color.customCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(12)
         .contentShape(Rectangle())
         .onTapGesture {
             onEdit()

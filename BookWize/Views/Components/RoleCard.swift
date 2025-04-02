@@ -37,7 +37,6 @@ struct RoleCard: View {
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(cardColor)
-                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
         )
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
