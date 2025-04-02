@@ -15,6 +15,11 @@ enum BookStatus: String {
         }
     }
 }
+struct Member: Identifiable , Codable {
+    let id: String
+    let email: String
+    let name: String
+}
 
 struct BorrowedBook: Identifiable {
     let id: String
@@ -260,6 +265,82 @@ struct ReturnedBook: Identifiable {
     let progress: Double
 }
 
+// Add this after the ReturnedBooksManager class
+class ReservedBooksManager: ObservableObject {
+    @Published var reservedBooks: [ReservationRecord] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    private var timer: Timer?
+    
+    deinit {
+        timer?.invalidate()
+    }
+    
+    func refreshReservedBooks() async {
+        await fetchReservedBooks()
+    }
+    
+    func fetchReservedBooks() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Get the current user's email from UserDefaults
+            guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
+                print("No email found in UserDefaults")
+                errorMessage = "User email not found"
+                isLoading = false
+                return
+            }
+            
+            print("Fetching reserved books for user: \(userEmail)")
+            
+            // First, get the user's ID from their email
+            let memberResponse: [Member] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("*")
+                .eq("email", value: userEmail)
+                .execute()
+                .value
+            
+            guard let memberId = memberResponse.first?.id else {
+                print("Member not found for email: \(userEmail)")
+                errorMessage = "Member not found"
+                isLoading = false
+                return
+            }
+            
+            // Fetch reservations with joined book data
+            let reservationsResponse: [ReservationRecord] = try await SupabaseManager.shared.client
+                .from("BookReservation")
+                .select("""
+                    *,
+                    member:Members(*),
+                    book:Books(*)
+                    """)
+                .eq("member_id", value: memberId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            
+            print("Fetched \(reservationsResponse.count) reservations")
+            
+            await MainActor.run {
+                self.reservedBooks = reservationsResponse
+                self.isLoading = false
+                print("Updated reserved books: \(reservationsResponse.count)")
+            }
+            
+        } catch {
+            print("Error fetching reserved books: \(error)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load reserved books: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+        }
+    }
+}
+
 // MARK: - Main Dashboard View
 struct DashboardView: View {
     @StateObject private var booksManager = BorrowedBooksManager()
@@ -345,9 +426,8 @@ struct DashboardView: View {
                     } else {
                         // Your Reads Section
                         VStack(alignment: .leading, spacing: 8) {
-                            Button(action: {
-                                showingBookManagement = true
-                            }) {
+                            NavigationLink(destination: BookManagementView()
+                                .environmentObject(booksManager)) {
                                 HStack {
                                     Text("Your Reads")
                                         .font(.title2)
@@ -366,6 +446,7 @@ struct DashboardView: View {
                                 TabView(selection: $currentIndex) {
                                     BorrowedBookRow(book: urgentBook)
                                         .tag(0)
+                                        .padding(.horizontal)
                                 }
                                 .tabViewStyle(.page(indexDisplayMode: .never))
                                 .frame(height: 200)
@@ -424,10 +505,6 @@ struct DashboardView: View {
                     await fetchUserData()
                     await booksManager.fetchBorrowedBooks()
                 }
-            }
-            .sheet(isPresented: $showingBookManagement) {
-                BookManagementView()
-                    .environmentObject(booksManager)
             }
             .sheet(isPresented: $showReadingTracker) {
                 ReadingProgressDetailView(
@@ -705,65 +782,53 @@ struct BookManagementView: View {
     @State private var selectedSegment = 0
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Custom Segmented Control
-                HStack(spacing: 0) {
-                    ForEach(0..<3) { index in
-                        Button(action: {
-                            withAnimation {
-                                selectedSegment = index
-                            }
-                        }) {
-                            VStack(spacing: 8) {
-                                Text(segmentTitle(for: index))
-                                    .font(.subheadline)
-                                    .fontWeight(selectedSegment == index ? .semibold : .regular)
-                                
-                                Rectangle()
-                                    .fill(selectedSegment == index ? Color.blue : Color.clear)
-                                    .frame(height: 3)
-                            }
-                            .foregroundColor(selectedSegment == index ? .blue : .gray)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+        VStack(spacing: 0) {
+            // Custom Segmented Control
+            HStack(spacing: 0) {
+                ForEach(0..<3) { index in
+                    Button(action: {
+                        withAnimation {
+                            selectedSegment = index
                         }
+                    }) {
+                        VStack(spacing: 8) {
+                            Text(segmentTitle(for: index))
+                                .font(.subheadline)
+                                .fontWeight(selectedSegment == index ? .semibold : .regular)
+                            
+                            Rectangle()
+                                .fill(selectedSegment == index ? Color.blue : Color.clear)
+                                .frame(height: 3)
+                        }
+                        .foregroundColor(selectedSegment == index ? .blue : .gray)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
                     }
                 }
-                .background(Color(.systemBackground))
-                .overlay(
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(height: 1),
-                    alignment: .bottom
-                )
+            }
+            .background(Color(.systemBackground))
+            .overlay(
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 1),
+                alignment: .bottom
+            )
+            
+            // Content based on selected segment
+            TabView(selection: $selectedSegment) {
+                BorrowedBooksView()
+                    .tag(0)
                 
-                // Content based on selected segment
-                TabView(selection: $selectedSegment) {
-                    BorrowedBooksView()
-                        .tag(0)
-                    
-                    ReservedBooksView()
-                        .tag(1)
-                    
-                    ReturnedBooksView()
-                        .tag(2)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
+                ReservedBooksView()
+                    .tag(1)
+                
+                ReturnedBooksView()
+                    .tag(2)
             }
-            .navigationTitle("My Books")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
+        .navigationTitle("Your Reads")
+        .navigationBarTitleDisplayMode(.large)
     }
     
     private func segmentTitle(for index: Int) -> String {
@@ -1035,16 +1100,194 @@ struct BorrowedBookRow: View {
 }
 
 struct ReservedBooksView: View {
+    @StateObject private var booksManager = ReservedBooksManager()
+    
+    var sortedBooks: [ReservationRecord] {
+        booksManager.reservedBooks.sorted { book1, book2 in
+            let expirationDate1 = Calendar.current.date(byAdding: .hour, value: 24, to: book1.created_at) ?? Date()
+            let expirationDate2 = Calendar.current.date(byAdding: .hour, value: 24, to: book2.created_at) ?? Date()
+            return expirationDate1 < expirationDate2 // Sort by earliest expiration first
+        }
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                ForEach(0..<2) { _ in
-                    ReservedBookRow()
+                if booksManager.isLoading {
+                    ProgressView("Loading books...")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if booksManager.reservedBooks.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                        Text("No reserved books")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                        Button(action: {
+                            Task {
+                                await booksManager.refreshReservedBooks()
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                } else {
+                    ForEach(sortedBooks) { reservation in
+                        ReservedBookRow(reservation: reservation)
+                    }
                 }
             }
             .padding()
         }
         .background(Color(.systemGroupedBackground))
+        .refreshable {
+            await booksManager.refreshReservedBooks()
+        }
+        .task {
+            await booksManager.refreshReservedBooks()
+        }
+    }
+}
+
+struct ReservedBookRow: View {
+    let reservation: ReservationRecord
+    
+    var remainingHours: Int {
+        let expirationDate = Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
+        let calendar = Calendar.current
+        let now = Date()
+        let components = calendar.dateComponents([.hour], from: now, to: expirationDate)
+        return components.hour ?? 0
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 16) {
+                // Book Cover with AsyncImage
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(LinearGradient(
+                            colors: [Color.blue.opacity(0.2), Color.blue.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 80, height: 100)
+                        .shadow(color: Color.blue.opacity(0.2), radius: 4, x: 0, y: 2)
+                    
+                    if let imageURL = reservation.book?.imageURL,
+                       let url = URL(string: imageURL) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 50, height: 50)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 70, height: 90)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            case .failure:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            @unknown default:
+                                Image(systemName: "book.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    } else {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(reservation.book?.title ?? "Unknown Book")
+                            .font(.headline)
+                            .lineLimit(1)
+                        
+                        Spacer()
+                        
+                        // Status Badge
+                        Text("Reserved")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.purple.opacity(0.2))
+                            .foregroundColor(.purple)
+                            .cornerRadius(8)
+                    }
+                    
+                    Text(reservation.book?.author ?? "Unknown Author")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    
+                    // Availability Info
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Reservation Time")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.fill")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                            Text("\(remainingHours) hour\(remainingHours == 1 ? "" : "s") remaining")
+                                .font(.subheadline)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                }
+            }
+            
+            // Reservation Details
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        Text("Reserved On")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Text(reservation.created_at.formatted(date: .abbreviated, time: .omitted))
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text("Hold Until")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    Text(Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at)?.formatted(date: .abbreviated, time: .omitted) ?? "")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(15)
+        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -1099,133 +1342,6 @@ struct ReturnedBooksView: View {
         .task {
             await booksManager.refreshReturnedBooks()
         }
-    }
-}
-
-struct ReservedBookRow: View {
-    // Sample data - in real app, this would come from a model
-    let reservationDate = Date().addingTimeInterval(-12*60*60) // 12 hours ago
-    let holdUntilDate = Date().addingTimeInterval(12*60*60) // 12 hours remaining
-    
-    var remainingHours: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let components = calendar.dateComponents([.hour], from: now, to: holdUntilDate)
-        return components.hour ?? 0
-    }
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 16) {
-                // Book Cover
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(LinearGradient(
-                            colors: [Color.blue.opacity(0.2), Color.blue.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 80, height: 100)
-                        .shadow(color: Color.blue.opacity(0.2), radius: 4, x: 0, y: 2)
-                    
-                    Image(systemName: "book.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(.blue)
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("1984")
-                            .font(.headline)
-                            .lineLimit(1)
-                        
-                        Spacer()
-                        
-                        // Status Badge
-                        Text("Reserved")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.purple.opacity(0.2))
-                            .foregroundColor(.purple)
-                            .cornerRadius(8)
-                    }
-                    
-                    Text("George Orwell")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                    
-                    // Availability Info
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Reservation Time")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock.fill")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                            Text("\(remainingHours) hour\(remainingHours == 1 ? "" : "s") remaining")
-                                .font(.subheadline)
-                                .foregroundColor(.orange)
-                        }
-                    }
-                }
-            }
-            
-            // Reservation Details and Actions
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                        Text("Reserved On")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    Text(reservationDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "clock")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        Text("Hold Until")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    Text(holdUntilDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                }
-                
-                Spacer()
-                
-                Button(action: {
-                    // Add cancel reservation action
-                }) {
-                    Text("Cancel")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .cornerRadius(8)
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(15)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
 
