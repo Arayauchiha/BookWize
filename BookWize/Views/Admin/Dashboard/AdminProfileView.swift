@@ -6,16 +6,19 @@ struct FetchAdmin:Codable{
     var name:String
 }
 
-
 struct AdminProfileView: View {
     @State private var showLogoutAlert = false
+    @State private var showPasswordReset = false
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
     @Environment(\.dismiss) private var dismiss
     @State private var user: FetchAdmin?
     
+    @State private var newPassword = ""
+    @State private var confirmPassword = ""
+    @State private var isNewPasswordVisible = false
+    
     private func fetchMember() async {
         do {
-            // Get email from UserDefaults
             guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
                 print("No email found in UserDefaults")
                 return
@@ -26,7 +29,7 @@ struct AdminProfileView: View {
             let response: [FetchAdmin] = try await SupabaseManager.shared.client
                 .from("Users")
                 .select("*")
-                .eq("email", value: userEmail)  // Use email instead of id
+                .eq("email", value: userEmail)
                 .execute()
                 .value
             
@@ -64,6 +67,10 @@ struct AdminProfileView: View {
             }
             
             Section {
+                Button(action: { showPasswordReset = true }) {
+                    Label("Change Password", systemImage: "lock")
+                }
+                
                 Button(role: .destructive) {
                     showLogoutAlert = true
                 } label: {
@@ -81,6 +88,27 @@ struct AdminProfileView: View {
             }
         } message: {
             Text("Are you sure you want to logout?")
+        }
+        .sheet(isPresented: $showPasswordReset) {
+            AdminPasswordResetView(
+                newPassword: $newPassword,
+                confirmPassword: $confirmPassword,
+                isNewPasswordVisible: $isNewPasswordVisible,
+                email: user?.email ?? "",
+                title: "Change Password",
+                message: "Enter your new password below",
+                buttonTitle: "Update Password",
+                onSave: {
+                    showPasswordReset = false
+                    newPassword = ""
+                    confirmPassword = ""
+                },
+                onCancel: {
+                    showPasswordReset = false
+                    newPassword = ""
+                    confirmPassword = ""
+                }
+            )
         }
         .task {
             await fetchMember()

@@ -1,182 +1,5 @@
 import SwiftUI
 import Supabase
-
-struct ReservedMember: Codable {
-    let id: UUID
-    let email: String
-    let name: String
-    let gender: String
-    let selectedLibrary: String
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case email
-        case name
-        case gender
-        case selectedLibrary = "selectedLibrary"
-    }
-}
-
-struct ReservedBook: Codable {
-    let id: UUID
-    let isbn: String?
-    let title: String
-    let author: String
-    let publisher: String?
-    let publishedDate: String?
-    let description: String?
-    let pageCount: Int?
-    let genre: String?
-    let imageURL: String?
-    let quantity: Int
-    let availableQuantity: Int
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case isbn
-        case title
-        case author
-        case publisher
-        case publishedDate
-        case description
-        case pageCount
-        case genre
-        case imageURL
-        case quantity
-        case availableQuantity
-    }
-}
-
-struct ReservationRecord: Identifiable, Codable {
-    let id: UUID
-    let created_at: Date
-    let member_id: UUID
-    let book_id: UUID
-    var member: ReservedMember?
-    var book: ReservedBook?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case created_at
-        case member_id
-        case book_id
-        case member
-        case book
-    }
-}
-
-//struct ReservedBookView: View {
-//    @State private var searchText = ""
-//    @State private var reservations: [ReservationRecord] = []
-//    @State private var isLoading = true
-//    @State private var errorMessage: String?
-//    @State private var selectedReservation: ReservationRecordreservation?
-//    @State private var showingDetail = false
-//    
-//    //MARK: - issue reserved book
-//    @State private var showIssueConfirmation = false
-//    @State private var issuedReservationId: UUID?
-//    @State private var showSuccessAlert = false
-//    
-//    private let supabase = SupabaseConfig.client
-//    
-//    var filteredReservations: [ReservationRecord] {
-//        if searchText.isEmpty { return reservations }
-//        return reservations.filter { reservation in
-//            let bookTitle = reservation.book?.title.lowercased() ?? ""
-//            let memberName = reservation.member?.name.lowercased() ?? ""
-//            let searchQuery = searchText.lowercased()
-//            return bookTitle.contains(searchQuery) || memberName.contains(searchQuery)
-//        }
-//    }
-//    
-//    var body: some View {
-//        ZStack {
-//            if isLoading {
-//                LoadingView()
-//            } else if reservations.isEmpty {
-//                EmptyView()
-//            } else {
-//                ScrollView {
-//                    LazyVStack(spacing: 16) {
-//                        // Reservations Grid
-//                        ForEach(filteredReservations) { reservation in
-//                            ReservationCard(
-//                                reservation: reservation,
-//                                //MARK: - issue reserved book
-//                                issueAction: {
-//                                    selectedReservation = reservation
-//                                    showIssueConfirmation = true
-//                                }
-//                            )
-//                            .onTapGesture {
-//                                selectedReservation = reservation
-//                                showingDetail = true
-//                            }
-//                        }
-//                        .padding(.horizontal)
-//                    }
-//                }
-//            }
-//        }
-//        
-//        .searchable(text: $searchText, prompt: "Search reservations")
-//        .refreshable {
-//            isLoading = true
-//            await fetchReservations()
-//        }
-//        .onAppear {
-//            Task {
-//                await fetchReservations()
-//            }
-//        }
-//        .onChange(of: searchText) { _ in
-//            // Refresh data when search text changes
-//            Task {
-//                await fetchReservations()
-//            }
-//        }
-//        .sheet(isPresented: $showingDetail) {
-//            if let reservation = selectedReservation {
-//                ReservationDetailSheet(
-//                    reservation: reservation,
-//                    //MARK: - issue reserved book
-//                    issueAction: {
-//                        showingDetail = false
-//                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-//                            showIssueConfirmation = true
-//                        }
-//                    }
-//                )
-//            }
-//                .alert("Issue Book", isPresented: $showIssueConfirmation) {
-//                    Button("Cancel", role: .cancel) {}
-//                    Button("Issue") {
-//                        if let reservation = selectedReservation {
-//                            Task {
-//                                await issueReservedBook(reservation: reservation)
-//                            }
-//                        }
-//                    }
-//                } message: {
-//                    if let reservation = selectedReservation {
-//                        Text("Are you sure you want to issue '\(reservation.book?.title ?? "Unknown Book")' to \(reservation.member?.name ?? "Unknown Member")?")
-//                    } else {
-//                        Text("Issue reserved book?")
-//                    }
-//                }
-//                .alert("Success", isPresented: $showSuccessAlert) {
-//                    Button("OK") { }
-//                } message: {
-//                    Text("Book has been successfully issued!")
-//                }
-//                .alert("Error", isPresented: .constant(errorMessage != nil)) {
-//                    Button("OK") { errorMessage = nil }
-//                } message: {
-//                    Text(errorMessage ?? "An error occurred")
-//                }
-//        }
-//        
 struct ReservedBookView: View {
     @State private var searchText = ""
     @State private var reservations: [ReservationRecord] = []
@@ -232,7 +55,6 @@ struct ReservedBookView: View {
                     )
                 }
             }
-        // Move all alerts to the main view hierarchy
             .alert("Issue Book", isPresented: $showIssueConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Issue") {
@@ -327,6 +149,96 @@ struct ReservedBookView: View {
     }
     
     //MARK: - issue reserved books:
+//    func issueReservedBook(reservation: ReservationRecord) async {
+//        guard let book = reservation.book, let member = reservation.member else {
+//            errorMessage = "Missing book or member information"
+//            return
+//        }
+//        
+//        isLoading = true
+//        
+//        do {
+//            // First, check if the book exists and has available quantity
+//            struct BookQuantity: Codable {
+//                let availableQuantity: Int
+//            }
+//            
+//            let response: BookQuantity = try await supabase
+//                .from("Books")
+//                .select("availableQuantity")
+//                .eq("id", value: book.id.uuidString)
+//                .single()
+//                .execute()
+//                .value
+//            
+//            // Print the data for debugging
+//            print("Book query response: \(response)")
+//            
+//            let currentQuantity = response.availableQuantity
+//            
+//            // Check if there are books available
+//            guard currentQuantity > 0 else {
+//                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No books available"])
+//            }
+//            
+//            // Create the issueBooks object
+//            let issueDate = Date()
+//            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
+//            
+//            let newIssue = issueBooks(
+//                id: UUID(),
+//                isbn: book.isbn ?? "",
+//                memberEmail: member.email,
+//                issueDate: issueDate,
+//                returnDate: returnDate
+//            )
+//            
+//            // Start a transaction using the same client
+//            try await supabase.rpc("begin_transaction")
+//            
+//            // Insert the issued book record
+//            try await supabase
+//                .from("issuebooks")
+//                .insert(newIssue)
+//                .execute()
+//            
+//            // Update the available quantity
+//            try await supabase
+//                .from("Books")
+//                .update(["availableQuantity": currentQuantity - 1])
+//                .eq("id", value: book.id.uuidString)
+//                .execute()
+//            
+//            // Delete the reservation
+//            try await supabase
+//                .from("BookReservation")
+//                .delete()
+//                .eq("id", value: reservation.id.uuidString)
+//                .execute()
+//            
+//            // Commit the transaction
+//            try await supabase.rpc("commit_transaction")
+//            
+//            await MainActor.run {
+//                isLoading = false
+//                issuedReservationId = reservation.id
+//                showSuccessAlert = true
+//                
+//                // Remove the issued book from the local array
+//                reservations.removeAll(where: { $0.id == reservation.id })
+//            }
+//        } catch {
+//            // Rollback the transaction if it was started
+//            try? await supabase.rpc("rollback_transaction")
+//            
+//            await MainActor.run {
+//                print("Error issuing book: \(error)")
+//                errorMessage = "Failed to issue book: \(error.localizedDescription)"
+//                isLoading = false
+//            }
+//        }
+//    }
+    
     func issueReservedBook(reservation: ReservationRecord) async {
         guard let book = reservation.book, let member = reservation.member else {
             errorMessage = "Missing book or member information"
@@ -336,7 +248,29 @@ struct ReservedBookView: View {
         isLoading = true
         
         do {
-            // First, check if the book exists and has available quantity
+            // Create the issueBooks object
+            let issueDate = Date()
+            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
+            
+            let newIssue = issueBooks(
+                id: UUID(),
+                isbn: book.isbn ?? "",
+                memberEmail: member.email,
+                issueDate: issueDate,
+                returnDate: returnDate,
+                actualReturnedDate: nil
+            )
+            
+            // Start a transaction using the same client
+            try await supabase.rpc("begin_transaction")
+            
+            // Insert the issued book record
+            try await supabase
+                .from("issuebooks")
+                .insert(newIssue)
+                .execute()
+            
+            // Query current quantity (we still need this to keep track)
             struct BookQuantity: Codable {
                 let availableQuantity: Int
             }
@@ -349,43 +283,17 @@ struct ReservedBookView: View {
                 .execute()
                 .value
             
-            // Print the data for debugging
-            print("Book query response: \(response)")
-            
             let currentQuantity = response.availableQuantity
             
-            // Check if there are books available
-            guard currentQuantity > 0 else {
-                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No books available"])
+            // Update the available quantity only if it's greater than 0
+            // This prevents negative quantities but allows issuing reserved books
+            if currentQuantity > 0 {
+                try await supabase
+                    .from("Books")
+                    .update(["availableQuantity": currentQuantity - 1])
+                    .eq("id", value: book.id.uuidString)
+                    .execute()
             }
-            
-            // Create the issueBooks object
-            let issueDate = Date()
-            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
-            
-            let newIssue = issueBooks(
-                id: UUID(),
-                isbn: book.isbn ?? "",
-                memberEmail: member.email,
-                issueDate: issueDate,
-                returnDate: returnDate
-            )
-            
-            // Start a transaction using the same client
-            try await supabase.rpc("begin_transaction")
-            
-            // Insert the issued book record
-            try await supabase
-                .from("issuebooks")
-                .insert(newIssue)
-                .execute()
-            
-            // Update the available quantity
-            try await supabase
-                .from("Books")
-                .update(["availableQuantity": currentQuantity - 1])
-                .eq("id", value: book.id.uuidString)
-                .execute()
             
             // Delete the reservation
             try await supabase
@@ -416,7 +324,6 @@ struct ReservedBookView: View {
             }
         }
     }
-    
     
     
     struct ReservationCard: View {

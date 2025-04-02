@@ -121,10 +121,10 @@ struct RequestRow: View {
             Spacer()
             Text(request.Request_status.rawValue.capitalized)
                 .font(.caption)
-                .foregroundColor(.white)
+                .foregroundColor(statusColor)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(statusColor)
+                .background(statusColor.opacity(0.1))
                 .cornerRadius(6)
         }
         .padding()
@@ -136,7 +136,7 @@ struct RequestRow: View {
     private var statusColor: Color {
         switch request.Request_status {
         case .pending: return .orange
-        case .approved: return Color.librarianColor
+        case .approved: return .green
         case .rejected: return .red
         }
     }
@@ -149,13 +149,11 @@ struct AdminDashboardView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     
-    // Analytics State
-    @State private var totalRevenue = "$0"
-    @State private var overdueFines = "$0"
-    @State private var activeLibrarians = "0"
-    @State private var activeMembers = "0"
-    @State private var totalBooks = "0"
-    @State private var issuedBooks = "0"
+    // Task management
+    @State private var currentTask: Task<Void, Never>?
+    
+    // Dashboard Manager
+    @StateObject private var dashboardManager = DashboardManager()
     
     var body: some View {
         NavigationStack {
@@ -164,12 +162,12 @@ struct AdminDashboardView: View {
                     ScrollView {
                         VStack(spacing: 16) {
                             AnalyticsGridView(
-                                totalRevenue: totalRevenue,
-                                overdueFines: overdueFines,
-                                activeLibrarians: activeLibrarians,
-                                activeMembers: activeMembers,
-                                totalBooks: totalBooks,
-                                issuedBooks: issuedBooks
+                                totalRevenue: String(format: "$%.2f", dashboardManager.totalRevenue),
+                                overdueFines: String(format: "$%.2f", dashboardManager.overdueFines),
+                                activeLibrarians: "\(dashboardManager.activeLibrariansCount)",
+                                activeMembers: "\(dashboardManager.totalMembersCount)",
+                                totalBooks: "\(dashboardManager.totalBooksCount)",
+                                issuedBooks: "\(dashboardManager.issuedBooksCount)"
                             )
                             
                             RecentRequestsView(
@@ -180,11 +178,28 @@ struct AdminDashboardView: View {
                         }
                         .padding(.vertical)
                     }
-                    .navigationTitle("Dashboard")
                     .refreshable {
-                        await fetchBookRequests()
-                        await fetchAnalytics()
+                        // Cancel any existing task before starting a new one
+                        currentTask?.cancel()
+                        
+                        // Create a new task for the refresh
+                        currentTask = Task {
+                            do {
+                                errorMessage = nil // Clear any previous errors
+                                async let requests = fetchBookRequests()
+                                async let analytics = dashboardManager.fetchDashboardData()
+                                try await (requests, analytics)
+                            } catch {
+                                if !Task.isCancelled {
+                                    print("Refresh error (not cancellation): \(error)")
+                                }
+                            }
+                        }
+                        
+                        // Wait for the task to complete
+                        await currentTask?.value
                     }
+                    .navigationTitle("Dashboard")
                 }
                 .tabItem {
                     Label("Dashboard", systemImage: "chart.bar.fill")
@@ -234,10 +249,15 @@ struct AdminDashboardView: View {
             }
             .onAppear {
                 configureTabBar()
-                Task {
+                // Initial data load
+                currentTask = Task {
                     await fetchBookRequests()
-                    await fetchAnalytics()
                 }
+            }
+            .onDisappear {
+                // Clean up any running task when view disappears
+                currentTask?.cancel()
+                currentTask = nil
             }
         }
     }
@@ -275,6 +295,7 @@ struct AdminDashboardView: View {
     }
 
     private func fetchBookRequests() async {
+        guard !Task.isCancelled else { return }
         isLoading = true
         defer { isLoading = false }
         
@@ -287,147 +308,16 @@ struct AdminDashboardView: View {
                 .limit(5)
                 .execute()
                 .value
-            bookRequests = response
-        } catch {
-            errorMessage = "Failed to load requests: \(error.localizedDescription)"
-        }
-    }
-    
-    private func fetchAnalytics() async {
-        do {
-            let client = SupabaseManager.shared.client
             
-            // First, let's print raw JSON for membership fee
-            print("Fetching membership fee...")
-            let membershipRawResponse = try await client
-                .from("FineAndMembershipSet")
-                .select("*")
-                .execute()
-            print("Raw membership response: \(String(describing: membershipRawResponse.data))")
-            
-            struct MembershipSetting: Codable, Hashable {
-                let Membership: Double?
-                let PerDayFine: Double?
-                let FineSet_id: UUID?
-            }
-            
-            let membershipFeeResponse: [MembershipSetting] = try await client
-                .from("FineAndMembershipSet")
-                .select("*")
-                .execute()
-                .value
-            
-            print("Decoded membership response: \(membershipFeeResponse)")
-            let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
-            
-            // Print raw JSON for members
-            print("Fetching members count...")
-            let membersRawResponse = try await client
-                .from("Members")
-                .select("*")
-                .execute()
-            print("Raw members response: \(String(describing: membersRawResponse.data))")
-            
-            let membersCount: Int = try await client
-                .from("Members")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            
-            print("Members count: \(membersCount)")
-            let membershipRevenue = Double(membersCount) * membershipFee
-            
-            // Print raw JSON for fines
-            print("Fetching fines...")
-            let finesRawResponse = try await client
-                .from("issuebooks")
-                .select("*")
-                .execute()
-            print("Raw fines response: \(String(describing: finesRawResponse.data))")
-            
-            struct Fine: Codable {
-                let fineAmount: Double?
-                let id: UUID?
-            }
-            
-            let finesResponse: [Fine] = try await client
-                .from("issuebooks")
-                .select("fineAmount, id")
-                .execute()
-                .value
-            
-            print("Decoded fines: \(finesResponse)")
-            let totalFines = finesResponse.reduce(0) { $0 + ($1.fineAmount ?? 0) }
-            
-            // Calculate total revenue
-            let totalAmount = membershipRevenue + totalFines
-            totalRevenue = String(format: "$%.2f", totalAmount)
-            overdueFines = String(format: "$%.2f", totalFines)
-            
-            // Print raw JSON for librarians
-            print("Fetching librarians count...")
-            let librariansRawResponse = try await client
-                .from("Users")
-                .select("*")
-                .eq("roleFetched", value: "librarian")
-                .execute()
-            print("Raw librarians response: \(String(describing: librariansRawResponse.data))")
-            
-            let librariansCount: Int = try await client
-                .from("Users")
-                .select("*", head: true)
-                .eq("roleFetched", value: "librarian")
-                .execute()
-                .count ?? 0
-            
-            activeLibrarians = "\(librariansCount)"
-            activeMembers = "\(membersCount)"
-            
-            // Print raw JSON for books
-            print("Fetching books count...")
-            let booksRawResponse = try await client
-                .from("Books")
-                .select("*")
-                .execute()
-            print("Raw books response: \(String(describing: booksRawResponse.data))")
-            
-            let booksCount: Int = try await client
-                .from("Books")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            
-            totalBooks = "\(booksCount)"
-            
-            // Print raw JSON for issued books
-            print("Fetching issued books count...")
-            let issuedRawResponse = try await client
-                .from("issuebooks")
-                .select("*")
-                .execute()
-            print("Raw issued books response: \(String(describing: issuedRawResponse.data))")
-            
-            let issuedCount: Int = try await client
-                .from("issuebooks")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            
-            issuedBooks = "\(issuedCount)"
-            
-        } catch {
-            print("Analytics error details: \(error)")
-            if let decodingError = error as? DecodingError {
-                switch decodingError {
-                case .keyNotFound(let key, _):
-                    errorMessage = "Column not found: \(key)"
-                case .typeMismatch(_, let context):
-                    errorMessage = "Type mismatch: \(context.debugDescription)"
-                default:
-                    errorMessage = "Decoding error: \(decodingError.localizedDescription)"
+            // Only update if the task hasn't been cancelled
+            if !Task.isCancelled {
+                await MainActor.run {
+                    bookRequests = response
                 }
-            } else {
-                errorMessage = "Failed to load analytics: \(error.localizedDescription)"
+            }
+        } catch {
+            if !Task.isCancelled {
+                print("Book requests error: \(error.localizedDescription)")
             }
         }
     }
