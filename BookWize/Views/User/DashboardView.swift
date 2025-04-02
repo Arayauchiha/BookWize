@@ -817,6 +817,8 @@ struct DetailedBookProgressRow: View {
     let pagesRead: Int
     let bookId: UUID
     let updatePagesRead: (UUID, Int) async -> Void
+    @State private var showingUpdateAlert = false
+    @State private var pagesReadInput = ""
     
     var body: some View {
         HStack(spacing: 20) {
@@ -860,7 +862,8 @@ struct DetailedBookProgressRow: View {
                 HStack {
                     Spacer()
                     Button("Update") {
-                        presentUpdateAlert()
+                        pagesReadInput = "\(pagesRead)"
+                        showingUpdateAlert = true
                     }
                     .font(.subheadline.bold())
                     .foregroundColor(.white)
@@ -875,76 +878,22 @@ struct DetailedBookProgressRow: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
-    }
-    
-    // Rewritten alert presentation method
-    private func presentUpdateAlert() {
-        guard let rootVC = UIApplication.shared.windows.first?.rootViewController else {
-            print("❌ Could not find root view controller")
-            return
-        }
-        
-        let alert = UIAlertController(
-            title: "Update Reading Progress",
-            message: "Enter the number of pages you've read (out of \(pageCount))",
-            preferredStyle: .alert
-        )
-        
-        alert.addTextField { textField in
-            textField.keyboardType = .numberPad
-            textField.text = "\(pagesRead)"
-        }
-        
-        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel)
-        
-        let updateAction = UIAlertAction(title: "Update", style: .default) { _ in
-            guard let textField = alert.textFields?.first,
-                  let text = textField.text,
-                  let newPagesRead = Int(text) else {
-                return
-            }
+        .alert("Update Reading Progress", isPresented: $showingUpdateAlert) {
+            TextField("Pages read", text: $pagesReadInput)
+                .keyboardType(.numberPad)
             
-            // Validate the input
-            if newPagesRead > pageCount {
-                self.presentErrorAlert(message: "Pages read cannot exceed the total page count.")
-                return
-            }
+            Button("Cancel", role: .cancel) { }
             
-            if newPagesRead < 0 {
-                self.presentErrorAlert(message: "Pages read cannot be negative.")
-                return
+            Button("Update") {
+                if let newPagesRead = Int(pagesReadInput), newPagesRead >= 0, newPagesRead <= pageCount {
+                    Task {
+                        print("📝 Updating pages read from \(pagesRead) to \(newPagesRead) for book: \(title)")
+                        await updatePagesRead(bookId, newPagesRead)
+                    }
+                }
             }
-            
-            // Update reading progress
-            Task {
-                await updatePagesRead(bookId, newPagesRead)
-            }
-        }
-        
-        alert.addAction(cancelAction)
-        alert.addAction(updateAction)
-        
-        DispatchQueue.main.async {
-            rootVC.present(alert, animated: true)
-        }
-    }
-    
-    private func presentErrorAlert(message: String) {
-        guard let rootVC = UIApplication.shared.windows.first?.rootViewController else {
-            print("❌ Could not find root view controller")
-            return
-        }
-        
-        let alert = UIAlertController(
-            title: "Invalid Input",
-            message: message,
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        
-        DispatchQueue.main.async {
-            rootVC.present(alert, animated: true)
+        } message: {
+            Text("Enter the number of pages you've read (out of \(pageCount))")
         }
     }
 }
