@@ -44,6 +44,32 @@ struct MemberPasswordResetView: View {
     private func updatePassword() async {
         print("Attempting to update password for email: \(email)")
         
+        // First verify current password
+        do {
+            let data: [FetchData] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("*")
+                .eq("email", value: email)
+                .eq("password", value: currentPassword)
+                .execute()
+                .value
+            
+            if data.isEmpty {
+                DispatchQueue.main.async {
+                    errorMessage = "Current password is incorrect"
+                    showError = true
+                }
+                return
+            }
+        } catch {
+            print("Error verifying current password:", error)
+            DispatchQueue.main.async {
+                errorMessage = "Failed to verify current password: \(error.localizedDescription)"
+                showError = true
+            }
+            return
+        }
+        
         // Validate passwords match
         guard newPassword == confirmPassword else {
             errorMessage = "New passwords do not match"
