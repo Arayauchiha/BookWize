@@ -1,7 +1,7 @@
 import SwiftUI
 import Supabase
 
-struct Libraries: Identifiable, Decodable {
+struct Libraries: Identifiable, Codable {
     var id: UUID
     var Name: String
 }
@@ -45,7 +45,7 @@ struct SignupView: View {
     
     private var libraries: [String] {
         let fetched = selectedLibrary1.map { $0.Name }
-        return fetched.isEmpty ? ["Good Reads Library"] : fetched
+        return fetched.isEmpty ? ["Good Reads"] : fetched
     }
     
     private var isFormValid: Bool {
@@ -333,13 +333,13 @@ struct SignupView: View {
                 if !self.selectedLibrary1.isEmpty {
                     self.selectedLibrary = self.selectedLibrary1[0].Name
                 } else {
-                    self.selectedLibrary = "Good Reads Library"
+                    self.selectedLibrary = "Good Reads"
                 }
             }
         } catch {
             print("Error fetching libraries: \(error.localizedDescription)")
             DispatchQueue.main.async {
-                self.selectedLibrary = "Good Reads Library"
+                self.selectedLibrary = "Good Reads"
                 self.errorMessage = "Failed to load libraries. Using default library."
             }
         }
