@@ -1,4 +1,7 @@
+/*
+// Original User_Dashboard.swift file - functionality moved to DashboardView.swift
 import SwiftUI
+import Supabase
 
 class BorrowedBooksManager: ObservableObject {
     @Published var borrowedBooks: [BorrowedBook] = []
@@ -101,21 +104,6 @@ struct UserDashboardView: View {
                             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                             .padding(.horizontal)
                         }
-                    }
-                    
-                    // Progress Section
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Reading Progress")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                        .padding(.horizontal)
-                        
-                        ProgressCard(borrowedBooks: booksManager.borrowedBooks)
                     }
                 }
                 .padding(.vertical)
@@ -691,48 +679,6 @@ struct ReturnedBookRow: View {
     }
 }
 
-struct ProgressCard: View {
-    let borrowedBooks: [BorrowedBook]
-    
-    var averageProgress: Double {
-        guard !borrowedBooks.isEmpty else { return 0 }
-        return borrowedBooks.reduce(0) { $0 + $1.progress } / Double(borrowedBooks.count)
-    }
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Overall Progress")
-                        .font(.headline)
-                    Text("\(Int(averageProgress * 100))%")
-                        .font(.title)
-                        .fontWeight(.bold)
-                }
-                
-                Spacer()
-                
-                ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 10)
-                        .frame(width: 60, height: 60)
-                    
-                    Circle()
-                        .trim(from: 0, to: averageProgress)
-                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                        .frame(width: 60, height: 60)
-                        .rotationEffect(.degrees(-90))
-                }
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(15)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-        .padding(.horizontal)
-    }
-}
-
 enum BookStatus: String {
     case borrowed = "Borrowed"
     case reserved = "Reserved"
@@ -756,4 +702,5 @@ struct BorrowedBook: Identifiable {
     let dueDate: Date
     let progress: Double
     let status: BookStatus
-} 
+}
+*/ 
