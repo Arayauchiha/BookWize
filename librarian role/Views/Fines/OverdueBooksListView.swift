@@ -56,7 +56,7 @@ struct OverdueBooksListView: View {
                 EmptyStateView(
                     icon: "magnifyingglass",
                     title: "No results found",
-                    message: "No overdue members match your search."
+                    message: "No overdue books match your search."
                 )
             } else {
                 List(filteredMembers) { member in
