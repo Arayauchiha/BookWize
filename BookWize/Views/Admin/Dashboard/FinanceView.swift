@@ -14,6 +14,8 @@ struct FinanceView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var scrollOffset: CGFloat = 0
+    @State private var isCalendarExpanded = false
+    @State private var showingMonthPicker = false
     
     private let categories = ["Librarian Salary", "Inventory", "Others"]
     
@@ -57,14 +59,19 @@ struct FinanceView: View {
                         .transition(.opacity)
                     }
                     
-                    // Month/Year Selection
+                    // Month/Year Selection with custom picker
                     HStack {
-                        Button(action: { showingDatePicker = true }) {
+                        Button(action: {
+                            showingMonthPicker = true
+                        }) {
                             HStack {
                                 Image(systemName: "calendar")
                                     .foregroundStyle(Color.customButton)
                                 Text(selectedDate.formatted(.dateTime.month().year()))
                                     .foregroundStyle(Color.customText)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color.customText.opacity(0.6))
                             }
                             .padding(10)
                             .background(Color.customCardBackground)
@@ -82,15 +89,34 @@ struct FinanceView: View {
                     
                     // Expenses List
                     LazyVStack(spacing: 12) {
-                        ForEach(filteredExpenses) { expense in
-                            ExpenseRow(expense: expense, onDelete: {
-                                expenseToDelete = expense
-                                showingDeleteAlert = true
-                            }, onEdit: {
-                                editingExpense = expense
-                                showingAddExpense = true
-                            })
-                            .padding(.horizontal)
+                        if filteredExpenses.isEmpty {
+                            VStack(spacing: 16) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(Color.customText.opacity(0.6))
+                                
+                                Text("No expenses found")
+                                    .font(.headline)
+                                    .foregroundColor(Color.customText)
+                                
+                                Text("There are no expenses for the selected month.")
+                                    .font(.subheadline)
+                                    .foregroundColor(Color.customText.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(.top, 40)
+                            .padding(.bottom, 40)
+                        } else {
+                            ForEach(filteredExpenses) { expense in
+                                ExpenseRow(expense: expense, onDelete: {
+                                    expenseToDelete = expense
+                                    showingDeleteAlert = true
+                                }, onEdit: {
+                                    editingExpense = expense
+                                    showingAddExpense = true
+                                })
+                                .padding(.horizontal)
+                            }
                         }
                     }
                     .padding(.vertical)
@@ -130,6 +156,11 @@ struct FinanceView: View {
         .sheet(isPresented: $showingHistory) {
             ExpenseHistoryView(expenses: $expenses)
         }
+        .sheet(isPresented: $showingMonthPicker) {
+            MonthYearPickerView(selectedDate: $selectedDate)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
         .alert("Delete Expense", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -139,11 +170,6 @@ struct FinanceView: View {
             }
         } message: {
             Text("Are you sure you want to delete this expense?")
-        }
-        .sheet(isPresented: $showingDatePicker) {
-            DatePickerView(selectedDate: $selectedDate)
-                .presentationDetents([.height(450)])
-                .presentationDragIndicator(.visible)
         }
         .task {
             await loadExpenses()
@@ -565,39 +591,6 @@ struct ExpenseHistoryView: View {
     }
 }
 
-struct DatePickerView: View {
-    @Binding var selectedDate: Date
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            DatePicker(
-                "Select Month",
-                selection: $selectedDate,
-                displayedComponents: [.date]
-            )
-            .datePickerStyle(.graphical)
-            .padding()
-            
-            Button("Done") {
-                dismiss()
-            }
-            .font(.headline)
-            .foregroundStyle(Color.white)
-            .padding(.horizontal, 30)
-            .padding(.vertical, 10)
-            .background(Color.customButton)
-            .clipShape(Capsule())
-            .padding(.bottom)
-        }
-        .background(Color(.systemBackground))
-        .cornerRadius(15)
-        .padding()
-        .frame(maxWidth: 350)
-        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
-    }
-}
-
 struct Expense: Identifiable, Codable {
     let id: UUID
     let title: String
@@ -642,6 +635,88 @@ struct Expense: Identifiable, Codable {
         try container.encode(category, forKey: .category)
         try container.encode(date, forKey: .date)
         try container.encode(status, forKey: .status)
+    }
+}
+
+struct MonthYearPickerView: View {
+    @Binding var selectedDate: Date
+    @Environment(\.dismiss) private var dismiss
+    @State private var pickerDate: Date
+    @State private var selectedMonth: Int
+    @State private var selectedYear: Int
+    
+    init(selectedDate: Binding<Date>) {
+        self._selectedDate = selectedDate
+        let calendar = Calendar.current
+        let date = selectedDate.wrappedValue
+        self._pickerDate = State(initialValue: date)
+        self._selectedMonth = State(initialValue: calendar.component(.month, from: date) - 1)
+        self._selectedYear = State(initialValue: calendar.component(.year, from: date))
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack {
+                // Month and Year picker with wheels
+                HStack {
+                    Picker("Month", selection: $selectedMonth) {
+                        ForEach(0..<12, id: \.self) { month in
+                            Text(DateFormatter().monthSymbols[month]).tag(month)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(width: 150)
+                    .clipped()
+                    
+                    Picker("Year", selection: $selectedYear) {
+                        ForEach(yearRange, id: \.self) { year in
+                            Text(String(year)).tag(year)
+                        }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(width: 100)
+                    .clipped()
+                }
+                .padding()
+                
+                Divider()
+            }
+            .navigationTitle("Select Month")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        updateDate()
+                        dismiss()
+                    }
+                    .fontWeight(.bold)
+                }
+            }
+        }
+    }
+    
+    private var yearRange: [Int] {
+        let currentYear = Calendar.current.component(.year, from: Date())
+        return Array((currentYear-10)...(currentYear+10))
+    }
+    
+    private func updateDate() {
+        // Create a date with the first day of the selected month and year
+        let calendar = Calendar.current
+        var components = DateComponents()
+        components.year = selectedYear
+        components.month = selectedMonth + 1
+        components.day = 1
+        
+        if let newDate = calendar.date(from: components) {
+            selectedDate = newDate
+        }
     }
 }
 
