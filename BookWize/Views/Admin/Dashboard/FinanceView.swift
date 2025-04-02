@@ -13,8 +13,11 @@ struct FinanceView: View {
     @State private var editingExpense: Expense?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var scrollOffset: CGFloat = 0
     
     private let categories = ["Librarian Salary", "Inventory", "Others"]
+    
+    var onProfileTap: () -> Void = {}
     
     var filteredExpenses: [Expense] {
         expenses.filter { expense in
@@ -35,67 +38,86 @@ struct FinanceView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Search Bar
-                SearchBarPayouts(text: $searchText)
-                    .padding()
-                
-                // Category Segmented Control
-                if searchText.isEmpty {
-                    Picker("Category", selection: $selectedCategory) {
-                        ForEach(0..<categories.count, id: \.self) { index in
-                            Text(categories[index]).tag(index)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .padding()
-                    .transition(.opacity)
-                }
-                
-                // Month/Year Selection
-                HStack {
-                    Button(action: { showingDatePicker = true }) {
-                        HStack {
-                            Image(systemName: "calendar")
-                            Text(selectedDate.formatted(.dateTime.month().year()))
-                        }
-                    }
-                    .padding(.horizontal)
+        ScrollView {
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    // Search Bar
+                    SearchBarPayouts(text: $searchText)
+                        .padding()
                     
-                    Spacer()
-                }
-                .padding(.vertical, 8)
-                
-                // Expenses List
-                List {
-                    ForEach(filteredExpenses) { expense in
-                        ExpenseRow(expense: expense, onDelete: {
-                            expenseToDelete = expense
-                            showingDeleteAlert = true
-                        }, onEdit: {
-                            editingExpense = expense
-                            showingAddExpense = true
-                        })
+                    // Category Segmented Control
+                    if searchText.isEmpty {
+                        Picker("Category", selection: $selectedCategory) {
+                            ForEach(0..<categories.count, id: \.self) { index in
+                                Text(categories[index]).tag(index)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding()
+                        .transition(.opacity)
                     }
-                }
-                .scrollContentBackground(.hidden)
-            }
-            .background(Color.customBackground)
-//            .navigationTitle("Payouts")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button(action: { showingHistory = true }) {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 20))
+                    
+                    // Month/Year Selection
+                    HStack {
+                        Button(action: { showingDatePicker = true }) {
+                            HStack {
+                                Image(systemName: "calendar")
+                                    .foregroundStyle(Color.customButton)
+                                Text(selectedDate.formatted(.dateTime.month().year()))
+                                    .foregroundStyle(Color.customText)
+                            }
+                            .padding(10)
+                            .background(Color.customCardBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.customText.opacity(0.1), lineWidth: 1)
+                            )
                         }
                         
-                        Button(action: { showingAddExpense = true }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20))
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    
+                    // Expenses List
+                    LazyVStack(spacing: 12) {
+                        ForEach(filteredExpenses) { expense in
+                            ExpenseRow(expense: expense, onDelete: {
+                                expenseToDelete = expense
+                                showingDeleteAlert = true
+                            }, onEdit: {
+                                editingExpense = expense
+                                showingAddExpense = true
+                            })
+                            .padding(.horizontal)
                         }
                     }
+                    .padding(.vertical)
+                }
+            }
+        }
+        .background(Color.customBackground)
+        .navigationTitle("Finance")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button(action: { showingHistory = true }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color.customText)
+                }
+                
+                Button(action: { showingAddExpense = true }) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color.customText)
+                }
+                
+                Button(action: onProfileTap) {
+                    Image(systemName: "person.circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.customButton)
                 }
             }
         }
@@ -120,9 +142,21 @@ struct FinanceView: View {
         }
         .sheet(isPresented: $showingDatePicker) {
             DatePickerView(selectedDate: $selectedDate)
+                .presentationDetents([.height(450)])
+                .presentationDragIndicator(.visible)
         }
         .task {
             await loadExpenses()
+        }
+        .onAppear {
+            // Force navigation bar to reset
+            DispatchQueue.main.async {
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = windowScene.windows.first,
+                   let navigationController = window.rootViewController?.children.first as? UINavigationController {
+                    navigationController.navigationBar.sizeToFit()
+                }
+            }
         }
     }
     
@@ -210,28 +244,32 @@ struct SearchBarPayouts: View {
     
     var body: some View {
         HStack {
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                    .padding(.leading, 8)
+                    .foregroundStyle(Color.customText.opacity(0.6))
+                    .font(.system(size: 17))
                 
                 TextField("Search payouts...", text: $text)
                     .textFieldStyle(PlainTextFieldStyle())
-                    .padding(.vertical, 8)
+                    .font(.system(size: 17))
+                    .foregroundStyle(Color.customText)
                 
                 if !text.isEmpty {
                     Button(action: { text = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
+                            .foregroundStyle(Color.customText.opacity(0.6))
+                            .font(.system(size: 17))
                     }
-                    .padding(.trailing, 8)
                 }
             }
-            .background(Color(.systemGray6))
-            .cornerRadius(10)
+            .padding(12)
+            .background(Color.customCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.customText.opacity(0.1), lineWidth: 1)
+            )
         }
-        .padding(.leading, 5)
-        .padding(.trailing, 5)
     }
 }
 
@@ -245,15 +283,16 @@ struct ExpenseRow: View {
             VStack(alignment: .leading) {
                 Text(expense.title)
                     .font(.headline)
+                    .foregroundStyle(Color.customText)
                 HStack {
                     Text(expense.category)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Color.customText.opacity(0.6))
                     Text("•")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Color.customText.opacity(0.6))
                     Text(expense.status)
                         .font(.subheadline)
-                        .foregroundColor(expense.status == "Pending" ? .orange : .green)
+                        .foregroundStyle(expense.status == "Pending" ? .orange : .green)
                 }
             }
             
@@ -262,11 +301,16 @@ struct ExpenseRow: View {
             VStack(alignment: .trailing) {
                 Text("₹\(expense.amount, specifier: "%.2f")")
                     .font(.headline)
+                    .foregroundStyle(Color.customText)
                 Text(expense.date.formatted(.dateTime.day().month().year()))
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(Color.customText.opacity(0.6))
             }
         }
+        .padding(16)
+        .background(Color.customCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         .contentShape(Rectangle())
         .onTapGesture {
             onEdit()
@@ -523,6 +567,7 @@ struct ExpenseHistoryView: View {
 
 struct DatePickerView: View {
     @Binding var selectedDate: Date
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         VStack(spacing: 20) {
@@ -535,14 +580,21 @@ struct DatePickerView: View {
             .padding()
             
             Button("Done") {
-                // This button is now a placeholder
+                dismiss()
             }
+            .font(.headline)
+            .foregroundStyle(Color.white)
+            .padding(.horizontal, 30)
+            .padding(.vertical, 10)
+            .background(Color.customButton)
+            .clipShape(Capsule())
             .padding(.bottom)
         }
         .background(Color(.systemBackground))
         .cornerRadius(15)
         .padding()
         .frame(maxWidth: 350)
+        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
     }
 }
 

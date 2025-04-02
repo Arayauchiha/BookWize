@@ -146,159 +146,148 @@ struct AdminDashboardView: View {
     @State private var selectedTab = 0
     @State private var showProfile = false
     @State private var bookRequests: [BookRequest] = []
-    @State private var isLoading = false
-    @State private var errorMessage: String?
-    
-    // Task management
     @State private var currentTask: Task<Void, Never>?
-    
-    // Dashboard Manager
     @StateObject private var dashboardManager = DashboardManager()
     
     var body: some View {
-        NavigationStack {
-            TabView(selection: $selectedTab) {
-                NavigationStack {
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            AnalyticsGridView(
-                                totalRevenue: String(format: "$%.2f", dashboardManager.totalRevenue),
-                                overdueFines: String(format: "$%.2f", dashboardManager.overdueFines),
-                                activeLibrarians: "\(dashboardManager.activeLibrariansCount)",
-                                activeMembers: "\(dashboardManager.totalMembersCount)",
-                                totalBooks: "\(dashboardManager.totalBooksCount)",
-                                issuedBooks: "\(dashboardManager.issuedBooksCount)"
-                            )
-                            
-                            RecentRequestsView(
-                                bookRequests: bookRequests,
-                                isLoading: isLoading,
-                                errorMessage: errorMessage
-                            )
-                        }
-                        .padding(.vertical)
-                    }
-                    .refreshable {
-                        // Cancel any existing task before starting a new one
-                        currentTask?.cancel()
+        TabView(selection: $selectedTab) {
+            // Dashboard Tab
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        AnalyticsGridView(
+                            totalRevenue: String(format: "$%.2f", dashboardManager.totalRevenue),
+                            overdueFines: String(format: "$%.2f", dashboardManager.overdueFines),
+                            activeLibrarians: "\(dashboardManager.activeLibrariansCount)",
+                            activeMembers: "\(dashboardManager.totalMembersCount)",
+                            totalBooks: "\(dashboardManager.totalBooksCount)",
+                            issuedBooks: "\(dashboardManager.issuedBooksCount)"
+                        )
                         
-                        // Create a new task for the refresh
-                        currentTask = Task {
-                            do {
-                                errorMessage = nil // Clear any previous errors
-                                async let requests = fetchBookRequests()
-                                async let analytics = dashboardManager.fetchDashboardData()
-                                try await (requests, analytics)
-                            } catch {
-                                if !Task.isCancelled {
-                                    print("Refresh error (not cancellation): \(error)")
-                                }
+                        RecentRequestsView(
+                            bookRequests: bookRequests,
+                            isLoading: false,
+                            errorMessage: nil
+                        )
+                    }
+                    .padding(.vertical)
+                }
+                .refreshable {
+                    currentTask?.cancel()
+                    currentTask = Task {
+                        async let requests = fetchBookRequests()
+                        async let analytics = dashboardManager.fetchDashboardData()
+                        try? await (requests, analytics)
+                    }
+                }
+                .navigationTitle("Dashboard")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button(action: { showProfile = true }) {
+                            Image(systemName: "person.circle")
+                                .font(.system(size: 22))
+                        }
+                    }
+                }
+            }
+            .tabItem {
+                Label("Dashboard", systemImage: "chart.bar.fill")
+            }
+            .tag(0)
+            
+            // Librarians Tab
+            NavigationStack {
+                LibrarianManagementView()
+                    .navigationTitle("Librarians")
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button(action: { showProfile = true }) {
+                                Image(systemName: "person.circle")
+                                    .font(.system(size: 22))
                             }
                         }
-                        
-                        // Wait for the task to complete
-                        await currentTask?.value
                     }
-                    .navigationTitle("Dashboard")
-                }
-                .tabItem {
-                    Label("Dashboard", systemImage: "chart.bar.fill")
-                }
-                .tag(0)
-                
-                NavigationStack {
-                    LibrarianManagementView().navigationTitle("Librarians")
-                }
-                .tabItem {
-                    Label("Librarians", systemImage: "person.2.fill")
-                }
-                .tag(1)
-                
-                NavigationStack {
-                    CatalogueView()
-                        .navigationTitle("Catalogue")
-                }
-                .tabItem {
-                    Label("Catalogue", systemImage: "books.vertical.fill")
-                }
-                .tag(2)
-                
-                NavigationStack {
-                    FinanceView()
-                        .navigationTitle("Finance")
-                }
-                .tabItem {
-                    Label("Finance", systemImage: "dollarsign.circle.fill")
-                }
-                .tag(3)
             }
-            .navigationTitle(tabTitle)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    profileButton
-                }
+            .tabItem {
+                Label("Librarians", systemImage: "person.2.fill")
             }
-            .tint(Color.customButton)
-            .sheet(isPresented: $showProfile) {
-                NavigationStack {
-                    AdminProfileView()
-                        .navigationTitle("Profile")
-                        .navigationBarTitleDisplayMode(.inline)
-                }
-                .presentationDragIndicator(.visible)
+            .tag(1)
+            
+            // Catalogue Tab
+            NavigationStack {
+                CatalogueView()
+                    .navigationTitle("Catalogue")
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button(action: { showProfile = true }) {
+                                Image(systemName: "person.circle")
+                                    .font(.system(size: 22))
+                            }
+                        }
+                    }
             }
-            .onAppear {
-                configureTabBar()
-                // Initial data load
-                currentTask = Task {
-                    await fetchBookRequests()
-                }
+            .tabItem {
+                Label("Catalogue", systemImage: "books.vertical.fill")
             }
-            .onDisappear {
-                // Clean up any running task when view disappears
-                currentTask?.cancel()
-                currentTask = nil
+            .tag(2)
+            
+            // Finance Tab
+            NavigationStack {
+                FinanceView(onProfileTap: { showProfile = true })
+                    .navigationTitle("Finance")
+                    .navigationBarTitleDisplayMode(.large)
             }
+            .tabItem {
+                Label("Finance", systemImage: "dollarsign.circle.fill")
+            }
+            .tag(3)
+        }
+        .tint(Color.customButton)
+        .sheet(isPresented: $showProfile) {
+            NavigationStack {
+                AdminProfileView()
+                    .navigationTitle("Profile")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDragIndicator(.visible)
+        }
+        .onAppear {
+            configureTabBar()
+            // Initial data load
+            currentTask = Task {
+                await fetchBookRequests()
+            }
+        }
+        .onDisappear {
+            currentTask?.cancel()
+            currentTask = nil
         }
     }
     
     private func configureTabBar() {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
+        
+        // Configure normal state
         appearance.stackedLayoutAppearance.normal.iconColor = .gray
-        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.gray]
-        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.black)
-        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor(Color.black)]
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            NSAttributedString.Key.foregroundColor: UIColor.gray
+        ]
+        
+        // Configure selected state
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor(Color.customButton)
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            NSAttributedString.Key.foregroundColor: UIColor(Color.customButton)
+        ]
+        
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
     }
-
-    private var profileButton: some View {
-        Button {
-            showProfile = true
-        } label: {
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(Color.customButton)
-                .padding(.trailing, 4)
-        }
-    }
-
-    private var tabTitle: String {
-        switch selectedTab {
-        case 0: return "Dashboard"
-        case 1: return "Management"
-        case 2: return "Catalogue"
-        case 3: return "Finance"
-        default: return ""
-        }
-    }
-
+    
     private func fetchBookRequests() async {
-        guard !Task.isCancelled else { return }
-        isLoading = true
-        defer { isLoading = false }
-        
         do {
             let client = SupabaseManager.shared.client
             let response: [BookRequest] = try await client
@@ -325,5 +314,4 @@ struct AdminDashboardView: View {
 
 #Preview {
     AdminDashboardView()
-        .environment(\.colorScheme, .light)
 }
