@@ -29,9 +29,9 @@ struct LibrarianDashboard: View {
                     // Second Row
                     HStack(spacing: 16) {
                         DashboardCard(
-                            title: "Fine Overdue",
-                            value: String(format: "$%.2f", dashboardManager.overdueFines),
-                            icon: "dollarsign.circle.fill",
+                            title: "Members with Overdue Fines",
+                            value: "\(dashboardManager.overdueMembersCount)",
+                            icon: "exclamationmark.triangle.fill",
                             color: .red
                         )
                         
@@ -71,21 +71,42 @@ struct LibrarianDashboard: View {
                     }
                     
                     // Overdue Books Section
-//                    Group {
-//                        Text("Overdue Books")
-//                            .font(.title2)
-//                            .fontWeight(.bold)
-//                            .padding(.top)
-//                            .padding(.horizontal)
-//                        
-//                        NavigationLink(destination: OverdueBooksListView()) {
-//                            OverdueSummaryCard(
-//                                //overdueCount: fineManager.overdueBooks.count,
-//                                totalFine: calculateTotalFine()
-//                            )
-//                            .padding(.horizontal)
-//                        }
-//                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Overdues")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Spacer()
+                            
+                            NavigationLink(destination: OverdueBooksListView()) {
+                                Text("See All")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(dashboardManager.overdueFines > 0 ? "₹\(String(format: "%.2f", dashboardManager.overdueFines))" : "₹0.00")")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.red)
+                                
+                                Text("Total Overdue Fines")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                           
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal)
+                    }
+                    .padding(.top)
                 }
                 .padding(.vertical)
             }
@@ -108,6 +129,7 @@ struct LibrarianDashboard: View {
         return dashboardManager.overdueFines
     }
 }
+
 
 struct OverdueSummaryCard: View {
     let overdueCount: Int

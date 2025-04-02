@@ -30,7 +30,7 @@ struct InventoryManagerView: View {
                     if SHOW_FINES {
                         LibrarianDashboard()
                             .tabItem {
-                                Label("Fines", systemImage: "dollarsign.circle.fill")
+                                Label("Dashboard", systemImage: "dollarsign.circle.fill")
                             }
                     }
                     
