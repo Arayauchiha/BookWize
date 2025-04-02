@@ -8,18 +8,28 @@
 import SwiftUI
 import Supabase
 
+struct issueBooksCorrect: Identifiable, Codable {
+    let id: UUID
+    let isbn: String
+    let member_email: String
+    let issue_date: Date
+    let return_date: Date?
+    let actual_returned_date: Date?
+}
+
 struct IssueBookView: View {
     @StateObject private var circulationManager = IssuedBookManager.shared
     @State private var searchText = ""
     @State private var showingIssueForm = false
 
-    var filteredLoans: [issueBooks] {
+    var filteredLoans: [issueBooksCorrect] {
         if searchText.isEmpty {
-            return circulationManager.loans
+            return circulationManager.loans.filter { $0.actual_returned_date == nil }
         }
         return circulationManager.loans.filter { loan in
-            loan.isbn.localizedCaseInsensitiveContains(searchText) ||
-            loan.memberEmail.localizedCaseInsensitiveContains(searchText)
+            (loan.isbn.localizedCaseInsensitiveContains(searchText) ||
+            loan.member_email.localizedCaseInsensitiveContains(searchText)) &&
+            loan.actual_returned_date == nil
         }
     }
 
@@ -89,7 +99,7 @@ struct IssueBookView: View {
 
 // ADD: Enhanced loan card with book cover
 struct EnhancedLoanCard: View {
-    let issuedBooks: issueBooks
+    let issuedBooks: issueBooksCorrect
     @State private var bookCoverURL: URL?
     @State private var isLoadingCover = true
     
@@ -135,7 +145,7 @@ struct EnhancedLoanCard: View {
                             .font(.subheadline)
                     }
                     
-                    Text("Member Email: \(issuedBooks.memberEmail)")
+                    Text("Member Email: \(issuedBooks.member_email)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -150,7 +160,7 @@ struct EnhancedLoanCard: View {
                     Text("Issue Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(issuedBooks.issueDate, style: .date)
+                    Text(issuedBooks.issue_date, style: .date)
                         .font(.subheadline)
                 }
                 
@@ -160,7 +170,7 @@ struct EnhancedLoanCard: View {
                     Text("Return Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    if let returnDate = issuedBooks.returnDate {
+                    if let returnDate = issuedBooks.return_date {
                         Text(returnDate, style: .date)
                             .font(.subheadline)
                     } else {
@@ -202,7 +212,7 @@ struct IssueBookFormView: View {
     @State private var errorMessage: String?
     @State private var showSuccessAlert = false
     
-    let onIssue: (issueBooks) -> Void
+    let onIssue: (issueBooksCorrect) -> Void
     
     // Auto-filled issue & return dates
     private let issueDate = Date()
@@ -425,12 +435,13 @@ struct IssueBookFormView: View {
         circulationManager.errorMessage = nil
 
         Task {
-            let newIssue = issueBooks(
+            let newIssue = issueBooksCorrect(
                 id: UUID(),
                 isbn: isbn,
-                memberEmail: smartCardID,
-                issueDate: issueDate,
-                returnDate: returnDate
+                member_email: smartCardID,
+                issue_date: issueDate,
+                return_date: returnDate,
+                actual_returned_date: nil
             )
             do {
                 // First, fetch the current book to get its current available quantity
@@ -450,15 +461,6 @@ struct IssueBookFormView: View {
                     }
                     return
                 }
-                
-                // Create the new book issue
-                let newIssue = issueBooks(
-                    id: UUID(),
-                    isbn: isbn,
-                    memberEmail: smartCardID,
-                    issueDate: issueDate,
-                    returnDate: returnDate
-                )
                 
                 // Insert the new book issue
                 let issueResponse = try await SupabaseManager.shared.client

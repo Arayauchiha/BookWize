@@ -84,7 +84,7 @@ import Foundation
 class IssuedBookManager: ObservableObject {
     static let shared = IssuedBookManager()
     
-    @Published var loans: [issueBooks] = []
+    @Published var loans: [issueBooksCorrect] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -126,7 +126,7 @@ class IssuedBookManager: ObservableObject {
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
                 
-                let issuedBooks = try decoder.decode([issueBooks].self, from: jsonData)
+                let issuedBooks = try decoder.decode([issueBooksCorrect].self, from: jsonData)
                 
                 await MainActor.run {
                     self.loans = issuedBooks
