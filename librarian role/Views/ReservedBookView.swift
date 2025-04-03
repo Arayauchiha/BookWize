@@ -611,7 +611,6 @@ struct ReservedBookView: View {
                         CachedAsyncImage(url: url)
                             .frame(width: 100, height: 150)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .shadow(radius: 2)
                     } else {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color(.systemGray5))
@@ -684,9 +683,8 @@ struct ReservedBookView: View {
                 .opacity(timeRemaining <= 0 ? 0.5 : 1)
             }
             .padding(16)
-            .background(Color(UIColor.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+            .background(Color.customCardBackground)
+            .cornerRadius(12)
             .onAppear {
                 calculateTimeRemaining()
                 startTimer()
@@ -759,7 +757,6 @@ struct ReservedBookView: View {
                             CachedAsyncImage(url: url)
                                 .frame(height: 240)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .shadow(radius: 4)
                         }
                         
                         // Book Details

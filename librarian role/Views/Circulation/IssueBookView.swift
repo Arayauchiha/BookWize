@@ -173,9 +173,8 @@ struct EnhancedLoanCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.customCardBackground)
         .cornerRadius(12)
-        .shadow(radius: 2)
         .task {
             await fetchBookCover()
         }
@@ -346,261 +345,101 @@ struct IssueBookFormView: View {
         }
     }
     
-//    private func fetchBookDetails(isbn: String) async {
-//        isLoading = true
-//        errorMessage = nil
-//        
-//        do {
-//            let query = SupabaseManager.shared.client
-//                .from("Books")
-//                .select()
-//                .eq("isbn", value: isbn)
-//                .single()
-//            
-//            let book: Book = try await query.execute().value
-//            
-//            await MainActor.run {
-//                bookName = book.title
-//                authorName = book.author
-//                isLoading = false
-//            }
-//        } catch {
-//            await MainActor.run {
-//                errorMessage = error.localizedDescription
-//                isLoading = false
-//            }
-//        }
-//    }
-//    
-//    private func fetchMemberDetails(smartCardID: String) async {
-//        isLoading = true
-//        errorMessage = nil
-//        
-//        do {
-//            // Try to parse the JSON data from the smart card
-//            if let jsonData = smartCardID.data(using: .utf8),
-//               let memberData = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
-//               let memberEmail = memberData["email"] as? String,
-//               let memberName = memberData["name"] as? String {
-//                
-//                await MainActor.run {
-//                    // Update the @State properties
-//                    self.smartCardID = memberEmail
-//                    self.memberName = memberName
-//                    isLoading = false
-//                }
-//            } else {
-//                // If JSON parsing fails, try fetching from Supabase
-//                let query = SupabaseManager.shared.client
-//                    .from("Members")
-//                    .select("email, name")
-//                    .eq("email", value: smartCardID)
-//                    .single()
-//                
-//                let response = try await query.execute()
-//                if let data = response.data as? [String: Any],
-//                   let email = data["email"] as? String,
-//                   let name = data["name"] as? String {
-//                    await MainActor.run {
-//                        self.smartCardID = email
-//                        self.memberName = name
-//                        isLoading = false
-//                    }
-//                } else {
-//                    await MainActor.run {
-//                        errorMessage = "Member details not found."
-//                        isLoading = false
-//                    }
-//                }
-//            }
-//        } catch {
-//            await MainActor.run {
-//                errorMessage = "Failed to fetch member details."
-//                isLoading = false
-//            }
-//        }
-//    }
-    
-//    private func fetchBookDetails(isbn: String) async {
-//            isLoading = true
-//            errorMessage = nil
-//            
-//            // Check if this is coming from a scanner or manual input
-//            guard isbn.count >= 10 else {
-//                await MainActor.run {
-//                    errorMessage = "Please use the barcode scanner to scan the ISBN"
-//                    isLoading = false
-//                }
-//                return
-//            }
-//            
-//            do {
-//                let query = SupabaseManager.shared.client
-//                    .from("Books")
-//                    .select()
-//                    .eq("isbn", value: isbn)
-//                    .single()
-//                
-//                let book: Book = try await query.execute().value
-//                
-//                await MainActor.run {
-//                    bookName = book.title
-//                    authorName = book.author
-//                    isLoading = false
-//                }
-//            } catch {
-//                await MainActor.run {
-//                    errorMessage = "Please use the barcode scanner to scan the ISBN"
-//                    isLoading = false
-//                }
-//            }
-//        }
-//        
-//        private func fetchMemberDetails(smartCardID: String) async {
-//            isLoading = true
-//            errorMessage = nil
-//            
-//            do {
-//                // Try to parse the JSON data from the smart card
-//                if let jsonData = smartCardID.data(using: .utf8),
-//                   let memberData = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
-//                   let memberEmail = memberData["email"] as? String,
-//                   let memberName = memberData["name"] as? String {
-//                    
-//                    await MainActor.run {
-//                        // Update the @State properties
-//                        self.smartCardID = memberEmail
-//                        self.memberName = memberName
-//                        isLoading = false
-//                    }
-//                } else {
-//                    // If JSON parsing fails, try fetching from Supabase
-//                    let query = SupabaseManager.shared.client
-//                        .from("Members")
-//                        .select("email, name")
-//                        .eq("email", value: smartCardID)
-//                        .single()
-//                    
-//                    let response = try await query.execute()
-//                    if let data = response.data as? [String: Any],
-//                       let email = data["email"] as? String,
-//                       let name = data["name"] as? String {
-//                        await MainActor.run {
-//                            self.smartCardID = email
-//                            self.memberName = name
-//                            isLoading = false
-//                        }
-//                    } else {
-//                        await MainActor.run {
-//                            errorMessage = "Please use the barcode scanner to scan the member card"
-//                            isLoading = false
-//                        }
-//                    }
-//                }
-//            } catch {
-//                await MainActor.run {
-//                    errorMessage = "Please use the barcode scanner to scan the member card"
-//                    isLoading = false
-//                }
-//            }
-//        }
-    
-   
     private func fetchBookDetails(isbn: String) async {
-            isLoading = true
-            errorMessage = nil
-            
-            // Check if this is coming from a scanner or manual input
-            guard isbn.count >= 10 else {
-                await MainActor.run {
-                    errorMessage = "Please use the barcode scanner to scan the ISBN"
-                    isLoading = false
-                }
-                return
+        isLoading = true
+        errorMessage = nil
+        
+        // Check if this is coming from a scanner or manual input
+        guard isbn.count >= 10 else {
+            await MainActor.run {
+                errorMessage = "Please use the barcode scanner to scan the ISBN"
+                isLoading = false
             }
-            
-            do {
-                let query = SupabaseManager.shared.client
-                    .from("Books")
-                    .select()
-                    .eq("isbn", value: isbn)
-                    .single()
-                
-                let book: Book = try await query.execute().value
-                
-                await MainActor.run {
-                    bookName = book.title
-                    authorName = book.author
-                    isLoading = false
-                }
-            } catch let error as PostgrestError where error.code == "PGRST116" {
-                // PostgrestError with code PGRST116 means "json object requested, multiple (or no rows) returned"
-                await MainActor.run {
-                    errorMessage = "This book does not exist in the library inventory. Add this to the inventory first."
-                    isLoading = false
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Please use the barcode scanner to scan the ISBN"
-                    isLoading = false
-                }
-            }
+            return
         }
         
-        private func fetchMemberDetails(smartCardID: String) async {
-            isLoading = true
-            errorMessage = nil
+        do {
+            let query = SupabaseManager.shared.client
+                .from("Books")
+                .select()
+                .eq("isbn", value: isbn)
+                .single()
             
-            do {
-                // Try to parse the JSON data from the smart card
-                if let jsonData = smartCardID.data(using: .utf8),
-                   let memberData = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
-                   let memberEmail = memberData["email"] as? String,
-                   let memberName = memberData["name"] as? String {
-                    
+            let book: Book = try await query.execute().value
+            
+            await MainActor.run {
+                bookName = book.title
+                authorName = book.author
+                isLoading = false
+            }
+        } catch let error as PostgrestError where error.code == "PGRST116" {
+            // PostgrestError with code PGRST116 means "json object requested, multiple (or no rows) returned"
+            await MainActor.run {
+                errorMessage = "This book does not exist in the library inventory. Add this to the inventory first."
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Please use the barcode scanner to scan the ISBN"
+                isLoading = false
+            }
+        }
+    }
+    
+    private func fetchMemberDetails(smartCardID: String) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Try to parse the JSON data from the smart card
+            if let jsonData = smartCardID.data(using: .utf8),
+               let memberData = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any],
+               let memberEmail = memberData["email"] as? String,
+               let memberName = memberData["name"] as? String {
+                
+                await MainActor.run {
+                    // Update the @State properties
+                    self.smartCardID = memberEmail
+                    self.memberName = memberName
+                    isLoading = false
+                }
+            } else {
+                // If JSON parsing fails, try fetching from Supabase
+                let query = SupabaseManager.shared.client
+                    .from("Members")
+                    .select("email, name")
+                    .eq("email", value: smartCardID)
+                    .single()
+                
+                let response = try await query.execute()
+                if let data = response.data as? [String: Any],
+                   let email = data["email"] as? String,
+                   let name = data["name"] as? String {
                     await MainActor.run {
-                        // Update the @State properties
-                        self.smartCardID = memberEmail
-                        self.memberName = memberName
+                        self.smartCardID = email
+                        self.memberName = name
                         isLoading = false
                     }
                 } else {
-                    // If JSON parsing fails, try fetching from Supabase
-                    let query = SupabaseManager.shared.client
-                        .from("Members")
-                        .select("email, name")
-                        .eq("email", value: smartCardID)
-                        .single()
-                    
-                    let response = try await query.execute()
-                    if let data = response.data as? [String: Any],
-                       let email = data["email"] as? String,
-                       let name = data["name"] as? String {
-                        await MainActor.run {
-                            self.smartCardID = email
-                            self.memberName = name
-                            isLoading = false
-                        }
-                    } else {
-                        await MainActor.run {
-                            errorMessage = "Member not found. Please register the member first."
-                            isLoading = false
-                        }
+                    await MainActor.run {
+                        errorMessage = "Member not found. Please register the member first."
+                        isLoading = false
                     }
                 }
-            } catch let error as PostgrestError where error.code == "PGRST116" {
-                // This error occurs when no member is found
-                await MainActor.run {
-                    errorMessage = "Member not found. Please register the member first."
-                    isLoading = false
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Please use the barcode scanner to scan the member card"
-                    isLoading = false
-                }
+            }
+        } catch let error as PostgrestError where error.code == "PGRST116" {
+            // This error occurs when no member is found
+            await MainActor.run {
+                errorMessage = "Member not found. Please register the member first."
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Please use the barcode scanner to scan the member card"
+                isLoading = false
             }
         }
+    }
     
     private func issueBook() {
         circulationManager.isLoading = true

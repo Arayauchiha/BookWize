@@ -5,118 +5,120 @@ struct LibrarianDashboard: View {
     @StateObject private var dashboardManager = DashboardManager()
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // First Row
-                    HStack(spacing: 16) {
-                        DashboardCard(
-                            title: "Total Books",
-                            value: "\(dashboardManager.totalBooksCount)",
-                            icon: "book.fill",
-                            color: .blue
-                        )
-                        
-                        DashboardCard(
-                            title: "Issued Books",
-                            value: "\(dashboardManager.issuedBooksCount)",
-                            icon: "book.circle.fill",
-                            color: .green
-                        )
-                    }
-                    .padding(.horizontal)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Stats Grid
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 16),
+                        GridItem(.flexible(), spacing: 16)
+                    ],
+                    spacing: 16
+                ) {
+                    DashboardCard(
+                        title: "Total Books",
+                        value: "\(dashboardManager.totalBooksCount)",
+                        icon: "book.fill",
+                        color: .blue
+                    )
                     
-                    // Second Row
-                    HStack(spacing: 16) {
-                        DashboardCard(
-                            title: "Members with Overdue Fines",
-                            value: "\(dashboardManager.overdueMembersCount)",
-                            icon: "exclamationmark.triangle.fill",
-                            color: .red
-                        )
-                        
-                        DashboardCard(
-                            title: "Total Members",
-                            value: "\(dashboardManager.totalMembersCount)",
-                            icon: "person.3.fill",
-                            color: .purple
-                        )
-                    }
-                    .padding(.horizontal)
+                    DashboardCard(
+                        title: "Issued Books",
+                        value: "\(dashboardManager.issuedBooksCount)",
+                        icon: "book.circle.fill",
+                        color: .green
+                    )
                     
-                    // Analytics Section
-                    Group {
-                        Text("Analytics")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.top)
-                            .padding(.horizontal)
-                            .dynamicTypeSize(.small ... .accessibility3)
-                        
-                        HStack(spacing: 16) {
-                            if let mostPopularGenre = getPopularGenres().first {
-                                PopularGenreCard(
-                                    title: "Popular Genres",
-                                    genre: mostPopularGenre.0,
-                                    color: .orange
-                                )
-                            }
-                            
-                            GenreStatsCard(
-                                title: "Genre-wise Issued",
-                                genres: getGenreWiseIssues(),
-                                color: .teal
+                    DashboardCard(
+                        title: "Members with Overdue Fines",
+                        value: "\(dashboardManager.overdueMembersCount)",
+                        icon: "exclamationmark.triangle.fill",
+                        color: .red
+                    )
+                    
+                    DashboardCard(
+                        title: "Total Members",
+                        value: "\(dashboardManager.totalMembersCount)",
+                        icon: "person.3.fill",
+                        color: .purple
+                    )
+                }
+                .padding(.horizontal)
+                
+                // Analytics Section
+                Group {
+                    Text("Analytics")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .padding(.top)
+                        .padding(.horizontal)
+                        .dynamicTypeSize(.small ... .accessibility3)
+                    
+                    HStack(spacing: 16) {
+                        if let mostPopularGenre = getPopularGenres().first {
+                            PopularGenreCard(
+                                title: "Popular Genres",
+                                genre: mostPopularGenre.0,
+                                color: .orange
                             )
                         }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Overdue Books Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Overdues")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .dynamicTypeSize(.small ... .accessibility3)
-                            
-                            Spacer()
-                            
-                            NavigationLink(destination: OverdueBooksListView()) {
-                                Text("See All")
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
-                                    .dynamicTypeSize(.small ... .accessibility2)
-                            }
-                        }
-                        .padding(.horizontal)
                         
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(dashboardManager.overdueFines > 0 ? "₹\(String(format: "%.2f", dashboardManager.overdueFines))" : "₹0.00")")
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.red)
-                                    .dynamicTypeSize(.small ... .accessibility3)
-                                
-                                Text("Total Overdue Fines")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .dynamicTypeSize(.small ... .accessibility2)
-                            }
-                           
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                        .padding(.horizontal)
+                        GenreStatsCard(
+                            title: "Genre-wise Issued",
+                            genres: getGenreWiseIssues(),
+                            color: .teal
+                        )
                     }
-                    .padding(.top)
+                    .padding(.horizontal)
                 }
-                .padding(.vertical)
+                
+                // Overdue Books Section
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Overdues")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .dynamicTypeSize(.small ... .accessibility3)
+                        
+                        Spacer()
+                        
+                        NavigationLink(destination: OverdueBooksListView()) {
+                            Text("See All")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
+                                .dynamicTypeSize(.small ... .accessibility2)
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(dashboardManager.overdueFines > 0 ? "₹\(String(format: "%.2f", dashboardManager.overdueFines))" : "₹0.00")")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.red)
+                            .dynamicTypeSize(.small ... .accessibility3)
+                        
+                        Text("Total Overdue Fines")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .dynamicTypeSize(.small ... .accessibility2)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.customCardBackground)
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+                .padding(.top)
             }
-            .navigationTitle("Dashboard")
-            .refreshable {
+            .padding(.vertical)
+        }
+        .background(Color.customBackground)
+        .refreshable {
+            await dashboardManager.fetchDashboardData()
+        }
+        .onAppear {
+            Task {
                 await dashboardManager.fetchDashboardData()
             }
         }
@@ -189,7 +191,6 @@ struct OverdueSummaryCard: View {
         .frame(maxWidth: .infinity)
         .background(Color(.systemBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -256,29 +257,34 @@ struct DashboardCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: icon)
                     .font(.title2)
                     .foregroundColor(color)
+                    .frame(width: 24, height: 24)
+                
                 Spacer()
+                
                 Text(value)
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
                     .dynamicTypeSize(.small ... .accessibility3)
             }
+            .frame(height: 30)
             
             Text(title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .dynamicTypeSize(.small ... .accessibility2)
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .dynamicTypeSize(.small ... .accessibility2)
         }
         .padding()
+        .frame(height: 100)
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.customCardBackground)
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -315,7 +321,6 @@ struct SimpleMiniBarGraph: View {
     }
 }
 
-// Updated GenreStatsCard with debugging info
 struct GenreStatsCard: View {
     let title: String
     let genres: [(String, Int)]
@@ -324,40 +329,32 @@ struct GenreStatsCard: View {
     var body: some View {
         NavigationLink(destination: GenreAnalyticsView(genres: genres, color: color)) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
+                HStack(alignment: .center, spacing: 12) {
                     Image(systemName: "chart.bar.fill")
                         .font(.title2)
                         .foregroundColor(color)
-                    Spacer()
+                        .frame(width: 24, height: 24)
+                    
                     if let genre = genres.first {
                         Text(genre.0)
                             .font(.title2)
                             .bold()
                             .foregroundColor(.primary)
-                            .dynamicTypeSize(.small ... .accessibility3)
-                            .lineLimit(1)
+                            .lineLimit(2)
                     }
                 }
-                
-                // Add debug text to check if genres data exists
-//                Text("Debug: \(genres.count) genres")
-//                    .font(.caption)
-//                    .foregroundColor(.gray)
-                
-                // Simplified graph
-                SimpleMiniBarGraph(data: genres, color: color)
+                .frame(height: 30)
                 
                 Text(title)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                    .dynamicTypeSize(.small ... .accessibility2)
-                    .lineLimit(2)
+                    .lineLimit(1)
             }
             .padding()
+            .frame(height: 100)
             .frame(maxWidth: .infinity)
-            .background(Color(.systemBackground))
+            .background(Color.customCardBackground)
             .cornerRadius(12)
-            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
     }
 }
@@ -369,29 +366,29 @@ struct PopularGenreCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: "chart.bar.fill")
                     .font(.title2)
                     .foregroundColor(color)
-                Spacer()
+                    .frame(width: 24, height: 24)
+                
                 Text(genre)
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
-                    .dynamicTypeSize(.small ... .accessibility3)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
+            .frame(height: 30)
             
             Text(title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .dynamicTypeSize(.small ... .accessibility2)
-                .lineLimit(2)
+                .lineLimit(1)
         }
         .padding()
+        .frame(height: 100)
         .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
+        .background(Color.customCardBackground)
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }

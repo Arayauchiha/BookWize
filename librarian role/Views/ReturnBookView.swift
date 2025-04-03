@@ -205,9 +205,8 @@ struct ReturnedBookCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.customCardBackground)
         .cornerRadius(12)
-        .shadow(radius: 2)
         .task {
             await fetchBookCover()
         }
