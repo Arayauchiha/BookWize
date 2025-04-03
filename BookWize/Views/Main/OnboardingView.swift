@@ -3,13 +3,10 @@ import SwiftUI
 struct OnboardingView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        ZStack {
-            // Background color adapts to light/dark mode
-            Color.customBackground.ignoresSafeArea()
-            
-            ScrollView {
+        NavigationView {
                 VStack(spacing: 20) {
                     // Logo and title - reduced top padding
                     VStack(spacing: 16) {
@@ -28,7 +25,7 @@ struct OnboardingView: View {
                             .font(.system(size: 34, weight: .bold))
                             .foregroundColor(Color.customText)
                     }
-                    .padding(.top, 30)
+                    .padding(.top, 20)
                     
                     // Feature list - more compact
                     VStack(alignment: .leading, spacing: 20) {
@@ -53,7 +50,7 @@ struct OnboardingView: View {
                     .padding(.horizontal, 24)
                     .padding(.vertical, 15)
                     
-                    // Bottom section with people icon and disclaimer text - more compact
+                    // Bottom section with people icon and disclaimer text
                     VStack(spacing: 10) {
                         Image(systemName: "person.2.fill")
                             .font(.system(size: 22))
@@ -68,11 +65,12 @@ struct OnboardingView: View {
                     }
                     .padding(.vertical, 5)
                     
-                    // Continue button - ensure it's visible
+                    // Continue button
                     Button(action: {
-                        // Mark onboarding as seen and dismiss the sheet
-                        hasSeenOnboarding = true
-                        dismiss()
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            hasSeenOnboarding = true
+                            dismiss()
+                        }
                     }) {
                         Text("Continue")
                             .font(.headline)
@@ -87,11 +85,13 @@ struct OnboardingView: View {
                 }
                 .padding(.vertical, 20)
             }
-        }
-        .presentationDetents([.height(700)])
-        .presentationDragIndicator(.hidden)
-        .interactiveDismissDisabled(true) // Prevent dismissal by dragging down
-        .preferredColorScheme(.none) // Supports both light and dark mode
+            .background(Color.customBackground)
+            .navigationBarTitleDisplayMode(.inline)
+        
+        .presentationDragIndicator(.visible)
+        .presentationDetents([.large])
+        .presentationBackground(colorScheme == .dark ? .black : .white)
+        .interactiveDismissDisabled()
     }
 }
 

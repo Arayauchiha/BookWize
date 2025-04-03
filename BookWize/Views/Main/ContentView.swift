@@ -96,13 +96,15 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingView()
-                .interactiveDismissDisabled(true) // Prevent dismissal by dragging down
+                .transition(.move(edge: .bottom))
         }
         .onAppear {
             // If the user hasn't seen onboarding, show it when the view appears
             if !hasSeenOnboarding {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showOnboarding = true
+                withAnimation(.easeOut(duration: 0.3)) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showOnboarding = true
+                    }
                 }
             }
         }
