@@ -52,6 +52,7 @@ struct BookSectionsView: View {
     @ObservedObject var viewModel: BookSearchViewModel
     @State private var selectedBook: Book?
     @State private var showingBookDetail = false
+    @State private var refreshKey = UUID()
 
     var body: some View {
         VStack(spacing: 20) {
@@ -62,14 +63,21 @@ struct BookSectionsView: View {
                 selectedBook: $selectedBook,
                 showingBookDetail: $showingBookDetail
             )
+            .id("forYou-\(forYouBooks.count)-\(refreshKey)")
 
             RecentlyAddedSectionView(
                 books: recentlyAddedBooks,
                 selectedBook: $selectedBook,
                 showingBookDetail: $showingBookDetail
             )
+            .id("recentlyAdded-\(recentlyAddedBooks.count)-\(refreshKey)")
 
             BrowseByGenreSectionView(booksByGenre: booksByGenre, supabase: supabase)
+            .id("browseByGenre-\(booksByGenre.count)-\(refreshKey)")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("BookDataUpdated"))) { _ in
+            refreshKey = UUID()
+            print("BookSectionsView updating with new data")
         }
         .sheet(item: $selectedBook) { book in
             NavigationView {
@@ -113,7 +121,14 @@ struct ForYouSectionView: View {
             }
             .padding(.horizontal)
 
-            if books.isEmpty {
+            if viewModel.isLoading && books.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            } else if books.isEmpty {
                 Text("Select your favorite genres to get personalized recommendations")
                     .foregroundColor(.secondary)
                     .padding()
@@ -139,6 +154,8 @@ struct RecentlyAddedSectionView: View {
     let books: [Book]
     @Binding var selectedBook: Book?
     @Binding var showingBookDetail: Bool
+    @Environment(\.refresh) private var refresh
+    @State private var isRefreshing = false
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -180,7 +197,14 @@ struct RecentlyAddedSectionView: View {
             }
             .padding(.horizontal)
 
-            if books.isEmpty {
+            if isRefreshing && books.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            } else if books.isEmpty {
                 HStack {
                     Spacer()
                     VStack(spacing: 8) {
@@ -215,12 +239,19 @@ struct RecentlyAddedSectionView: View {
             }
         }
         .padding(.vertical, 8)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("BookDataUpdated"))) { _ in
+            self.isRefreshing = false
+        }
+        .onAppear {
+            self.isRefreshing = books.isEmpty
+        }
     }
 }
 
 struct BrowseByGenreSectionView: View {
     let booksByGenre: [String: [Book]]
     let supabase: SupabaseClient
+    @State private var isRefreshing = false
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -243,7 +274,20 @@ struct BrowseByGenreSectionView: View {
             }
             .padding(.horizontal)
 
-            if booksByGenre.isEmpty {
+            if isRefreshing && booksByGenre.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack {
+                        ProgressView()
+                            .padding()
+                        Text("Refreshing genres...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding()
+            } else if booksByGenre.isEmpty {
                 HStack {
                     Spacer()
                     VStack {
@@ -274,6 +318,12 @@ struct BrowseByGenreSectionView: View {
             }
         }
         .padding(.vertical, 8)
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("BookDataUpdated"))) { _ in
+            self.isRefreshing = false
+        }
+        .onAppear {
+            self.isRefreshing = booksByGenre.isEmpty
+        }
     }
 }
 

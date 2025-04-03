@@ -65,6 +65,10 @@ struct SearchBrowseView: View {
                 if initialBooksByGenre.isEmpty {
                     Task {
                         await viewModel.refreshData()
+                        // Update initialBooksByGenre after refreshing data
+                        DispatchQueue.main.async {
+                            initialBooksByGenre = viewModel.booksByGenre
+                        }
                     }
                 }
             }
@@ -80,6 +84,30 @@ struct SearchBrowseView: View {
                 print("SearchBrowseView received reservation change notification, refreshing UI")
                 forceUpdateKey = UUID()
             }
+        }
+        .refreshable {
+            // Refresh data from Supabase when pulled down
+            print("Pull-to-refresh triggered, fetching fresh data for all sections...")
+            
+            // Show immediate visual feedback by updating the force key right away
+            forceUpdateKey = UUID()
+            
+            // Use Task to allow the refresh indicator to complete even if data is still loading
+            Task {
+                // Refresh all data from Supabase
+                await viewModel.refreshData()
+                
+                // Update the sections with refreshed data
+                await MainActor.run {
+                    initialBooksByGenre = viewModel.booksByGenre
+                    forceUpdateKey = UUID() // Force UI refresh again after data is loaded
+                    
+                    print("Explore tab sections refreshed")
+                }
+            }
+            
+            // Return immediately to complete the refresh UI sooner
+            // This allows the pull-to-refresh indicator to disappear while data loads in background
         }
         .navigationTitle("Explore")
         .navigationBarTitleDisplayMode(.large)
