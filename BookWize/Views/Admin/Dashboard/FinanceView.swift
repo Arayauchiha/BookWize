@@ -69,6 +69,7 @@ struct FinanceView: View {
                                     .foregroundStyle(Color.customButton)
                                 Text(selectedDate.formatted(.dateTime.month().year()))
                                     .foregroundStyle(Color.customText)
+                                    .dynamicTypeSize(.small ... .accessibility2)
                                 Image(systemName: "chevron.down")
                                     .font(.system(size: 13))
                                     .foregroundStyle(Color.customText.opacity(0.6))
@@ -98,11 +99,13 @@ struct FinanceView: View {
                                 Text("No expenses found")
                                     .font(.headline)
                                     .foregroundColor(Color.customText)
+                                    .dynamicTypeSize(.small ... .accessibility2)
                                 
                                 Text("There are no expenses for the selected month.")
                                     .font(.subheadline)
                                     .foregroundColor(Color.customText.opacity(0.6))
                                     .multilineTextAlignment(.center)
+                                    .dynamicTypeSize(.small ... .accessibility2)
                             }
                             .padding(.top, 40)
                             .padding(.bottom, 40)
@@ -276,6 +279,7 @@ struct SearchBarPayouts: View {
             
             TextField("Search", text: $text)
                 .font(.body)
+                .dynamicTypeSize(.small ... .accessibility2)
             
             if !text.isEmpty {
                 Button(action: { text = "" }) {
@@ -300,35 +304,63 @@ struct ExpenseRow: View {
     let onEdit: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 20) {
+            // Top row with title and amount
+            VStack(alignment: .leading, spacing: 12) {
+                // Title
                 Text(expense.title)
                     .font(.headline)
                     .foregroundStyle(Color.primary)
-                HStack {
-                    Text(expense.category)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.secondary)
-                    Text("•")
-                        .foregroundStyle(Color.secondary)
-                    Text(expense.status)
-                        .font(.subheadline)
-                        .foregroundStyle(expense.status == "Pending" ? .orange : .green)
-                }
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing) {
+                    .dynamicTypeSize(.small ... .accessibility2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                // Amount
                 Text("₹\(expense.amount, specifier: "%.2f")")
                     .font(.headline)
                     .foregroundStyle(Color.primary)
+                    .dynamicTypeSize(.small ... .accessibility2)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            
+            Divider()
+            
+            // Bottom row with category, status, and date
+            VStack(alignment: .leading, spacing: 12) {
+                // Category and Status
+                HStack(spacing: 8) {
+                    Text(expense.category)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondary)
+                        .dynamicTypeSize(.small ... .accessibility2)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                    
+                    Text("•")
+                        .foregroundStyle(Color.secondary)
+                    
+                    Text(expense.status)
+                        .font(.subheadline)
+                        .foregroundStyle(expense.status == "Pending" ? .orange : .green)
+                        .dynamicTypeSize(.small ... .accessibility2)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                
+                // Date
                 Text(expense.date.formatted(.dateTime.day().month().year()))
                     .font(.caption)
                     .foregroundStyle(Color.secondary)
+                    .dynamicTypeSize(.small ... .accessibility1)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
-        .padding(16)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
         .contentShape(Rectangle())

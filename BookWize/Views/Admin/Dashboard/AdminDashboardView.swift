@@ -1,6 +1,41 @@
 import SwiftUI
 import Supabase
 
+struct DashboardCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+                Spacer()
+                Text(value)
+                    .font(.title2)
+                    .bold()
+                    .foregroundColor(.primary)
+                    .dynamicTypeSize(.small ... .accessibility3)
+            }
+            
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+    }
+}
+
 struct StatCard: View {
     let title: String
     let value: String
@@ -23,6 +58,7 @@ struct StatCard: View {
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+                    .dynamicTypeSize(.small ... .accessibility2)
                 
                 Spacer()
             }
@@ -33,12 +69,117 @@ struct StatCard: View {
             Text(value)
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.primary)
+                .dynamicTypeSize(.small ... .accessibility3)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
+    }
+}
+
+struct SummaryItem: View {
+    var title: String
+    var value: String
+    var icon: String
+    var color: Color
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.headline)
+                .foregroundColor(AppTheme.textColor)
+                .dynamicTypeSize(.small ... .accessibility3)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(AppTheme.secondaryTextColor)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct GenreStatsCard: View {
+    let title: String
+    let genres: [(String, Int)]
+    let color: Color
+    
+    var body: some View {
+        NavigationLink(destination: GenreAnalyticsView(genres: genres, color: color)) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.title2)
+                        .foregroundColor(color)
+                    Spacer()
+                    if let genre = genres.first {
+                        Text(genre.0)
+                            .font(.title2)
+                            .bold()
+                            .foregroundColor(.primary)
+                            .dynamicTypeSize(.small ... .accessibility3)
+                            .lineLimit(1)
+                    }
+                }
+                
+                // Simplified graph
+                SimpleMiniBarGraph(data: genres, color: color)
+                
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
+                    .lineLimit(2)
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color(.systemBackground))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+    }
+}
+
+struct OverdueSummaryCard: View {
+    let overdueCount: Int
+    let totalFine: Double
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text("Overdue Books")
+                        .font(.headline)
+                        .dynamicTypeSize(.small ... .accessibility2)
+                }
+                
+                Text("\(overdueCount) books • $\(String(format: "%.2f", totalFine)) in fines")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .foregroundColor(.secondary)
+                .font(.system(size: 14, weight: .semibold))
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -88,6 +229,7 @@ struct RecentRequestsView: View {
                     Text("Recent Requests")
                         .font(.title2.bold())
                         .foregroundColor(.primary)
+                        .dynamicTypeSize(.small ... .accessibility3)
                     Spacer()
                     Image(systemName: "chevron.right")
                         .foregroundColor(.secondary)
@@ -104,10 +246,12 @@ struct RecentRequestsView: View {
                     Text(error)
                         .foregroundColor(.red)
                         .padding()
+                        .dynamicTypeSize(.small ... .accessibility2)
                 } else if bookRequests.isEmpty {
                     Text("No recent requests")
                         .foregroundColor(.secondary)
                         .padding()
+                        .dynamicTypeSize(.small ... .accessibility2)
                 } else {
                     ForEach(bookRequests.prefix(5), id: \.id) { request in
                         RequestRow(request: request)
@@ -131,9 +275,11 @@ struct RequestRow: View {
                 Text(request.title)
                     .font(.headline)
                     .foregroundStyle(.primary)
+                    .dynamicTypeSize(.small ... .accessibility2)
                 Text(request.author)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
             }
             Spacer()
             Text(request.Request_status.rawValue.capitalized)
@@ -143,6 +289,7 @@ struct RequestRow: View {
                 .padding(.vertical, 4)
                 .background(statusColor.opacity(0.1))
                 .cornerRadius(6)
+                .dynamicTypeSize(.small ... .accessibility1)
         }
         .padding()
         .background(Color(uiColor: .secondarySystemGroupedBackground))
