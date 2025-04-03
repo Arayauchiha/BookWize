@@ -1,19 +1,29 @@
 import SwiftUI
 import CoreData
 
+// Extension to invert a Bool binding
+extension Binding where Value == Bool {
+    func inverse() -> Binding<Bool> {
+        Binding<Bool>(
+            get: { !self.wrappedValue },
+            set: { self.wrappedValue = !$0 }
+        )
+    }
+}
+
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isAdminLoggedIn") private var isAdminLoggedIn = false
     @AppStorage("isLibrarianLoggedIn") private var isLibrarianLoggedIn = false
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
+    
+    // State to force onboarding to show on first launch
+    @State private var showOnboarding = false
 
     var body: some View {
         Group {
-            if !hasSeenOnboarding {
-                OnboardingView()
-            }
-            else if isAdminLoggedIn {
+            if isAdminLoggedIn {
                 AdminDashboardView()
             } else if isLibrarianLoggedIn {
                 //LibrarianDashboardScreen()
@@ -81,6 +91,18 @@ struct ContentView: View {
                     }
                     .navigationBarHidden(true)
                     .background(Color.customBackground)
+                }
+            }
+        }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView()
+                .interactiveDismissDisabled(true) // Prevent dismissal by dragging down
+        }
+        .onAppear {
+            // If the user hasn't seen onboarding, show it when the view appears
+            if !hasSeenOnboarding {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showOnboarding = true
                 }
             }
         }
