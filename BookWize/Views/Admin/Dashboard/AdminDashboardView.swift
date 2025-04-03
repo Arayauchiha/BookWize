@@ -23,6 +23,7 @@ struct StatCard: View {
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+                    .dynamicTypeSize(.small ... .accessibility2)
                 
                 Spacer()
             }
@@ -33,12 +34,105 @@ struct StatCard: View {
             Text(value)
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(.primary)
+                .dynamicTypeSize(.small ... .accessibility3)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
+    }
+}
+
+// Recent Requests View Component
+struct RecentRequestsView: View {
+    let bookRequests: [BookRequest]
+    let isLoading: Bool
+    let errorMessage: String?
+    
+    var body: some View {
+        NavigationLink {
+            AllRequestsView(bookRequests: .constant(bookRequests))
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Recent Requests")
+                        .font(.title2.bold())
+                        .foregroundColor(.primary)
+                        .dynamicTypeSize(.small ... .accessibility3)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 14))
+                }
+                .padding(.horizontal)
+                .padding(.top, 6)
+                
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .padding()
+                        .dynamicTypeSize(.small ... .accessibility2)
+                } else if bookRequests.isEmpty {
+                    Text("No recent requests")
+                        .foregroundColor(.secondary)
+                        .padding()
+                        .dynamicTypeSize(.small ... .accessibility2)
+                } else {
+                    ForEach(bookRequests.prefix(5), id: \.id) { request in
+                        RequestRow(request: request)
+                    }
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// Request Row Component
+struct RequestRow: View {
+    let request: BookRequest
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "book.fill")
+                .foregroundStyle(Color.memberColor)
+            VStack(alignment: .leading) {
+                Text(request.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .dynamicTypeSize(.small ... .accessibility2)
+                Text(request.author)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
+            }
+            Spacer()
+            Text(request.Request_status.rawValue.capitalized)
+                .font(.caption)
+                .foregroundStyle(statusColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(statusColor.opacity(0.1))
+                .cornerRadius(6)
+                .dynamicTypeSize(.small ... .accessibility1)
+        }
+        .padding()
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+    
+    private var statusColor: Color {
+        switch request.Request_status {
+        case .pending: return .orange
+        case .approved: return .green
+        case .rejected: return .red
+        }
     }
 }
 
@@ -70,92 +164,6 @@ struct AnalyticsGridView: View {
                     icon: "book.closed.fill", color: .purple)
         }
         .padding(.horizontal)
-    }
-}
-
-// Recent Requests View Component
-struct RecentRequestsView: View {
-    let bookRequests: [BookRequest]
-    let isLoading: Bool
-    let errorMessage: String?
-    
-    var body: some View {
-        NavigationLink {
-            AllRequestsView(bookRequests: .constant(bookRequests))
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("Recent Requests")
-                        .font(.title2.bold())
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.secondary)
-                        .font(.system(size: 14))
-                }
-                .padding(.horizontal)
-                .padding(.top, 6)
-                
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else if let error = errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .padding()
-                } else if bookRequests.isEmpty {
-                    Text("No recent requests")
-                        .foregroundColor(.secondary)
-                        .padding()
-                } else {
-                    ForEach(bookRequests.prefix(5), id: \.id) { request in
-                        RequestRow(request: request)
-                    }
-                }
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// Request Row Component
-struct RequestRow: View {
-    let request: BookRequest
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "book.fill")
-                .foregroundStyle(Color.memberColor)
-            VStack(alignment: .leading) {
-                Text(request.title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                Text(request.author)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(request.Request_status.rawValue.capitalized)
-                .font(.caption)
-                .foregroundStyle(statusColor)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(statusColor.opacity(0.1))
-                .cornerRadius(6)
-        }
-        .padding()
-        .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .cornerRadius(12)
-        .padding(.horizontal)
-    }
-    
-    private var statusColor: Color {
-        switch request.Request_status {
-        case .pending: return .orange
-        case .approved: return .green
-        case .rejected: return .red
-        }
     }
 }
 
