@@ -309,7 +309,7 @@ struct ExpenseRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 // Amount
-                Text("₹\(expense.amount, specifier: "%.2f")")
+                Text("$\(expense.amount, specifier: "%.2f")")
                     .font(.headline)
                     .foregroundStyle(Color.primary)
                     .dynamicTypeSize(.small ... .accessibility2)
@@ -569,7 +569,7 @@ struct ExpenseHistoryView: View {
                     Text(expense.category)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-                    Text("₹\(expense.amount, specifier: "%.2f")")
+                    Text("$\(expense.amount, specifier: "%.2f")")
                         .font(.headline)
                     Text(expense.date.formatted(.dateTime.day().month().year()))
                         .font(.caption)

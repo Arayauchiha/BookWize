@@ -251,9 +251,9 @@ struct MembershipView: View {
                             Text("Membership Perks")
                                 .font(.headline)
                             
-                            PerkRow(icon: "book.fill", text: "Advance Book Reservation")
-                            PerkRow(icon: "star.fill", text: "Access to Popular Books Catalog")
-                            PerkRow(icon: "arrow.clockwise", text: "Book Renewal Option")
+                            PerkRow(icon: "arrow.clockwise" , text: "Seamless smart card access")
+                            PerkRow(icon: "star.fill", text: "Personalised Reading Logs")
+                            PerkRow(icon: "book.fill" , text: "Book Reservations")
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -633,3 +633,4 @@ struct GenreSelectionView: View {
         }
     }
 }
+

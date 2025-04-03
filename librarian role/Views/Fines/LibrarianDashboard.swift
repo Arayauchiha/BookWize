@@ -111,7 +111,7 @@ struct LibrarianDashboard: View {
                         
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("\(dashboardManager.overdueFines > 0 ? "₹\(String(format: "%.2f", dashboardManager.overdueFines))" : "₹0.00")")
+                                Text("\(dashboardManager.overdueFines > 0 ? "$\(String(format: "%.2f", dashboardManager.overdueFines))" : "$0.00")")
                                     .font(.title3)
                                     .fontWeight(.bold)
                                     .foregroundColor(.red)
@@ -193,7 +193,7 @@ struct OverdueSummaryCard: View {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.red)
-                    Text("Overdue Books")
+                    Text("Overdue ")
                         .font(.headline)
                         .dynamicTypeSize(.small ... .accessibility2)
                 }
