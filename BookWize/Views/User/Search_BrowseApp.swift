@@ -124,6 +124,7 @@ struct Search_BrowseApp: View {
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var isNewPasswordVisible = false
+    @State private var showLogoutAlert = false
     
     init(userPreferredGenres: [String] = []) {
         self.userPreferredGenres = userPreferredGenres
@@ -231,16 +232,7 @@ struct Search_BrowseApp: View {
                         }
                         
                         Button(role: .destructive) {
-                            // Clear stored user data
-                            UserDefaults.standard.removeObject(forKey: "currentMemberId")
-                            UserDefaults.standard.removeObject(forKey: "currentMemberEmail")
-                            
-                            // Update UI
-                            isMemberLoggedIn = false
-                            NavigationUtil.popToRootView()
-                            let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-                            let window = windowScene?.windows.first
-                            window?.rootViewController = UIHostingController(rootView: ContentView())
+                            showLogoutAlert = true
                         } label: {
                             Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
                         }
@@ -256,6 +248,23 @@ struct Search_BrowseApp: View {
                     }
                 }
                 .navigationTitle("Account")
+                .alert("Logout", isPresented: $showLogoutAlert) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Logout", role: .destructive) {
+                        // Clear stored user data
+                        UserDefaults.standard.removeObject(forKey: "currentMemberId")
+                        UserDefaults.standard.removeObject(forKey: "currentMemberEmail")
+                        
+                        // Update UI
+                        isMemberLoggedIn = false
+                        NavigationUtil.popToRootView()
+                        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                        let window = windowScene?.windows.first
+                        window?.rootViewController = UIHostingController(rootView: ContentView())
+                    }
+                } message: {
+                    Text("Are you sure you want to logout?")
+                }
                 .sheet(isPresented: $isPasswordResetPresented) {
                     if let user = user {
                         MemberPasswordResetView(
