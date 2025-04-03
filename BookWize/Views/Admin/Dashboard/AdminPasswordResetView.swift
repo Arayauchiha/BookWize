@@ -57,6 +57,7 @@ struct AdminPasswordResetView: View {
             
             if data.isEmpty {
                 DispatchQueue.main.async {
+                    HapticManager.error()
                     errorMessage = "Current password is incorrect"
                     showError = true
                 }
@@ -65,6 +66,7 @@ struct AdminPasswordResetView: View {
         } catch {
             print("Error verifying current password:", error)
             DispatchQueue.main.async {
+                HapticManager.error()
                 errorMessage = "Failed to verify current password: \(error.localizedDescription)"
                 showError = true
             }
@@ -73,6 +75,7 @@ struct AdminPasswordResetView: View {
         
         // Validate passwords match
         guard newPassword == confirmPassword else {
+            HapticManager.error()
             errorMessage = "New passwords do not match"
             showError = true
             return
@@ -80,6 +83,7 @@ struct AdminPasswordResetView: View {
         
         // Validate new password is different
         guard newPassword != currentPassword else {
+            HapticManager.error()
             errorMessage = "New password must be different from current password"
             showError = true
             return
@@ -87,6 +91,7 @@ struct AdminPasswordResetView: View {
         
         // Validate password requirements
         guard passwordValidation.isValid else {
+            HapticManager.error()
             errorMessage = "New password does not meet requirements"
             showError = true
             return
@@ -106,11 +111,13 @@ struct AdminPasswordResetView: View {
             
             DispatchQueue.main.async {
                 print("Password successfully updated for admin:", email)
+                HapticManager.success()
                 showSuccess = true
             }
         } catch {
             print("Error updating password:", error)
             DispatchQueue.main.async {
+                HapticManager.error()
                 errorMessage = "Failed to update password: \(error.localizedDescription)"
                 showError = true
             }
@@ -157,7 +164,12 @@ struct AdminPasswordResetView: View {
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
                                         .onChange(of: newPassword) { newValue in
+                                            let oldValidation = passwordValidation
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
+                                            // Provide haptic feedback when password requirements are met
+                                            if !oldValidation.isValid && passwordValidation.isValid {
+                                                HapticManager.success()
+                                            }
                                         }
                                 } else {
                                     SecureField("Enter new password", text: $newPassword)
@@ -165,12 +177,20 @@ struct AdminPasswordResetView: View {
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
                                         .onChange(of: newPassword) { newValue in
+                                            let oldValidation = passwordValidation
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
+                                            // Provide haptic feedback when password requirements are met
+                                            if !oldValidation.isValid && passwordValidation.isValid {
+                                                HapticManager.success()
+                                            }
                                         }
                                 }
                             }
                             
-                            Button(action: { isNewPasswordVisible.toggle() }) {
+                            Button(action: {
+                                HapticManager.lightImpact()
+                                isNewPasswordVisible.toggle()
+                            }) {
                                 Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
                                     .foregroundStyle(Color.customButton.opacity(Color.secondaryIconOpacity))
                             }
@@ -241,11 +261,21 @@ struct AdminPasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .confirmPassword)
+                                        .onChange(of: confirmPassword) { newValue in
+                                            if !newValue.isEmpty && newValue == newPassword {
+                                                HapticManager.success()
+                                            }
+                                        }
                                 } else {
                                     SecureField("Confirm new password", text: $confirmPassword)
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .confirmPassword)
+                                        .onChange(of: confirmPassword) { newValue in
+                                            if !newValue.isEmpty && newValue == newPassword {
+                                                HapticManager.success()
+                                            }
+                                        }
                                 }
                             }
                         }
@@ -265,6 +295,7 @@ struct AdminPasswordResetView: View {
                     }
                     
                     Button(action: {
+                        HapticManager.mediumImpact()
                         print("Update password button tapped for email:", email)
                         Task {
                             await updatePassword()
@@ -295,23 +326,30 @@ struct AdminPasswordResetView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
+                    Button("Cancel", action: {
+                        HapticManager.lightImpact()
+                        onCancel()
+                    })
                         .foregroundStyle(Color.customButton)
                 }
             }
             .alert("Error", isPresented: $showError) {
-                Button("OK") { showError = false }
+                Button("OK") {
+                    HapticManager.error()
+                    showError = false
+                }
             } message: {
                 Text(errorMessage)
             }
             .alert("Success", isPresented: $showSuccess) {
                 Button("OK") {
+                    HapticManager.success()
                     onSave()
                 }
             } message: {
                 Text("Your password has been updated successfully")
             }
-            .onAppear { 
+            .onAppear {
                 focusedField = .currentPassword
                 print("AdminPasswordResetView appeared for email:", email)
             }

@@ -36,6 +36,7 @@ struct LibrarianCredentialsView: View {
             }
             
             Button(action: {
+                HapticManager.mediumImpact()
                 sendCredentialsEmail()
             }) {
                 if isSending {
@@ -79,7 +80,7 @@ struct LibrarianCredentialsView: View {
             
             let success = await emailService.sendEmail(
                 to: credentials.email,
-                subject: subject, 
+                subject: subject,
                 body: body
             )
             

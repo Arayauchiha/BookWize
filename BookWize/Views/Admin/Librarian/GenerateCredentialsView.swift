@@ -51,6 +51,7 @@ struct GenerateCredentialsView: View {
             }
             
             Button(action: {
+                HapticManager.mediumImpact()
                 Task {
                     await sendCredentialsEmail()
                 }
@@ -74,9 +75,11 @@ struct GenerateCredentialsView: View {
             
             Button("Done") {
                 if isSent {
+                    HapticManager.success()
                     onSend()
                     dismiss()
                 } else {
+                    HapticManager.error()
                     errorMessage = "Please send credentials first"
                 }
             }
@@ -117,8 +120,10 @@ struct GenerateCredentialsView: View {
         DispatchQueue.main.async {
             isSending = false
             if success {
+                HapticManager.success()
                 isSent = true
             } else {
+                HapticManager.error()
                 errorMessage = "Failed to send email. Please try again."
             }
         }
@@ -127,8 +132,8 @@ struct GenerateCredentialsView: View {
 
 #Preview {
     GenerateCredentialsView(
-        email: "librarian@example.com", 
-        password: "temp123", 
+        email: "librarian@example.com",
+        password: "temp123",
         onSend: {}
     )
 }

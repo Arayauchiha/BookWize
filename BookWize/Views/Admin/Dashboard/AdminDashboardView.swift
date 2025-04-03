@@ -64,6 +64,7 @@ struct RecentRequestsView: View {
                     Image(systemName: "chevron.right")
                         .foregroundColor(.secondary)
                         .font(.system(size: 14))
+                    
                 }
                 .padding(.horizontal)
                 .padding(.top, 6)
@@ -200,6 +201,7 @@ struct AdminDashboardView: View {
                 .background(Color(.systemGroupedBackground))
                 .ignoresSafeArea(edges: .bottom)
                 .refreshable {
+                    HapticManager.mediumImpact()
                     currentTask?.cancel()
                     currentTask = Task {
                         async let requests = fetchBookRequests()
@@ -211,7 +213,10 @@ struct AdminDashboardView: View {
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: { showProfile = true }) {
+                        Button(action: {
+                            HapticManager.lightImpact()
+                            showProfile = true
+                        }) {
                             Image(systemName: "person.circle")
                                 .font(.system(size: 22))
                         }
@@ -234,20 +239,6 @@ struct AdminDashboardView: View {
             }
             .tag(1)
             
-            // Catalogue Tab
-            NavigationStack {
-                CatalogueView()
-                    .navigationTitle("Catalogue")
-                    .navigationBarTitleDisplayMode(.large)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button(action: { showProfile = true }) {
-                                Image(systemName: "person.circle")
-                                    .font(.system(size: 22))
-                            }
-                        }
-                    }
-            }
             .tabItem {
                 Label("Catalogue", systemImage: "books.vertical.fill")
             }
@@ -272,6 +263,9 @@ struct AdminDashboardView: View {
                     .navigationBarTitleDisplayMode(.inline)
             }
             .presentationDragIndicator(.visible)
+        }
+        .onChange(of: selectedTab) { _ in
+            HapticManager.selection()
         }
         .onAppear {
             configureTabBar()
@@ -321,11 +315,15 @@ struct AdminDashboardView: View {
             if !Task.isCancelled {
                 await MainActor.run {
                     bookRequests = response
+                    HapticManager.success()
                 }
             }
         } catch {
             if !Task.isCancelled {
                 print("Book requests error: \(error.localizedDescription)")
+                await MainActor.run {
+                    HapticManager.error()
+                }
             }
         }
     }

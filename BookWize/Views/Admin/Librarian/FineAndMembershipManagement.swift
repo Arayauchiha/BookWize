@@ -27,6 +27,7 @@ struct FineAndMembershipManagement: View {
                 fineSetId = settings.fineSetId
                 editedFine = settings.perDayFine != nil ? String(format: "%.2f", settings.perDayFine!) : ""
                 editedMembership = settings.membership != nil ? String(format: "%.2f", settings.membership!) : ""
+                HapticManager.success()
             } else {
                 let defaultSettings: FineAndMembership = try await SupabaseManager.shared.client
                     .from("FineAndMembershipSet")
@@ -44,6 +45,7 @@ struct FineAndMembershipManagement: View {
                 fineSetId = defaultSettings.fineSetId
                 editedFine = defaultSettings.perDayFine != nil ? String(format: "%.2f", defaultSettings.perDayFine!) : ""
                 editedMembership = defaultSettings.membership != nil ? String(format: "%.2f", defaultSettings.membership!) : ""
+                HapticManager.success()
             }
             isLoading = false
         } catch {
@@ -54,6 +56,7 @@ struct FineAndMembershipManagement: View {
             }
             isLoading = false
             showingErrorAlert = true
+            HapticManager.error()
         }
     }
 
@@ -61,18 +64,21 @@ struct FineAndMembershipManagement: View {
         guard let fineSetId = fineSetId else {
             errorMessage = "Missing record ID. Please try again."
             showingErrorAlert = true
+            HapticManager.error()
             return
         }
 
         guard let newFine = Double(editedFine) else {
             errorMessage = "Invalid fine amount. Please enter a valid number."
             showingErrorAlert = true
+            HapticManager.error()
             return
         }
 
         guard let newMembership = Double(editedMembership) else {
             errorMessage = "Invalid membership amount. Please enter a valid number."
             showingErrorAlert = true
+            HapticManager.error()
             return
         }
 
@@ -89,6 +95,7 @@ struct FineAndMembershipManagement: View {
             perDayFine = newFine
             membership = newMembership
             showingUpdateSheet = false
+            HapticManager.success()
         } catch {
             if error.localizedDescription.contains("permission denied") {
                 errorMessage = "Access denied: Admins only"
@@ -96,6 +103,7 @@ struct FineAndMembershipManagement: View {
                 errorMessage = "Failed to update settings: \(error.localizedDescription)"
             }
             showingErrorAlert = true
+            HapticManager.error()
         }
     }
 
@@ -147,7 +155,10 @@ struct FineAndMembershipManagement: View {
                 Spacer()
                 
                 // Edit button at the bottom
-                Button(action: { showingUpdateSheet = true }) {
+                Button(action: {
+                    HapticManager.mediumImpact()
+                    showingUpdateSheet = true
+                }) {
                     HStack {
                         Image(systemName: "pencil")
                         Text("Edit Fee Settings")
@@ -177,6 +188,11 @@ struct FineAndMembershipManagement: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 100)
+                                .onChange(of: editedFine) { newValue in
+                                    if let _ = Double(newValue) {
+                                        HapticManager.lightImpact()
+                                    }
+                                }
                         }
                         
                         HStack {
@@ -186,6 +202,11 @@ struct FineAndMembershipManagement: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 100)
+                                .onChange(of: editedMembership) { newValue in
+                                    if let _ = Double(newValue) {
+                                        HapticManager.lightImpact()
+                                    }
+                                }
                         }
                     }
                 }
@@ -194,12 +215,14 @@ struct FineAndMembershipManagement: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
+                            HapticManager.lightImpact()
                             showingUpdateSheet = false
                         }
                     }
                     
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") {
+                            HapticManager.mediumImpact()
                             Task {
                                 await updateSettings()
                             }
@@ -217,7 +240,9 @@ struct FineAndMembershipManagement: View {
             Alert(
                 title: Text("Error"),
                 message: Text(errorMessage ?? "An unknown error occurred"),
-                dismissButton: .default(Text("OK"))
+                dismissButton: .default(Text("OK")) {
+                    HapticManager.lightImpact()
+                }
             )
         }
     }

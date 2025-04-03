@@ -21,6 +21,7 @@ struct AdminProfileView: View {
         do {
             guard let userEmail = UserDefaults.standard.string(forKey: "currentMemberEmail") else {
                 print("No email found in UserDefaults")
+                HapticManager.error()
                 return
             }
             
@@ -37,12 +38,15 @@ struct AdminProfileView: View {
                 if let fetchedUser = response.first {
                     self.user = fetchedUser
                     print("Successfully fetched user: \(fetchedUser.name)")
+                   // HapticManager.success()
                 } else {
                     print("No user found with email: \(userEmail)")
+                    HapticManager.error()
                 }
             }
         } catch {
             print("Error fetching member: \(error)")
+            HapticManager.error()
         }
     }
     
@@ -67,11 +71,15 @@ struct AdminProfileView: View {
             }
             
             Section {
-                Button(action: { showPasswordReset = true }) {
+                Button(action: {
+                    HapticManager.mediumImpact()
+                    showPasswordReset = true
+                }) {
                     Label("Change Password", systemImage: "lock")
                 }
                 
                 Button(role: .destructive) {
+                    HapticManager.warning()
                     showLogoutAlert = true
                 } label: {
                     Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
@@ -81,8 +89,11 @@ struct AdminProfileView: View {
         .scrollContentBackground(.hidden)
         .background(Color.customBackground)
         .alert("Logout", isPresented: $showLogoutAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {
+                HapticManager.lightImpact()
+            }
             Button("Logout", role: .destructive) {
+                HapticManager.mediumImpact()
                 isAdminLoggedIn = false
                 dismiss()
             }
@@ -99,11 +110,13 @@ struct AdminProfileView: View {
                 message: "Enter your new password below",
                 buttonTitle: "Update Password",
                 onSave: {
+                    HapticManager.success()
                     showPasswordReset = false
                     newPassword = ""
                     confirmPassword = ""
                 },
                 onCancel: {
+                    HapticManager.lightImpact()
                     showPasswordReset = false
                     newPassword = ""
                     confirmPassword = ""
