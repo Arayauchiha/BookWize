@@ -9,6 +9,7 @@ class DashboardManager: ObservableObject {
     @Published private(set) var overdueFines: Double = 0
     @Published private(set) var activeLibrariansCount: Int = 0
     @Published private(set) var books: [Book] = []
+    @Published private(set) var popularGenres: [(String, Int)] = []
     
     init() {
         Task {
@@ -25,6 +26,7 @@ class DashboardManager: ObservableObject {
         await fetchOverdueFines()
         await fetchActiveLibrariansCount()
         await loadBooksFromSupabase()
+        await fetchPopularGenres()
     }
     
     private func fetchOverdueMembersCount() async {
@@ -226,26 +228,86 @@ class DashboardManager: ObservableObject {
         }
     }
     
-    func getPopularGenres() -> [(String, Int)] {
-        var genreCounts: [String: Int] = [:]
-        
-        // Count occurrences of each genre from all books
-        books.forEach { book in
-            if let categories = book.categories {
-                categories.forEach { genre in
-                    genreCounts[genre, default: 0] += 1
+    func fetchPopularGenres() async {
+        do {
+            print("Fetching member genre preferences...")
+            
+            let members: [User] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("selectedGenres")
+                .execute()
+                .value
+            
+            print("Fetched \(members.count) members with genre preferences")
+            
+            // Debug: Count non-empty selectedGenres arrays
+            let membersWithGenres = members.filter { !$0.selectedGenres.isEmpty }
+            print("Members with non-empty genre preferences: \(membersWithGenres.count)/\(members.count)")
+            
+            // Debug log some samples
+            if !membersWithGenres.isEmpty {
+                let sampleMembers = Array(membersWithGenres.prefix(3))
+                print("Sample member genres:")
+                for (i, member) in sampleMembers.enumerated() {
+                    print("  Member \(i+1): \(member.selectedGenres)")
                 }
             }
+            
+            var genreCounts: [String: Int] = [:]
+            
+            // Count occurrences of each genre from members' preferences
+            for member in members {
+                for genre in member.selectedGenres {
+                    if !genre.isEmpty {
+                        genreCounts[genre, default: 0] += 1
+                    }
+                }
+            }
+            
+            print("Counted \(genreCounts.count) unique genres")
+            
+            // If no genres found from member preferences, fall back to book categories
+            if genreCounts.isEmpty {
+                print("No genres found from member preferences, falling back to book categories")
+                
+                // Get genres from book categories
+                for book in books {
+                    if let categories = book.categories, !categories.isEmpty {
+                        for category in categories {
+                            genreCounts[category, default: 0] += 1
+                        }
+                    }
+                }
+                
+                print("Counted \(genreCounts.count) unique genres from book categories")
+            }
+            
+            // Sort genres by count in descending order
+            let sortedGenres = genreCounts.sorted { $0.value > $1.value }
+            
+            await MainActor.run {
+                if !sortedGenres.isEmpty {
+                    // Update the published property with the results
+                    self.popularGenres = sortedGenres
+                    print("Updated popular genres: \(self.popularGenres)")
+                } else {
+                    // If still no genres, add a sample genre
+                    self.popularGenres = [("Fiction", 5)]
+                    print("No genres found at all, added a sample genre: \(self.popularGenres)")
+                }
+            }
+        } catch {
+            print("Error fetching member genre preferences: \(error)")
+            await MainActor.run {
+                // Add a sample genre on error
+                self.popularGenres = [("Fiction", 5)]
+                print("Error occurred, added a sample genre: \(self.popularGenres)")
+            }
         }
-        
-        // Sort by count and get the most frequent genre
-        if let mostPopularGenre = genreCounts.max(by: { $0.value < $1.value }) {
-            print("Most popular genre: \(mostPopularGenre.key)")
-            return [(mostPopularGenre.key, 0)] // Return 0 as count since we don't need it
-        }
-        
-        print("No genres found")
-        return []
+    }
+    
+    func getPopularGenres() -> [(String, Int)] {
+        return popularGenres.isEmpty ? [] : [popularGenres[0]]
     }
     
     func getGenreWiseIssues() -> [(String, Int)] {

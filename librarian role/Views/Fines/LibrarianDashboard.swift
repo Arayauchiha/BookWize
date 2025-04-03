@@ -53,12 +53,31 @@ struct LibrarianDashboard: View {
                             .padding(.horizontal)
                             .dynamicTypeSize(.small ... .accessibility3)
                         
+                        // Debug text view - will show in UI
+                        let popularGenres = getPopularGenres()
+//                        Text("Debug: \(popularGenres.count) popular genres")
+//                            .font(.caption)
+//                            .foregroundColor(.gray)
+//                            .padding(4)
+//                            .background(Color.yellow.opacity(0.2))
+//                            .cornerRadius(4)
+//                            .padding(.horizontal)
+                        
                         HStack(spacing: 16) {
-                            if let mostPopularGenre = getPopularGenres().first {
+                            if let mostPopularGenre = popularGenres.first {
                                 PopularGenreCard(
                                     title: "Popular Genres",
                                     genre: mostPopularGenre.0,
-                                    color: .orange
+                                    color: .orange,
+                                    count: mostPopularGenre.1
+                                )
+                            } else {
+                                // Placeholder for when no popular genres are available
+                                PopularGenreCard(
+                                    title: "Popular Genres",
+                                    genre: "No data",
+                                    color: .gray,
+                                    count: 0
                                 )
                             }
                             
@@ -118,6 +137,12 @@ struct LibrarianDashboard: View {
             .navigationTitle("Dashboard")
             .refreshable {
                 await dashboardManager.fetchDashboardData()
+                // Debug print
+                print("Debug - Popular Genres after refresh: \(dashboardManager.getPopularGenres())")
+            }
+            .onAppear {
+                // Debug print on appear
+                print("Debug - Popular Genres on appear: \(dashboardManager.getPopularGenres())")
             }
         }
     }
@@ -366,6 +391,7 @@ struct PopularGenreCard: View {
     let title: String
     let genre: String
     let color: Color
+    let count: Int
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -381,6 +407,11 @@ struct PopularGenreCard: View {
                     .dynamicTypeSize(.small ... .accessibility3)
                     .lineLimit(1)
             }
+            
+            Text("\(count) members prefer this genre")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.vertical, 2)
             
             Text(title)
                 .font(.subheadline)
