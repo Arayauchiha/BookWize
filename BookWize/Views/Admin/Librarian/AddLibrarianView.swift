@@ -29,9 +29,9 @@ struct AddLibrarianView: View {
     @State private var alertType: AlertType?
     
     var formIsValid: Bool {
-        !name.isEmpty && 
-        !age.isEmpty && 
-        !email.isEmpty && 
+        !name.isEmpty &&
+        !age.isEmpty &&
+        !email.isEmpty &&
         !phone.isEmpty &&
         ValidationUtils.isValidEmail(email) &&
         phone.count == 10 &&
@@ -60,8 +60,10 @@ struct AddLibrarianView: View {
                             .onChange(of: name) { newValue in
                                 if newValue.isEmpty {
                                     nameError = "Name is required"
+                                    HapticManager.error()
                                 } else {
                                     nameError = nil
+                                    HapticManager.success()
                                 }
                             }
                         
@@ -85,10 +87,13 @@ struct AddLibrarianView: View {
                             .onChange(of: age) { newValue in
                                 if newValue.isEmpty {
                                     ageError = "Age is required"
+                                    HapticManager.error()
                                 } else if let ageInt = Int(newValue), ageInt < 18 || ageInt > 100 {
                                     ageError = "Age must be between 18 and 100"
+                                    HapticManager.error()
                                 } else {
                                     ageError = nil
+                                    HapticManager.success()
                                 }
                             }
                         
@@ -111,7 +116,13 @@ struct AddLibrarianView: View {
                             .textInputAutocapitalization(.never)
                             .keyboardType(.emailAddress)
                             .onChange(of: email) { _, newValue in
+                                let oldError = emailError
                                 emailError = ValidationUtils.getEmailError(newValue)
+                                if oldError != nil && emailError == nil {
+                                    HapticManager.success()
+                                } else if oldError == nil && emailError != nil {
+                                    HapticManager.error()
+                                }
                             }
                         
                         if let error = emailError {
@@ -134,12 +145,16 @@ struct AddLibrarianView: View {
                             .onChange(of: phone) { newValue in
                                 if newValue.isEmpty {
                                     phoneError = "Phone number is required"
+                                    HapticManager.error()
                                 } else if newValue.count != 10 {
                                     phoneError = "Phone number must be 10 digits"
+                                    HapticManager.error()
                                 } else if Int(newValue) == nil {
                                     phoneError = "Invalid phone number"
+                                    HapticManager.error()
                                 } else {
                                     phoneError = nil
+                                    HapticManager.success()
                                 }
                             }
                         
@@ -152,7 +167,10 @@ struct AddLibrarianView: View {
                     .padding(.horizontal, 20)
                     
                     if formIsValid && !credentialsSent {
-                        Button(action: showCredentialsSheet) {
+                        Button(action: {
+                            HapticManager.mediumImpact()
+                            showCredentialsSheet()
+                        }) {
                             Text("Proceed to Credentials")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(Color.white)
@@ -166,7 +184,10 @@ struct AddLibrarianView: View {
                         .padding(.horizontal, 20)
                     }
                     
-                    Button(action: addLibrarian) {
+                    Button(action: {
+                        HapticManager.mediumImpact()
+                        addLibrarian()
+                    }) {
                         Text("Add Librarian")
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Color.white)
@@ -187,7 +208,10 @@ struct AddLibrarianView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") {
+                        HapticManager.lightImpact()
+                        dismiss()
+                    }
                 }
             }
             .sheet(isPresented: $showCredentials) {
@@ -195,13 +219,17 @@ struct AddLibrarianView: View {
                     email: email,
                     password: generatedPassword,
                     onSend: {
+                        HapticManager.success()
                         credentialsSent = true
                         showCredentials = false
                     }
                 )
             }
             .alert(alertType?.title ?? "", isPresented: .constant(alertType != nil)) {
-                Button("OK") { alertType = nil }
+                Button("OK") {
+                    HapticManager.lightImpact()
+                    alertType = nil
+                }
             } message: {
                 Text(alertType?.message ?? "")
             }
@@ -241,18 +269,22 @@ struct AddLibrarianView: View {
     
     private func addLibrarian() {
         guard let ageInt = Int(age) else {
+            HapticManager.error()
             alertType = .error("Invalid age")
             return
         }
         guard isValidEmail(email) else {
+            HapticManager.error()
             alertType = .error("Invalid Email")
             return
         }
         guard phone.count == 10 else {
+            HapticManager.error()
             alertType = .error("Phone number should be of 10 digit")
             return
         }
         guard let phoneInt = Int(phone) else {
+            HapticManager.error()
             alertType = .error("Invalid phone number")
             return
         }
@@ -275,6 +307,7 @@ struct AddLibrarianView: View {
                    !librarians.isEmpty {
                     // A librarian with this email already exists
                     await MainActor.run {
+                        HapticManager.error()
                         alertType = .error("A librarian with email '\(email)' already exists")
                     }
                     return
@@ -299,12 +332,14 @@ struct AddLibrarianView: View {
                     .execute()
                 
                 await MainActor.run {
+                    HapticManager.success()
                     onAdd(librarianData)
                     dismiss()
                 }
             } catch {
                 print("Error: \(error.localizedDescription)")
                 await MainActor.run {
+                    HapticManager.error()
                     alertType = .error("Failed to add librarian: \(error.localizedDescription)")
                 }
             }

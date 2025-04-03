@@ -7,6 +7,7 @@ struct LibrarianCardView: View {
     
     var body: some View {
         Button(action: {
+            HapticManager.lightImpact()
             showDetail = true
         }) {
             VStack(alignment: .leading, spacing: 12) {
@@ -156,6 +157,7 @@ struct LibrarianDetailView: View {
                     
                     // Delete button
                     Button(action: {
+                        HapticManager.mediumImpact()
                         showDeleteConfirmation = true
                     }) {
                         HStack {
@@ -194,12 +196,18 @@ struct LibrarianDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Close") {
+                        HapticManager.lightImpact()
+                        dismiss()
+                    }
                 }
             }
             .alert("Delete Librarian", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
+                Button("Cancel", role: .cancel) {
+                    HapticManager.lightImpact()
+                }
                 Button("Delete", role: .destructive) {
+                    HapticManager.mediumImpact()
                     deleteLibrarian()
                 }
             } message: {
@@ -207,6 +215,7 @@ struct LibrarianDetailView: View {
             }
             .alert("Success", isPresented: $showSuccessAlert) {
                 Button("OK") {
+                    HapticManager.success()
                     dismiss()
                     onDelete()
                 }
@@ -240,6 +249,7 @@ struct LibrarianDetailView: View {
                 await MainActor.run {
                     isDeleting = false
                     errorMessage = "Failed to delete librarian: \(error.localizedDescription)"
+                    HapticManager.error()
                 }
             }
         }

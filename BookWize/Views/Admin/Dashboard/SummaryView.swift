@@ -36,6 +36,9 @@ struct SummaryView: View {
                         SummaryCard(requestCount: pendingRequests.count)
                             .padding(.horizontal)
                     }
+                    .simultaneousGesture(TapGesture().onEnded {
+                        HapticManager.lightImpact()
+                    })
                     
                     Spacer()
                 }
@@ -105,6 +108,9 @@ struct AllRequestsView: View {
             .padding(.top, 16)
             .padding(.bottom, 20)
             .tint(Color.customButton)
+            .onChange(of: selectedSegment) { _ in
+                HapticManager.lightImpact()
+            }
             
             if filteredRequests.isEmpty {
                 Text("No \(statusTitle) requests found.")
@@ -130,6 +136,9 @@ struct AllRequestsView: View {
                             } label: {
                                 RequestCard(request: request)
                             }
+                            .simultaneousGesture(TapGesture().onEnded {
+                                HapticManager.lightImpact()
+                            })
                         }
                     }
                     .padding(.horizontal, 16)
@@ -231,6 +240,7 @@ struct RequestDetailView: View {
             if request.Request_status == .pending {
                 HStack(spacing: 20) {
                     Button(action: {
+                        HapticManager.mediumImpact()
                         showAcceptConfirmation = true
                     }) {
                         Text("Accept")
@@ -244,6 +254,7 @@ struct RequestDetailView: View {
                     .disabled(isUpdating)
                     
                     Button(action: {
+                        HapticManager.mediumImpact()
                         showRejectConfirmation = true
                     }) {
                         Text("Reject")
@@ -279,8 +290,11 @@ struct RequestDetailView: View {
             }
         }
         .alert("Confirm Accept", isPresented: $showAcceptConfirmation) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {
+                HapticManager.lightImpact()
+            }
             Button("Accept") {
+                HapticManager.mediumImpact()
                 Task {
                     await updateStatus(to: .approved)
                 }
@@ -289,8 +303,11 @@ struct RequestDetailView: View {
             Text("Are you sure you want to accept this request for \"\(request.title)\"?")
         }
         .alert("Confirm Reject", isPresented: $showRejectConfirmation) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {
+                HapticManager.lightImpact()
+            }
             Button("Reject", role: .destructive) {
+                HapticManager.mediumImpact()
                 Task {
                     await updateStatus(to: .rejected)
                 }
@@ -331,12 +348,14 @@ struct RequestDetailView: View {
             
             await MainActor.run {
                 print("Updating UI for \(request.Request_id)")
+                HapticManager.success()
                 onStatusUpdate(updatedRequest)
                 isUpdating = false
                 dismiss()
             }
         } catch {
             await MainActor.run {
+                HapticManager.error()
                 errorMessage = "Failed to update status: \(error.localizedDescription)"
                 isUpdating = false
                 print("Update failed for \(request.Request_id): \(error)")

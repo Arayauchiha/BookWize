@@ -23,7 +23,7 @@ struct FinanceView: View {
     
     var filteredExpenses: [Expense] {
         expenses.filter { expense in
-            let matchesSearch = searchText.isEmpty || 
+            let matchesSearch = searchText.isEmpty ||
                 expense.title.localizedCaseInsensitiveContains(searchText)
             let matchesMonth = Calendar.current.isDate(expense.date, equalTo: selectedDate, toGranularity: .month)
             let matchesStatus = expense.status == "Pending"
@@ -43,10 +43,6 @@ struct FinanceView: View {
         ScrollView {
             LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                 Section {
-                    // Search Bar
-                    SearchBarPayouts(text: $searchText)
-                        .padding(.horizontal)
-                    
                     // Category Segmented Control
                     if searchText.isEmpty {
                         Picker("Category", selection: $selectedCategory) {
@@ -57,11 +53,15 @@ struct FinanceView: View {
                         .pickerStyle(SegmentedPickerStyle())
                         .padding()
                         .transition(.opacity)
+                        .onChange(of: selectedCategory) { _ in
+                            HapticManager.selection()
+                        }
                     }
                     
                     // Month/Year Selection with custom picker
                     HStack {
                         Button(action: {
+                            HapticManager.mediumImpact()
                             showingMonthPicker = true
                         }) {
                             HStack {
@@ -129,24 +129,35 @@ struct FinanceView: View {
         .background(Color.customBackground)
         .navigationTitle("Finance")
         .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $searchText, prompt: "Search expenses")
+        .onChange(of: searchText) { _ in
+            HapticManager.lightImpact()
+        }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button(action: { showingHistory = true }) {
+                Button(action: {
+                    HapticManager.mediumImpact()
+                    showingHistory = true
+                }) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 17))
                         .foregroundStyle(Color.customText)
                 }
                 
-                Button(action: { 
+                Button(action: {
+                    HapticManager.mediumImpact()
                     editingExpense = nil
-                    showingAddExpense = true 
+                    showingAddExpense = true
                 }) {
                     Image(systemName: "plus")
                         .font(.system(size: 17))
                         .foregroundStyle(Color.customText)
                 }
                 
-                Button(action: onProfileTap) {
+                Button(action: {
+                    HapticManager.lightImpact()
+                    onProfileTap()
+                }) {
                     Image(systemName: "person.circle")
                         .font(.system(size: 22))
                         .foregroundStyle(Color.customButton)
@@ -169,8 +180,11 @@ struct FinanceView: View {
                 .presentationDragIndicator(.visible)
         }
         .alert("Delete Expense", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
+            Button("Cancel", role: .cancel) {
+                HapticManager.lightImpact()
+            }
             Button("Delete", role: .destructive) {
+                HapticManager.warning()
                 if let expense = expenseToDelete {
                     deleteExpense(expense)
                 }
@@ -244,9 +258,11 @@ struct FinanceView: View {
             }
             
             expenses = try decoder.decode([Expense].self, from: response.data)
+            HapticManager.success()
         } catch {
             print("Decoding error:", error) // Debug print
             errorMessage = "Failed to load payouts: \(error.localizedDescription)"
+            HapticManager.error()
         }
         isLoading = false
     }
@@ -263,42 +279,14 @@ struct FinanceView: View {
                 
                 if let index = expenses.firstIndex(where: { $0.id == expense.id }) {
                     expenses.remove(at: index)
+                    HapticManager.success()
                 }
             } catch {
                 errorMessage = "Failed to delete payout: \(error.localizedDescription)"
+                HapticManager.error()
             }
             isLoading = false
         }
-    }
-}
-
-struct SearchBarPayouts: View {
-    @Binding var text: String
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .padding(.leading, 6)
-            
-            TextField("Search", text: $text)
-                .font(.body)
-                .dynamicTypeSize(.small ... .accessibility2)
-            
-            if !text.isEmpty {
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Image(systemName: "mic.fill")
-                    .foregroundStyle(.secondary)
-                    .padding(.trailing, 6)
-            }
-        }
-        .padding(.vertical, 8)
-        .background(Color(.systemGray5))
-        .cornerRadius(10)
     }
 }
 
@@ -369,10 +357,12 @@ struct ExpenseRow: View {
         .cornerRadius(12)
         .contentShape(Rectangle())
         .onTapGesture {
+            HapticManager.mediumImpact()
             onEdit()
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
+                HapticManager.warning()
                 onDelete()
             } label: {
                 Label("Delete", systemImage: "trash")
@@ -444,8 +434,12 @@ struct AddExpenseView: View {
             }
             .navigationTitle(editingExpense == nil ? "Add New Payout" : "Edit Payout")
             .navigationBarItems(
-                leading: Button("Cancel") { dismiss() },
+                leading: Button("Cancel") {
+                    HapticManager.lightImpact()
+                    dismiss()
+                },
                 trailing: Button("Save") {
+                    HapticManager.mediumImpact()
                     Task {
                         await saveExpense()
                     }
@@ -544,10 +538,12 @@ struct AddExpenseView: View {
                     
                     expenses.append(newExpense)
                 }
+                HapticManager.success()
                 dismiss()
             }
         } catch {
             errorMessage = "Failed to save payout: \(error.localizedDescription)"
+            HapticManager.error()
         }
         isLoading = false
     }
@@ -583,12 +579,16 @@ struct ExpenseHistoryView: View {
             .navigationTitle("Payout History")
             .navigationBarItems(
                 leading: Button("Clear History") {
+                    HapticManager.warning()
                     Task {
                         await clearHistory()
                     }
                 }
                 .foregroundColor(.red),
-                trailing: Button("Done") { dismiss() }
+                trailing: Button("Done") {
+                    HapticManager.lightImpact()
+                    dismiss()
+                }
             )
             .overlay {
                 if isLoading {
@@ -613,8 +613,10 @@ struct ExpenseHistoryView: View {
         do {
             // Only remove completed expenses from the local array
             expenses.removeAll { $0.status == "Completed" }
+            HapticManager.success()
         } catch {
             errorMessage = "Failed to clear history: \(error.localizedDescription)"
+            HapticManager.error()
         }
         isLoading = false
     }
@@ -715,12 +717,14 @@ struct MonthYearPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
+                        HapticManager.lightImpact()
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
+                        HapticManager.mediumImpact()
                         updateDate()
                         dismiss()
                     }
