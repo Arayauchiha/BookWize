@@ -33,6 +33,7 @@ struct SignupView: View {
     @State private var emailError: String?
     @State private var passwordError: String?
     @State private var confirmPasswordError: String?
+    @State private var nameError: String?
     
     // Password validation state
     @State private var passwordValidation = ValidationUtils.PasswordValidation(
@@ -54,6 +55,7 @@ struct SignupView: View {
         passwordValidation.isValid &&
         password == confirmPassword &&
         emailError == nil &&
+        nameError == nil &&
         !selectedLibrary.isEmpty
     }
     
@@ -81,8 +83,13 @@ struct SignupView: View {
                         }
                         
                         // Name
-                        inputField(title: "Full Name", error: nil) {
+                        inputField(title: "Full Name", error: nameError) {
                             TextField("Enter your full name", text: $name)
+                                .onChange(of: name) { newValue in
+                                    let nameRegex = "^[A-Za-z\\s]+$"
+                                    let namePredicate = NSPredicate(format: "SELF MATCHES %@", nameRegex)
+                                    nameError = namePredicate.evaluate(with: newValue) ? nil : "Only letters and spaces allowed"
+                                }
                         }
                         
                         // Gender
@@ -378,16 +385,41 @@ struct SignupView: View {
     private func createAccount() {
         isLoading = true
         
-        // Send verification OTP to verify email
+        // Check if user already exists
         Task {
-            let sent = await EmailService.shared.sendOTPEmail(to: email)
-            
-            DispatchQueue.main.async {
-                isLoading = false
-                if sent {
-                    showVerificationView = true
-                } else {
-                    errorMessage = "Failed to send verification code. Please try again."
+            do {
+                let response: [User] = try await SupabaseManager.shared.client
+                    .from("Members")
+                    .select("*")
+                    .eq("email", value: email)
+                    .execute()
+                    .value
+                
+                DispatchQueue.main.async {
+                    if !response.isEmpty {
+                        // User already exists
+                        isLoading = false
+                        errorMessage = "An account with this email already exists"
+                    } else {
+                        // User doesn't exist, proceed with OTP verification
+                        Task {
+                            let sent = await EmailService.shared.sendOTPEmail(to: email)
+                            
+                            DispatchQueue.main.async {
+                                isLoading = false
+                                if sent {
+                                    showVerificationView = true
+                                } else {
+                                    errorMessage = "Failed to send verification code. Please try again."
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isLoading = false
+                    errorMessage = "Error checking existing account: \(error.localizedDescription)"
                 }
             }
         }

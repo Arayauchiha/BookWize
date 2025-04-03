@@ -110,67 +110,12 @@ class DashboardManager: ObservableObject {
         }
     }
     
-//    private func fetchRevenueAndFines() async {
-//        do {
-//            let client = SupabaseManager.shared.client
-//
-//            // Define the required structs
-//            struct MembershipSetting: Codable {
-//                let Membership: Double?
-//            }
-//
-//            struct MemberFine: Codable {
-//                let fine: Double?
-//            }
-//
-//            // Fetch membership fee
-//            let membershipFeeResponse: [MembershipSetting] = try await client
-//                .from("FineAndMembershipSet")
-//                .select("Membership")
-//                .execute()
-//                .value
-//            
-//            let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
-//
-//            // Fetch total members count
-//            let membersCount: Int = try await client
-//                .from("Members")
-//                .select("*", head: true)
-//                .execute()
-//                .count ?? 0
-//            
-//            let membershipRevenue = Double(membersCount) * membershipFee
-//
-//            // Fetch total overdue fines from "Members" table
-//            let finesResponse: [MemberFine] = try await client
-//                .from("Members")
-//                .select("fine")
-//                .execute()
-//                .value
-//            
-//            let totalFines = finesResponse.reduce(0.0) { sum, member in
-//                sum + (member.fine ?? 0)
-//            }
-//
-//            // Calculate total revenue
-//            let totalAmount = membershipRevenue + totalFines
-//
-//            await MainActor.run {
-//                self.totalRevenue = totalAmount
-//                self.overdueFines = totalFines
-//                print("Updated Revenue: \(self.totalRevenue)")
-//                print("Updated Overdue Fines: \(self.overdueFines)")
-//            }
-//        } catch {
-//            print("Error fetching revenue and fines: \(error)")
-//        }
-//    }
-
     private func fetchTotalRevenue() async {
             do {
                 let client = SupabaseManager.shared.client
                 struct MembershipSetting: Codable { let Membership: Double? }
                 
+                // Fetch membership fee
                 let membershipFeeResponse: [MembershipSetting] = try await client
                     .from("FineAndMembershipSet")
                     .select("Membership")
@@ -180,6 +125,7 @@ class DashboardManager: ObservableObject {
                 let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
                 print("Membership Fee Response: \(membershipFeeResponse)")
                 
+                // Fetch total members count
                 let membersCount: Int = try await client
                     .from("Members")
                     .select("*", count: .exact)
@@ -188,9 +134,25 @@ class DashboardManager: ObservableObject {
 
                 print("Total Members Count: \(membersCount)")
                 
+                // Calculate membership revenue
                 let membershipRevenue = Double(membersCount) * membershipFee
                 
-                await MainActor.run { self.totalRevenue = membershipRevenue }
+                // Fetch total fines from issuebooks table
+                struct IssueBookFine: Codable { let fineAmount: Double? }
+                let finesResponse: [IssueBookFine] = try await client
+                    .from("issuebooks")
+                    .select("fineAmount")
+                    .execute()
+                    .value
+                
+                let totalFines = finesResponse.reduce(0.0) { sum, issue in
+                    sum + (issue.fineAmount ?? 0)
+                }
+                
+                // Calculate total revenue including both membership fees and fines
+                let totalRevenue = membershipRevenue + totalFines
+                
+                await MainActor.run { self.totalRevenue = totalRevenue }
                 print("Updated Total Revenue: \(self.totalRevenue)")
             } catch {
                 print("Error fetching total revenue: \(error)")

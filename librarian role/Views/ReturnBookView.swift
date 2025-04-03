@@ -279,6 +279,7 @@ struct ReturnBookFormView: View {
                 .select("id, member_email, return_date")
                 .eq("isbn", value: isbn)
                 .eq("member_email", value: smartCardID)
+                .is("actual_returned_date", value: nil)
                 .execute()
                 .value
             
