@@ -466,8 +466,23 @@ struct DetailRow: View {
         HStack {
             Text(title)
                 .foregroundColor(.secondary)
+                .frame(width: 100, alignment: .leading)
+            
+            if title == "Status" {
+                let status = BookRequest.R_status(rawValue: value.lowercased()) ?? .pending
+                Text(value)
+                    .font(.caption)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(status.background)
+                    .cornerRadius(6)
+            } else {
+                Text(value)
+                    .foregroundStyle(.primary)
+            }
+            
             Spacer()
-            Text(value)
         }
     }
 }

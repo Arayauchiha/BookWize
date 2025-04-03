@@ -137,7 +137,10 @@ struct FinanceView: View {
                         .foregroundStyle(Color.customText)
                 }
                 
-                Button(action: { showingAddExpense = true }) {
+                Button(action: { 
+                    editingExpense = nil
+                    showingAddExpense = true 
+                }) {
                     Image(systemName: "plus")
                         .font(.system(size: 17))
                         .foregroundStyle(Color.customText)
@@ -150,11 +153,12 @@ struct FinanceView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAddExpense) {
+        .sheet(isPresented: $showingAddExpense, onDismiss: {
+            if !showingAddExpense {
+                editingExpense = nil
+            }
+        }) {
             AddExpenseView(expenses: $expenses, category: categories[selectedCategory], editingExpense: editingExpense)
-                .onDisappear {
-                    editingExpense = nil
-                }
         }
         .sheet(isPresented: $showingHistory) {
             ExpenseHistoryView(expenses: $expenses)
@@ -484,11 +488,10 @@ struct AddExpenseView: View {
     }
     
     private func saveExpense() async {
-        
         isLoading = true
         do {
             if let amount = Double(amount), !title.isEmpty {
-                if editingExpense != nil {
+                if let editingExpense = editingExpense {
                     // Update existing expense
                     let updateData = UpdatePayoutData(
                         title: title,
@@ -501,12 +504,12 @@ struct AddExpenseView: View {
                     let _ = try await SupabaseManager.shared.client
                         .from("payouts")
                         .update(updateData)
-                        .eq("id", value: editingExpense!.id.uuidString)
+                        .eq("id", value: editingExpense.id.uuidString)
                         .execute()
                     
-                    if let index = expenses.firstIndex(where: { $0.id == editingExpense!.id }) {
+                    if let index = expenses.firstIndex(where: { $0.id == editingExpense.id }) {
                         let updatedExpense = Expense(
-                            id: editingExpense!.id,
+                            id: editingExpense.id,
                             title: title,
                             amount: amount,
                             category: categories[selectedCategory],
