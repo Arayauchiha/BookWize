@@ -24,6 +24,10 @@ struct LoginView: View {
     @State private var isLoading = false
     @State private var emailError: String?
     @State private var showingForgotPassword = false
+    @State private var showingResetSuccessAlert = false
+    @State private var resetEmail = ""
+    @State private var showPasswordReset = false
+    @State private var passwordResetOTP = ""
     @FocusState private var focusedField: Field?
     
     // For first-time librarian login
@@ -149,19 +153,14 @@ struct LoginView: View {
                 .cornerRadius(12)
                 .disabled(!isFormValid || isLoading)
                 
+                // Forgot password and sign up links
                 if userRole == .librarian {
                     Button("Forgot Password?") {
-                        if !email.isEmpty && isEmailValid {
-                            // Send OTP and show OTP view first
-                            showingForgotPassword = true
-                            sendVerificationOTP()
-                            showingOTPView = true
-                        } else {
-                            errorMessage = "Please enter a valid email address first"
-                        }
+                        resetEmail = email // Pre-fill with current email if available
+                        showingForgotPassword = true
                     }
+                    .foregroundColor(Color.librarianColor)
                     .font(.subheadline)
-                    .foregroundStyle(Color.customButton)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
                 }
@@ -231,34 +230,42 @@ struct LoginView: View {
                 email: email,
                 otp: $otpCode,
                 onVerify: {
-                    if showingForgotPassword {
-                        // For forgot password flow
-                        verifyOTP()
-                    } else {
-                        // For normal login flow
-                        verifyOTP()
-                    }
+                    verifyOTP()
                 },
                 onCancel: {
                     showingOTPView = false
-                    if showingForgotPassword {
-                        showingForgotPassword = false
-                    }
+                    otpCode = ""
                 }
             )
         }
         .sheet(isPresented: $showingForgotPassword) {
+            PasswordResetRequestView(
+                email: $resetEmail,
+                passwordResetOTP: $passwordResetOTP,
+                onRequestReset: handleForgotPassword,
+                onVerifyOTP: {
+                    // When OTP is verified, close this sheet and show password reset sheet
+                    showingForgotPassword = false
+                    // Small delay to ensure smooth transition between sheets
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showPasswordReset = true
+                    }
+                }
+            )
+        }
+        .sheet(isPresented: $showPasswordReset) {
             PasswordResetView(
                 newPassword: $newPassword,
                 confirmPassword: $confirmPassword,
                 isNewPasswordVisible: $isNewPasswordVisible,
                 email: email,
                 title: "Reset Password",
-                message: "Please enter a new password for your account",
+                message: "Please enter your new password",
                 buttonTitle: "Reset Password",
                 onSave: {
+                    // Validation
                     if newPassword.isEmpty || confirmPassword.isEmpty {
-                        errorMessage = "Passwords cannot be empty"
+                        errorMessage = "Please enter a new password"
                         return
                     }
                     
@@ -270,17 +277,16 @@ struct LoginView: View {
                     // Update password in Supabase
                     Task {
                         do {
-                            let userData: [String: String] = ["password": newPassword]
                             try await SupabaseManager.shared.client
                                 .from("Users")
-                                .update(userData)
-                                .eq("email", value: email)
+                                .update(["password": newPassword])
+                                .eq("email", value: resetEmail)
                                 .execute()
                             
                             DispatchQueue.main.async {
-                                showingForgotPassword = false
-                                errorMessage = "Password has been reset successfully. Please login with your new password."
-                                password = ""
+                                showPasswordReset = false
+                                password = newPassword
+                                showingResetSuccessAlert = true
                             }
                         } catch {
                             DispatchQueue.main.async {
@@ -290,12 +296,24 @@ struct LoginView: View {
                     }
                 },
                 onCancel: {
-                    showingForgotPassword = false
+                    showPasswordReset = false
                 }
             )
         }
+        .alert("Success", isPresented: $showingResetSuccessAlert) {
+            Button("OK") {
+                // Clear any remaining state
+                password = ""
+                newPassword = ""
+                confirmPassword = ""
+                otpCode = ""
+            }
+        } message: {
+            Text("Password has been reset successfully. Please login with your new password")
+        }
         .onAppear {
             focusedField = .email
+            otpCode = ""
         }
     }
     
@@ -415,6 +433,25 @@ struct LoginView: View {
             }
         } else {
             errorMessage = "Invalid verification code"
+        }
+    }
+    
+    private func handleForgotPassword() {
+        if !resetEmail.isEmpty {
+            // Send password reset OTP email
+            Task {
+                let (sent, resetCode) = await EmailService.shared.sendPasswordResetOTP(to: resetEmail)
+                
+                DispatchQueue.main.async {
+                    if sent {
+                        print("Password reset OTP sent: \(resetCode)")
+                        // Don't dismiss the sheet here - let the user enter the OTP
+                        self.email = self.resetEmail // Set the login email to match reset email
+                    } else {
+                        self.errorMessage = "Failed to send verification code"
+                    }
+                }
+            }
         }
     }
 }

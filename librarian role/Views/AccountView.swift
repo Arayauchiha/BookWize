@@ -121,6 +121,8 @@ struct ChangePasswordView: View {
     @State private var errorMessage = ""
     @State private var showingSuccess = false
     @State private var isNewPasswordVisible = false
+    @State private var isCurrentPasswordVisible = false
+    @State private var isConfirmPasswordVisible = false
     @FocusState private var focusedField: Field?
     
     // Password validation state
@@ -140,132 +142,189 @@ struct ChangePasswordView: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Current Password")) {
-                    ZStack(alignment: .trailing) {
-                        SecureField("Enter current password", text: $currentPassword)
-                            .focused($focusedField, equals: .currentPassword)
-                            .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(10)
-                    }
-                }
-                
-                Section(header: Text("New Password")) {
-                    ZStack(alignment: .trailing) {
-                        Group {
-                            if isNewPasswordVisible {
-                                TextField("Enter new password", text: $newPassword)
-                                    .textContentType(.newPassword)
-                                    .textInputAutocapitalization(.never)
-                                    .focused($focusedField, equals: .newPassword)
-                                    .onChange(of: newPassword) { newValue in
-                                        passwordValidation = ValidationUtils.validatePassword(newValue)
-                                    }
-                            } else {
-                                SecureField("Enter new password", text: $newPassword)
-                                    .textContentType(.newPassword)
-                                    .textInputAutocapitalization(.never)
-                                    .focused($focusedField, equals: .newPassword)
-                                    .onChange(of: newPassword) { newValue in
-                                        passwordValidation = ValidationUtils.validatePassword(newValue)
-                                    }
-                            }
-                        }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Current Password Section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Current Password")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.7))
                         
-                        Button(action: { isNewPasswordVisible.toggle() }) {
-                            Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
-                                .foregroundStyle(Color.secondary)
-                                .padding(.trailing, 12)
+                        ZStack(alignment: .trailing) {
+                            Group {
+                                if isCurrentPasswordVisible {
+                                    TextField("Enter current password", text: $currentPassword)
+                                        .textContentType(.password)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .currentPassword)
+                                } else {
+                                    SecureField("Enter current password", text: $currentPassword)
+                                        .textContentType(.password)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .currentPassword)
+                                }
+                            }
+                            .padding()
+                            .background(.white)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 2)
+                            
+                            Button(action: { isCurrentPasswordVisible.toggle() }) {
+                                Image(systemName: isCurrentPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundStyle(Color.blue.opacity(0.6))
+                                    .padding(.trailing, 12)
+                            }
                         }
                     }
                     
-                    // Password requirements
+                    // New Password Section
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Password Requirements")
-                            .font(.caption)
-                            .foregroundStyle(Color.secondary)
+                        Text("New Password")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.7))
                         
-                        HStack {
-                            Image(systemName: passwordValidation.hasMinLength ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(passwordValidation.hasMinLength ? .green : .gray)
-                            Text("At least 8 characters")
-                                .font(.caption)
-                                .foregroundStyle(Color.secondary)
-                        }
-                        
-                        HStack {
-                            Image(systemName: passwordValidation.hasUppercase ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(passwordValidation.hasUppercase ? .green : .gray)
-                            Text("One uppercase letter")
-                                .font(.caption)
-                                .foregroundStyle(Color.secondary)
-                        }
-                        
-                        HStack {
-                            Image(systemName: passwordValidation.hasLowercase ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(passwordValidation.hasLowercase ? .green : .gray)
-                            Text("One lowercase letter")
-                                .font(.caption)
-                                .foregroundStyle(Color.secondary)
-                        }
-                        
-                        HStack {
-                            Image(systemName: passwordValidation.hasNumber ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(passwordValidation.hasNumber ? .green : .gray)
-                            Text("One number")
-                                .font(.caption)
-                                .foregroundStyle(Color.secondary)
-                        }
-                        
-                        HStack {
-                            Image(systemName: passwordValidation.hasSpecialChar ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(passwordValidation.hasSpecialChar ? .green : .gray)
-                            Text("One special character (@$!%*?&)")
-                                .font(.caption)
-                                .foregroundStyle(Color.secondary)
-                        }
-                    }
-                    .padding(.top, 8)
-                }
-                
-                Section(header: Text("Confirm New Password")) {
-                    ZStack(alignment: .trailing) {
-                        Group {
-                            if isNewPasswordVisible {
-                                TextField("Confirm new password", text: $confirmPassword)
-                                    .textContentType(.newPassword)
-                                    .textInputAutocapitalization(.never)
-                                    .focused($focusedField, equals: .confirmPassword)
-                            } else {
-                                SecureField("Confirm new password", text: $confirmPassword)
-                                    .textContentType(.newPassword)
-                                    .textInputAutocapitalization(.never)
-                                    .focused($focusedField, equals: .confirmPassword)
+                        ZStack(alignment: .trailing) {
+                            Group {
+                                if isNewPasswordVisible {
+                                    TextField("Enter new password", text: $newPassword)
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .newPassword)
+                                        .onChange(of: newPassword) { newValue in
+                                            passwordValidation = ValidationUtils.validatePassword(newValue)
+                                        }
+                                } else {
+                                    SecureField("Enter new password", text: $newPassword)
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .newPassword)
+                                        .onChange(of: newPassword) { newValue in
+                                            passwordValidation = ValidationUtils.validatePassword(newValue)
+                                        }
+                                }
+                            }
+                            .padding()
+                            .background(.white)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 2)
+                            
+                            Button(action: { isNewPasswordVisible.toggle() }) {
+                                Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundStyle(Color.blue.opacity(0.6))
+                                    .padding(.trailing, 12)
                             }
                         }
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
                         
-                        Button(action: { isNewPasswordVisible.toggle() }) {
-                            Image(systemName: isNewPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                        // Password requirements
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Password Requirements")
+                                .font(.caption)
                                 .foregroundStyle(Color.secondary)
-                                .padding(.trailing, 12)
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasMinLength ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasMinLength ? .green : .gray)
+                                Text("At least 8 characters")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.secondary)
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasUppercase ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasUppercase ? .green : .gray)
+                                Text("One uppercase letter")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.secondary)
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasLowercase ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasLowercase ? .green : .gray)
+                                Text("One lowercase letter")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.secondary)
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasNumber ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasNumber ? .green : .gray)
+                                Text("One number")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.secondary)
+                            }
+                            
+                            HStack {
+                                Image(systemName: passwordValidation.hasSpecialChar ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(passwordValidation.hasSpecialChar ? .green : .gray)
+                                Text("One special character (@$!%*?&)")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.secondary)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                    
+                    // Confirm Password Section
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Confirm New Password")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.7))
+                        
+                        ZStack(alignment: .trailing) {
+                            Group {
+                                if isConfirmPasswordVisible {
+                                    TextField("Confirm new password", text: $confirmPassword)
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .confirmPassword)
+                                } else {
+                                    SecureField("Confirm new password", text: $confirmPassword)
+                                        .textContentType(.newPassword)
+                                        .textInputAutocapitalization(.never)
+                                        .focused($focusedField, equals: .confirmPassword)
+                                }
+                            }
+                            .padding()
+                            .background(.white)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 2)
+                            
+                            Button(action: { isConfirmPasswordVisible.toggle() }) {
+                                Image(systemName: isConfirmPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundStyle(Color.blue.opacity(0.6))
+                                    .padding(.trailing, 12)
+                            }
                         }
                     }
-                }
-                
-                Section {
-                    Button("Update Password") {
-                        updatePassword()
+                    
+                    // Update Password Button
+                    Button(action: updatePassword) {
+                        Text("Update Password")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(isFormValid ? Color.librarianColor : Color.gray)
+                            .foregroundStyle(.white)
+                            .cornerRadius(12)
                     }
-                    .disabled(currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword)
+                    .disabled(!isFormValid)
                 }
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
             }
+            .background(Color.customBackground)
             .navigationTitle("Change Password")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -291,6 +350,14 @@ struct ChangePasswordView: View {
                 focusedField = .currentPassword
             }
         }
+    }
+    
+    private var isFormValid: Bool {
+        !currentPassword.isEmpty && 
+        !newPassword.isEmpty && 
+        !confirmPassword.isEmpty && 
+        passwordValidation.isValid && 
+        newPassword == confirmPassword
     }
     
     private func updatePassword() {
