@@ -43,71 +43,77 @@ struct AccountView: View {
     }
     
     var body: some View {
-        NavigationView {
-            List {
-                Section {
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 60))
+        List {
+            // Profile Section
+            Section {
+                HStack(spacing: 16) {
+                    Image(systemName: "person.circle.fill")
+                        .font(.system(size: 60))
+                        .foregroundStyle(.blue)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(user?.name ?? "Librarian")
+                            .font(.headline)
+                        Text(user?.email ?? "Librarian@example.com")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
             
-                        
-                        VStack(alignment: .leading) {
-                            Text(user?.name ?? "Librarian")
-                                .font(.headline)
-                            Text(user?.email ?? "Librarian@example.com")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-                
-                Section("Account Settings") {
-                    Button {
-                        showingChangePassword = true
-                    } label: {
-                        Label("Change Password", systemImage: "lock.fill")
-                    }
-                    
-                    Button(role: .destructive) {
-                        showingLogoutAlert = true
-                    } label: {
-                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
-                }
-                
-                Section("About") {
+            // Account Settings Section
+            Section {
+                Button(action: {
+                    showingChangePassword = true
+                }) {
                     HStack {
-                        Text("Version")
+                        Label("Change Password", systemImage: "lock.fill")
+                            .foregroundStyle(.primary)
                         Spacer()
-                        Text("1.0.0")
-                            .foregroundColor(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.gray)
                     }
                 }
-            }
-            .navigationTitle("Account")
-            .sheet(isPresented: $showingChangePassword) {
-                ChangePasswordView()
-            }
-            .alert("Logout", isPresented: $showingLogoutAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Logout", role: .destructive) {
-                    // Reset login state
-                    isLoggedIn = false
-                    isLibrarianLoggedIn = false
-                    
-                    // Navigate to role selection screen
-                    NavigationUtil.popToRootView()
-                    let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-                    let window = windowScene?.windows.first
-                    window?.rootViewController = UIHostingController(rootView: ContentView())
+                
+                Button(role: .destructive, action: {
+                    showingLogoutAlert = true
+                }) {
+                    HStack {
+                        Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
+                        Spacer()
+                    }
                 }
-            } message: {
-                Text("Are you sure you want to logout?")
+            } header: {
+                Text("Account Settings")
+                    .textCase(.uppercase)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
-            .task {
-                await fetchMember()
+        }
+        .listStyle(.insetGrouped)
+        .sheet(isPresented: $showingChangePassword) {
+            ChangePasswordView()
+        }
+        .alert("Logout", isPresented: $showingLogoutAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Logout", role: .destructive) {
+                // Reset login state
+                isLoggedIn = false
+                isLibrarianLoggedIn = false
+                
+                // Navigate to role selection screen
+                NavigationUtil.popToRootView()
+                let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                let window = windowScene?.windows.first
+                window?.rootViewController = UIHostingController(rootView: ContentView())
             }
+        } message: {
+            Text("Are you sure you want to logout?")
+        }
+        .task {
+            await fetchMember()
         }
     }
 }
