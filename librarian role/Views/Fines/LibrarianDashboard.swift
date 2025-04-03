@@ -28,6 +28,7 @@ struct LibrarianDashboard: View {
                         icon: "book.circle.fill",
                         color: .green
                     )
+                    
                     DashboardCard(
                         title: "Members with Overdue Fines",
                         value: "\(dashboardManager.overdueMembersCount)",
@@ -43,56 +44,23 @@ struct LibrarianDashboard: View {
                     )
                 }
                 .padding(.horizontal)
-            }
-                    // Analytics Section
-            HStack(spacing: 16) {
-                if let mostPopularGenre = getPopularGenres().first {
-                    PopularGenreCard(
-                        title: "Popular Genres",
-                        genre: mostPopularGenre.0,
-                        color: .orange,
-                        count: 0
-                    )
-                    Group {
-                        Text("Analytics")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.top)
-                            .padding(.horizontal)
-                            .dynamicTypeSize(.small ... .accessibility3)
-                        
-                        // Debug text view - will show in UI
-                        let popularGenres = getPopularGenres()
-//                        Text("Debug: \(popularGenres.count) popular genres")
-//                            .font(.caption)
-//                            .foregroundColor(.gray)
-//                            .padding(4)
-//                            .background(Color.yellow.opacity(0.2))
-//                            .cornerRadius(4)
-//                            .padding(.horizontal)
-                        
-                        HStack(spacing: 16) {
-                            if let mostPopularGenre = popularGenres.first {
-                                PopularGenreCard(
-                                    title: "Popular Genres",
-                                    genre: mostPopularGenre.0,
-                                    color: .orange,
-                                    count: mostPopularGenre.1
-                                )
-                            } else {
-                                // Placeholder for when no popular genres are available
-                                PopularGenreCard(
-                                    title: "Popular Genres",
-                                    genre: "No data",
-                                    color: .gray,
-                                    count: 0
-                                )
-                            }
-                            
-                            GenreStatsCard(
-                                title: "Genre-wise Issued",
-                                genres: getGenreWiseIssues(),
-                                color: .teal
+                
+                // Analytics Section
+                Group {
+                    Text("Analytics")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .padding(.top)
+                        .padding(.horizontal)
+                        .dynamicTypeSize(.small ... .accessibility3)
+                    
+                    HStack(spacing: 16) {
+                        if let mostPopularGenre = getPopularGenres().first {
+                            PopularGenreCard(
+                                title: "Popular Genres",
+                                genre: mostPopularGenre.0,
+                                color: .orange,
+                                count: mostPopularGenre.1
                             )
                         }
                         
@@ -153,13 +121,7 @@ struct LibrarianDashboard: View {
         .onAppear {
             Task {
                 await dashboardManager.fetchDashboardData()
-                // Debug print
-                print("Debug - Popular Genres after refresh: \(dashboardManager.getPopularGenres())")
             }
-//            .onAppear {
-//                // Debug print on appear
-//                print("Debug - Popular Genres on appear: \(dashboardManager.getPopularGenres())")
-//            }
         }
     }
     
