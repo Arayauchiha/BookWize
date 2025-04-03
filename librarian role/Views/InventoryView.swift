@@ -338,48 +338,6 @@ struct InventoryView: View {
         }
     }
     
-//    struct AddBookView: View {
-//        @Environment(\.dismiss) var dismiss
-//        @ObservedObject var inventoryManager: InventoryManager
-//        
-//        @State private var isbn = ""
-//        @State private var title = ""
-//        @State private var author = ""
-//        @State private var publisher = ""
-//        @State private var quantity = 1
-//        
-//        var body: some View {
-//            NavigationView {
-//                Form {
-//                    Section(header: Text("Book Details")) {
-//                        TextField("ISBN", text: $isbn)
-//                            .keyboardType(.numberPad)
-//                        TextField("Title", text: $title)
-//                        TextField("Author", text: $author)
-//                        TextField("Publisher", text: $publisher)
-//                        Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
-//                    }
-//                }
-//                .navigationTitle("Add New Book")
-//                .navigationBarItems(
-//                    leading: Button("Cancel") { dismiss() },
-//                    trailing: Button("Save") {
-//                        let newBook = Book(
-//                            isbn: isbn,
-//                            title: title,
-//                            author: author,
-//                            publisher: publisher,
-//                            quantity: quantity
-//                        )
-//                        inventoryManager.addBook(newBook)
-//                        dismiss()
-//                    }
-//                    .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
-//                )
-//            }
-//        }
-//    }
-    
     struct AddBookView: View {
         @Environment(\.dismiss) var dismiss
         @ObservedObject var inventoryManager: InventoryManager
@@ -389,11 +347,19 @@ struct InventoryView: View {
         @State private var author = ""
         @State private var publisher = ""
         @State private var quantity = 1
+        @State private var publishedDate = ""
+        @State private var description = ""
+        @State private var pageCount = ""
+        @State private var genre = ""
         @State private var bookImage: UIImage?
         @State private var showImagePicker = false
         @State private var showCamera = false
         @State private var selectedSource: UIImagePickerController.SourceType = .photoLibrary
-        @State private var isUploading = false // Add loading state
+        @State private var isUploading = false
+        @State private var isLoading = false
+        @State private var errorMessage: String?
+        @State private var showError = false
+        @State private var imageURL: String?
         
         var body: some View {
             NavigationView {
@@ -403,12 +369,29 @@ struct InventoryView: View {
                             .keyboardType(.numberPad)
                             .onChange(of: isbn) { newValue in
                                 // Only allow numeric input
-                                isbn = newValue.filter { $0.isNumber }
+                                let filteredValue = newValue.filter { $0.isNumber }
+                                if filteredValue != newValue {
+                                    isbn = filteredValue
+                                }
+                                
+                                // If ISBN is valid length, fetch book details
+                                if filteredValue.count >= 10 && filteredValue.count <= 13 {
+                                    fetchBookDetailsByISBN(filteredValue)
+                                }
                             }
                         TextField("Title", text: $title)
                         TextField("Author", text: $author)
                         TextField("Publisher", text: $publisher)
                         Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+                    }
+                    
+                    Section(header: Text("Additional Information")) {
+                        TextField("Published Date", text: $publishedDate)
+                        TextField("Description", text: $description, axis: .vertical)
+                            .lineLimit(3...6)
+                        TextField("Page Count", text: $pageCount)
+                            .keyboardType(.numberPad)
+                        TextField("Genre", text: $genre)
                     }
                     
                     Section(header: Text("Book Cover")) {
@@ -443,7 +426,7 @@ struct InventoryView: View {
                     leading: Button("Cancel") { dismiss() },
                     trailing:
                         Group {
-                            if isUploading {
+                            if isUploading || isLoading {
                                 ProgressView()
                             } else {
                                 Button("Save") {
@@ -459,28 +442,94 @@ struct InventoryView: View {
                 .fullScreenCover(isPresented: $showCamera) {
                     ImagePicker(image: $bookImage, sourceType: .camera)
                 }
+                .alert("Error", isPresented: $showError) {
+                    Button("OK") { }
+                } message: {
+                    Text(errorMessage ?? "An unknown error occurred")
+                }
+                .overlay {
+                    if isLoading {
+                        ProgressView("Fetching book details...")
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(8)
+                            .shadow(radius: 10)
+                    }
+                }
+            }
+        }
+        
+        private func fetchBookDetailsByISBN(_ isbn: String) {
+            isLoading = true
+            errorMessage = nil
+            
+            Task {
+                do {
+                    let book = try await BookService.shared.fetchBookDetails(isbn: isbn)
+                    
+                    // If an image URL exists, download the cover image
+                    if let imageURLString = book.imageURL, let url = URL(string: imageURLString) {
+                        await downloadBookImage(from: url)
+                    }
+                    
+                    await MainActor.run {
+                        self.title = book.title
+                        self.author = book.author
+                        self.publisher = book.publisher
+                        self.publishedDate = book.publishedDate ?? ""
+                        self.description = book.description ?? ""
+                        self.pageCount = book.pageCount.map { String($0) } ?? ""
+                        self.genre = book.categories?.first ?? ""
+                        self.imageURL = book.imageURL
+                        isLoading = false
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Could not find book details. Please enter manually."
+                        showError = true
+                        isLoading = false
+                    }
+                }
+            }
+        }
+        
+        private func downloadBookImage(from url: URL) async {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                if let image = UIImage(data: data) {
+                    await MainActor.run {
+                        self.bookImage = image
+                    }
+                }
+            } catch {
+                print("Failed to download image: \(error)")
             }
         }
         
         private func saveBook() {
-                isUploading = true
-                
-                let newBook = Book(
-                    isbn: isbn,
-                    title: title,
-                    author: author,
-                    publisher: publisher,
-                    quantity: quantity
-                )
-                
-                // Call the modified addBook method with the image
-                inventoryManager.addBook(newBook, withImage: bookImage)
-                
-                // We'll dismiss the view right away, the upload will continue in the background
-                isUploading = false
-                dismiss()
-            }
+            isUploading = true
+            
+            let newBook = Book(
+                isbn: isbn,
+                title: title,
+                author: author,
+                publisher: publisher,
+                quantity: quantity,
+                publishedDate: publishedDate.isEmpty ? nil : publishedDate,
+                description: description.isEmpty ? nil : description,
+                pageCount: Int(pageCount),
+                categories: genre.isEmpty ? nil : [genre],
+                imageURL: imageURL
+            )
+            
+            // Call the modified addBook method with the image
+            inventoryManager.addBook(newBook, withImage: bookImage)
+            
+            // We'll dismiss the view right away, the upload will continue in the background
+            isUploading = false
+            dismiss()
         }
+    }
 
     // MARK: - Image Picker
     struct ImagePicker: UIViewControllerRepresentable {
