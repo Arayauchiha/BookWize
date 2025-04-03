@@ -10,99 +10,135 @@ struct ReadingProgressCard: View {
     
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 15) {
-                HStack(spacing: 20) {
-                    // Progress Ring
-                    ZStack {
-                        Circle()
-                            .stroke(lineWidth: 10)
-                            .opacity(0.3)
-                            .foregroundColor(Color.blue)
+            VStack(spacing: 18) {
+                // Progress Ring centered
+                ZStack {
+                    Circle()
+                        .stroke(lineWidth: 10)
+                        .opacity(0.3)
+                        .foregroundColor(Color.blue)
+                    
+                    Circle()
+                        .trim(from: 0.0, to: monthlyGoal > 0 ? CGFloat(min(Double(completedBooks) / Double(monthlyGoal), 1.0)) : 0)
+                        .stroke(style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round))
+                        .foregroundColor(Color.blue)
+                        .rotationEffect(Angle(degrees: 270.0))
+                        .animation(.linear, value: completedBooks)
+                    
+                    VStack {
+                        Text("\(completedBooks)/\(monthlyGoal)")
+                            .font(.title2)
+                            .fontWeight(.bold)
                         
-                        Circle()
-                            .trim(from: 0.0, to: monthlyGoal > 0 ? CGFloat(min(Double(completedBooks) / Double(monthlyGoal), 1.0)) : 0)
-                            .stroke(style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round))
-                            .foregroundColor(Color.blue)
-                            .rotationEffect(Angle(degrees: 270.0))
-                            .animation(.linear, value: completedBooks)
+                        Text("Books")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(width: 140, height: 140)
+                .padding(.top, 10)
+                
+                // Statistics in 2x2 grid below the ring with more prominence
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 20) {
+                    // Completed books
+                    VStack(alignment: .center, spacing: 6) {
+                        Text("\(completedBooks)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
                         
-                        VStack {
-                            Text("\(completedBooks)/\(monthlyGoal)")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            
-                            Text("Books")
-                                .font(.caption)
+                        HStack(alignment: .center, spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.subheadline)
+                            Text("Completed")
+                                .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
                     }
-                    .frame(width: 140, height: 140)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.green.opacity(0.08))
+                    .cornerRadius(8)
                     
-                    // Statistics
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .center) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .frame(width: 20)
-                            Text("\(completedBooks) completed")
-                                .font(.subheadline)
-                        }
+                    // Borrowed books
+                    VStack(alignment: .center, spacing: 6) {
+                        Text("\(issuedBooks)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
                         
-                        HStack(alignment: .center) {
+                        HStack(alignment: .center, spacing: 6) {
                             Image(systemName: "book.fill")
                                 .foregroundColor(.blue)
-                                .frame(width: 20)
-                            Text("\(issuedBooks) borrowed")
                                 .font(.subheadline)
-                        }
-                        
-                        HStack(alignment: .center) {
-                            Image(systemName: "target")
-                                .foregroundColor(.orange)
-                                .frame(width: 20)
-                            Text("Goal: \(monthlyGoal) books")
+                            Text("Borrowed")
                                 .font(.subheadline)
-                        }
-                        
-                        if monthlyGoal > 0 {
-                            HStack(alignment: .center) {
-                                Image(systemName: completedBooks >= monthlyGoal ? "star.fill" : "hourglass")
-                                    .foregroundColor(completedBooks >= monthlyGoal ? .yellow : .gray)
-                                    .frame(width: 20)
-                                Text(completedBooks >= monthlyGoal 
-                                     ? "Goal achieved!" 
-                                     : "\(monthlyGoal - completedBooks) more to go!")
-                                    .font(.subheadline)
-                                    .foregroundColor(completedBooks >= monthlyGoal ? .primary : .secondary)
-                            }
+                                .foregroundColor(.secondary)
                         }
                     }
-                    .padding(.leading, 10)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue.opacity(0.08))
+                    .cornerRadius(8)
                     
-                    Spacer() // Add this spacer to stretch content horizontally
+                    // Goal books
+                    VStack(alignment: .center, spacing: 6) {
+                        Text("\(monthlyGoal)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.orange)
+                        
+                        HStack(alignment: .center, spacing: 6) {
+                            Image(systemName: "target")
+                                .foregroundColor(.orange)
+                                .font(.subheadline)
+                            Text("Goal")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(Color.orange.opacity(0.08))
+                    .cornerRadius(8)
+                    
+                    // Remaining or achieved
+                    VStack(alignment: .center, spacing: 6) {
+                        if completedBooks >= monthlyGoal {
+                            Text("✓")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.yellow)
+                        } else {
+                            Text("\(monthlyGoal - completedBooks)")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        HStack(alignment: .center, spacing: 6) {
+                            Image(systemName: completedBooks >= monthlyGoal ? "star.fill" : "hourglass")
+                                .foregroundColor(completedBooks >= monthlyGoal ? .yellow : .gray)
+                                .font(.subheadline)
+                            Text(completedBooks >= monthlyGoal ? "Achieved" : "Remaining")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity)
+                    .background(completedBooks >= monthlyGoal ? Color.yellow.opacity(0.08) : Color.gray.opacity(0.08))
+                    .cornerRadius(8)
                 }
-                .padding(.vertical, 10)
-                
-                // Status message
-                if monthlyGoal > 0 {
-                    Text(completedBooks > monthlyGoal 
-                         ? "Wow! You've surpassed your monthly goal by \(completedBooks - monthlyGoal) \(completedBooks - monthlyGoal == 1 ? "book" : "books")!" 
-                         : completedBooks == monthlyGoal 
-                         ? "Amazing! You've reached your monthly goal! Keep reading to surpass it!" 
-                         : "Keep reading to reach your monthly goal!")
-                        .font(.subheadline)
-                        .fontWeight(completedBooks >= monthlyGoal ? .bold : .regular)
-                        .foregroundColor(completedBooks >= monthlyGoal ? .primary : .secondary)
-                        .padding(.top, 5)
-                } else {
-                    Text("Set a monthly reading goal to track your progress")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .padding(.top, 5)
-                }
+                .padding(.horizontal)
+                .padding(.bottom, 10)
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
             .background(Color(.systemBackground))
             .cornerRadius(12)
             .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
