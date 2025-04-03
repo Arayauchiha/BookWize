@@ -373,7 +373,7 @@ class OverdueFinesManager: ObservableObject {
     @Published var errorMessage: String?
     
     var totalFineAmount: Double {
-        overdueFines.reduce(0) { $0 + $1.fineAmount }
+        overdueFines.filter { $0.returnDate == nil }.reduce(0) { $0 + $1.fineAmount }
     }
     
     var fineCount: Int {
@@ -572,6 +572,7 @@ struct DashboardView: View {
     @State private var showingBookManagement = false
     @State private var currentIndex = 0
     @StateObject private var finesManager = OverdueFinesManager()
+    @State private var showingHistory = false
     
     var mostUrgentBook: BorrowedBook? {
         // First, check for overdue books
@@ -678,7 +679,7 @@ struct DashboardView: View {
                             NavigationLink(destination: BookManagementView()
                                 .environmentObject(booksManager)) {
                                 HStack {
-                                    Text("Your Reads")
+                                    Text("Book Log")
                                         .font(.title2)
                                         .fontWeight(.bold)
                                     Spacer()
@@ -722,7 +723,7 @@ struct DashboardView: View {
                             NavigationLink(destination: OverdueFinesView()) {
                                 HStack {
                                     Text("Overdue Books")
-                                        .font(.title2)
+                                        .font(.title3)
                                         .fontWeight(.bold)
                                     Spacer()
                                     Image(systemName: "chevron.right")
@@ -733,14 +734,13 @@ struct DashboardView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             
-                            NavigationLink(destination: OverdueFinesView()) {
-                                OverdueFinesCard(
-                                    totalAmount: finesManager.totalFineAmount,
-                                    fineCount: finesManager.fineCount
-                                )
-                                .padding(.horizontal)
-                            }
-                            .buttonStyle(PlainButtonStyle())
+                            // Display the card without NavigationLink - make it non-clickable
+                            OverdueFinesCard(
+                                totalAmount: finesManager.totalFineAmount,
+                                fineCount: finesManager.fineCount
+                            )
+                            .padding(.horizontal)
+                            .padding(.top, 4)
                         }
                     }
                 }
@@ -1080,7 +1080,7 @@ struct BookManagementView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
-        .navigationTitle("Your Reads")
+        .navigationTitle("Book Log")
         .navigationBarTitleDisplayMode(.inline)
     }
     
@@ -1728,6 +1728,15 @@ struct ReturnedBookRow: View {
 
 struct OverdueFinesView: View {
     @StateObject private var finesManager = OverdueFinesManager()
+    @State private var showingHistory = false
+    
+    var nonReturnedOverdueFines: [OverdueFine] {
+        finesManager.overdueFines.filter { $0.returnDate == nil }
+    }
+    
+    var returnedOverdueFines: [OverdueFine] {
+        finesManager.overdueFines.filter { $0.returnDate != nil }
+    }
     
     var body: some View {
         ScrollView {
@@ -1738,30 +1747,30 @@ struct OverdueFinesView: View {
                         .padding()
                 } else if finesManager.overdueFines.isEmpty {
                     // Empty state
-                    VStack(spacing: 12) {
+                    VStack(spacing: 16) {
                         ZStack {
                             Circle()
-                                .fill(Color.green.opacity(0.1))
-                                .frame(width: 100, height: 100)
+                                .fill(Color.green.opacity(0.12))
+                                .frame(width: 90, height: 90)
                             
                             Image(systemName: "checkmark.circle")
-                                .font(.system(size: 50))
+                                .font(.system(size: 40))
                                 .foregroundColor(.green)
                         }
                         .padding(.top, 20)
                         
-                        Text("No overdue books")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                            .padding(.top, 10)
-                        
-                        Text("You don't have any overdue books at the moment.")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                            .padding(.bottom, 10)
+                        VStack(spacing: 8) {
+                            Text("No overdue books")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            
+                            Text("You don't have any overdue books at the moment.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
                         
                         Button(action: {
                             Task {
@@ -1770,17 +1779,95 @@ struct OverdueFinesView: View {
                         }) {
                             Label("Refresh", systemImage: "arrow.clockwise")
                                 .padding(.vertical, 8)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, 20)
                                 .background(Color.blue.opacity(0.1))
                                 .foregroundColor(.blue)
                                 .cornerRadius(20)
                         }
+                        .padding(.top, 4)
+                        .padding(.bottom, 20)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(LinearGradient(
+                                gradient: Gradient(
+                                    colors: [
+                                        Color(.systemBackground),
+                                        Color.green.opacity(0.03)
+                                    ]
+                                ),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(Color.green.opacity(0.1), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+                } else if nonReturnedOverdueFines.isEmpty && !returnedOverdueFines.isEmpty {
+                    // When there are only returned books
+                    VStack(spacing: 16) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.green.opacity(0.12))
+                                .frame(width: 90, height: 90)
+                            
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 40))
+                                .foregroundColor(.green)
+                        }
+                        .padding(.top, 20)
+                        
+                        VStack(spacing: 8) {
+                            Text("No current overdue books")
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            
+                            Text("You don't have any overdue books at the moment, but you can check your history.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        
+                        Button(action: {
+                            showingHistory = true
+                        }) {
+                            Label("View History", systemImage: "clock.arrow.circlepath")
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 20)
+                                .background(Color.blue.opacity(0.1))
+                                .foregroundColor(.blue)
+                                .cornerRadius(20)
+                        }
+                        .padding(.top, 4)
+                        .padding(.bottom, 20)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(LinearGradient(
+                                gradient: Gradient(
+                                    colors: [
+                                        Color(.systemBackground),
+                                        Color.green.opacity(0.03)
+                                    ]
+                                ),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(Color.green.opacity(0.1), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
                 } else {
-                    // List of books with fines
-                    ForEach(finesManager.overdueFines) { fine in
+                    // List of books with fines (not returned only)
+                    ForEach(nonReturnedOverdueFines) { fine in
                         FineDetailRow(fine: fine)
                     }
                     .padding(.horizontal)
@@ -1791,6 +1878,14 @@ struct OverdueFinesView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Overdue Books")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarItems(trailing: 
+            Button(action: {
+                showingHistory = true
+            }) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundColor(.blue)
+            }
+        )
         .refreshable {
             await finesManager.refreshFines()
         }
@@ -1799,6 +1894,159 @@ struct OverdueFinesView: View {
             FinePolicyManager.shared.loadFinePolicy()
             await finesManager.fetchOverdueFines()
         }
+        .sheet(isPresented: $showingHistory) {
+            ReturnedBooksHistoryView(returnedBooks: returnedOverdueFines)
+        }
+    }
+}
+
+// New view for returned books history
+struct ReturnedBooksHistoryView: View {
+    let returnedBooks: [OverdueFine]
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 16) {
+                    if returnedBooks.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 60))
+                                .foregroundColor(.secondary)
+                                .padding(.top, 40)
+                            
+                            Text("No history yet")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Text("You don't have any books that were returned late.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                                .padding(.bottom, 40)
+                        }
+                    } else {
+                        ForEach(returnedBooks) { fine in
+                            ReturnedBookHistoryRow(fine: fine)
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.vertical)
+            }
+            .navigationBarTitle("Return History", displayMode: .inline)
+            .navigationBarItems(trailing: Button("Done") {
+                dismiss()
+            })
+            .background(Color(.systemGroupedBackground))
+        }
+    }
+}
+
+// Row for returned books history
+struct ReturnedBookHistoryRow: View {
+    let fine: OverdueFine
+    
+    var daysOverdue: Int {
+        if let returnDate = fine.returnDate {
+            // If returned late, calculate exact days
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.day], from: fine.dueDate, to: returnDate)
+            // Count at least 1 day if it was returned late at all
+            return max(1, components.day ?? 0)
+        }
+        return 0
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Book title and author
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(fine.bookTitle)
+                        .font(.headline)
+                        .lineLimit(1)
+                    
+                    Text(fine.bookAuthor)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Fine Amount
+                Text("$\(fine.fineAmount, specifier: "%.2f")")
+                    .font(.headline)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.gray.opacity(0.2))
+                    .foregroundColor(.secondary)
+                    .cornerRadius(8)
+            }
+            
+            Divider()
+            
+            // Dates and status
+            HStack {
+                // Due date
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        Text("Due Date")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Text(fine.dueDate.formatted(date: .abbreviated, time: .omitted))
+                        .font(.subheadline)
+                }
+                
+                Spacer()
+                
+                // Return date
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.square")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text("Returned On")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Text(fine.returnDate?.formatted(date: .abbreviated, time: .omitted) ?? "")
+                        .font(.subheadline)
+                }
+            }
+            
+            // Status - always returned late
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("Returned \(daysOverdue) day\(daysOverdue == 1 ? "" : "s") late")
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
+                Text("Paid")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.gray.opacity(0.2))
+                    .foregroundColor(.gray)
+                    .cornerRadius(10)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
     }
 }
 
@@ -2013,7 +2261,7 @@ struct OverdueFinesCard: View {
                 } else {
                     Text("You have no overdue books!")
                         .font(.subheadline)
-                        .foregroundColor(.green)
+                        .foregroundColor(.primary)
                 }
                 
                 Spacer()
