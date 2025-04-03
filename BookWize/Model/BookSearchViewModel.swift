@@ -76,13 +76,20 @@ class BookSearchViewModel: ObservableObject {
         }
         
         do {
+            print("Fetching books from Supabase...")
+            
+            // Add a cache-busting query parameter
+            let timestamp = Int(Date().timeIntervalSince1970)
             let readableBooks: [Book]? = try await SupabaseManager.shared.client
                 .from("Books")
                 .select("*")
+                .order("id")
                 .execute()
                 .value
             
-            DispatchQueue.main.async {
+            print("Fetched \(readableBooks?.count ?? 0) books from Supabase")
+            
+            await MainActor.run {
                 self.isLoading = false
                 
                 guard let readableBooks else {
@@ -90,14 +97,18 @@ class BookSearchViewModel: ObservableObject {
                     return
                 }
                 
+                // Clear and update with fresh data
                 self.books = readableBooks
+                print("Updated books array with \(self.books.count) books")
+                
+                // Reset and regenerate all derived collections
                 self.setupInitialData()
                 
                 // Post notification that book data was updated
                 NotificationCenter.default.post(name: Notification.Name("BookDataUpdated"), object: nil)
             }
         } catch {
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.isLoading = false
                 print("Error fetching books: \(error)")
                 self.errorMessage = "Failed to load books. Please try again."
@@ -215,7 +226,62 @@ class BookSearchViewModel: ObservableObject {
     
     // Add a new public method for explicit data refreshing
     public func refreshData() async {
-        await fetchBooks()
-        await fetchMemberGenres()
+        print("BookSearchViewModel: Starting data refresh from Supabase...")
+        
+        // Set loading state without clearing the UI
+        await MainActor.run {
+            self.isLoading = true
+        }
+        
+        // Fetch fresh data from Supabase
+        do {
+            print("Refreshing books data from Supabase...")
+            
+            // Add cache-busting timestamp to force fresh data
+            let timestamp = Int(Date().timeIntervalSince1970)
+            let readableBooks: [Book]? = try await SupabaseManager.shared.client
+                .from("Books")
+                .select("*")
+                .order("id")
+                .execute()
+                .value
+            
+            print("Refreshed \(readableBooks?.count ?? 0) books from Supabase")
+            
+            // Fetch member genres concurrently
+            let genresTask = Task {
+                await fetchMemberGenres()
+            }
+            
+            // Update the UI on the main thread
+            await MainActor.run {
+                guard let readableBooks else {
+                    print("No books found during refresh")
+                    self.isLoading = false
+                    return
+                }
+                
+                // Update the main books collection
+                self.books = readableBooks
+                
+                // Regenerate all sections by calling setupInitialData
+                self.setupInitialData()
+                
+                self.isLoading = false
+                
+                // Post notification that data was updated
+                NotificationCenter.default.post(name: Notification.Name("BookDataUpdated"), object: nil)
+            }
+            
+            // Wait for the genres task to complete
+            _ = await genresTask.value
+            
+        } catch {
+            await MainActor.run {
+                self.isLoading = false
+                print("Error refreshing books: \(error)")
+                self.errorMessage = "Failed to refresh books. Please try again."
+            }
+        }
     }
 }
