@@ -183,10 +183,10 @@ struct ReturnedBookCard: View {
             
             HStack {
                 VStack(alignment: .leading) {
-                    Text("Issue Date")
+                    Text("Due Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(book.issue_date, style: .date)
+                    Text(book.return_date!, style: .date)
                         .font(.subheadline)
                 }
                 
@@ -205,9 +205,8 @@ struct ReturnedBookCard: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.customCardBackground)
         .cornerRadius(12)
-        .shadow(radius: 2)
         .task {
             await fetchBookCover()
         }

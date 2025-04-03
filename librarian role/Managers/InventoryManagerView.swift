@@ -6,40 +6,76 @@ struct InventoryManagerView: View {
     @State private var isLoggedIn = true
     @State private var showingLoginSheet = false
     @State private var showingLogoutAlert = false
+    @State private var showProfile = false
+    
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+        UITabBar.appearance().standardAppearance = appearance
+    }
     
     var body: some View {
-        NavigationView {
+        Group {
             if isLoggedIn {
-                // Main librarian interface
                 TabView {
-                    InventoryView()
-                        .tabItem {
-                            Label("Inventory", systemImage: "books.vertical.fill")
-                        }
-                    
-                    BookCirculationView()
-                        .tabItem {
-                            Label("Circulation", systemImage: "arrow.left.arrow.right.circle.fill")
-                        }
-                    
-                    MembersListView()
-                        .tabItem {
-                            Label("Members", systemImage: "person.2.fill")
-                        }
-                    
-                    if SHOW_FINES {
+                    // Dashboard Tab
+                    NavigationView {
                         LibrarianDashboard()
-                            .tabItem {
-                                Label("Dashboard", systemImage: "dollarsign.circle.fill")
-                            }
+                            .navigationBarItems(trailing: profileButton)
+                            .navigationTitle("Dashboard")
+                            .navigationBarTitleDisplayMode(.large)
                     }
+                    .tabItem {
+                        Label("Dashboard", systemImage: "chart.bar.fill")
+                    }
+                    .tag(0)
                     
-                    AccountView(isLoggedIn: $isLoggedIn)
-                        .tabItem {
-                            Label("Account", systemImage: "person.circle.fill")
-                        }
+                    // Inventory Tab
+                    NavigationView {
+                        InventoryView()
+                            .navigationBarItems(trailing: profileButton)
+                            .navigationTitle("Inventory")
+                            .navigationBarTitleDisplayMode(.large)
+                    }
+                    .tabItem {
+                        Label("Inventory", systemImage: "books.vertical.fill")
+                    }
+                    .tag(1)
+                    
+                    // Circulation Tab
+                    NavigationView {
+                        BookCirculationView()
+                            .navigationBarItems(trailing: profileButton)
+                            .navigationTitle("Circulation")
+                            .navigationBarTitleDisplayMode(.large)
+                    }
+                    .tabItem {
+                        Label("Circulation", systemImage: "arrow.left.arrow.right.circle.fill")
+                    }
+                    .tag(2)
+                    
+                    // Members Tab
+                    NavigationView {
+                        MembersListView()
+                            .navigationBarItems(trailing: profileButton)
+                            .navigationTitle("Members")
+                            .navigationBarTitleDisplayMode(.large)
+                    }
+                    .tabItem {
+                        Label("Members", systemImage: "person.2.fill")
+                    }
+                    .tag(3)
                 }
-                .tint(AppTheme.primaryColor)
+                .tint(.blue)
+                .sheet(isPresented: $showProfile) {
+                    NavigationView {
+                        AccountView(isLoggedIn: $isLoggedIn)
+                            .navigationTitle("Profile")
+                            .navigationBarTitleDisplayMode(.inline)
+                    }
+                    .presentationDragIndicator(.visible)
+                }
             } else {
                 // Login screen
                 ZStack {
@@ -86,6 +122,14 @@ struct InventoryManagerView: View {
             Text("Are you sure you want to logout?")
         }
     }
+    
+    private var profileButton: some View {
+        Button(action: { showProfile = true }) {
+            Image(systemName: "person.circle")
+                .font(.system(size: 22))
+                .foregroundColor(Color.customButton)
+        }
+    }
 }
 
 // Color Extension for Hex Colors
@@ -115,7 +159,6 @@ extension Color {
     }
 }
 
-
 struct UserManagementView: View {
     var body: some View {
         Text("User Management")
@@ -123,5 +166,5 @@ struct UserManagementView: View {
 }
 
 #Preview {
-    ContentView()
+    InventoryManagerView()
 }
