@@ -16,39 +16,124 @@ class InventoryManager: ObservableObject {
     }
     
     // MARK: - Book Management
+//    func addBook(_ book: Book) {
+//        if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
+//            // Update existing book locally
+//            books[index].quantity += book.quantity
+//            books[index].availableQuantity += book.quantity
+//            books[index].lastModified = Date()
+//            
+//            // Update in Supabase
+//            Task {
+//                do {
+//                    try await SupabaseManager.shared.client
+//                        .from("Books")
+//                        .update(books[index])
+//                        .eq("isbn", value: book.isbn)
+//                        .execute()
+//                    saveBooks()
+//                } catch {
+//                    print("Error updating book in Supabase: \(error)")
+//                }
+//            }
+//        } else {
+//            // Add new book
+//            books.append(book)
+//            
+//            // Insert in Supabase
+//            Task {
+//                do {
+//                    try await SupabaseManager.shared.client
+//                        .from("Books")
+//                        .insert(book)
+//                        .execute()
+//                    saveBooks()
+//                } catch {
+//                    print("Error inserting book in Supabase: \(error)")
+//                }
+//            }
+//        }
+//    }
     
+    // Add this method to your InventoryManager class
+    func uploadBookImage(_ image: UIImage, for isbn: String) async throws -> String {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            throw NSError(domain: "ImageConversionError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
+        }
+        
+        // Create a unique filename with ISBN and timestamp
+        let fileName = "\(isbn)_\(Int(Date().timeIntervalSince1970)).jpg"
+        
+        // Upload to Supabase Storage
+        let uploadResult = try await SupabaseManager.shared.client.storage
+            .from("book-covers") // Replace with your actual bucket name
+            .upload(
+                path: fileName,
+                file: imageData,
+                options: .init(contentType: "image/jpeg")
+            )
+        
+        // Generate public URL
+        let publicURL = try await SupabaseManager.shared.client.storage
+            .from("book-covers") // Replace with your actual bucket name
+            .getPublicURL(path: fileName)
+        
+        // Convert URL to String
+        return publicURL.absoluteString
+    }
 
-    
-    func addBook(_ book: Book) {
-        if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
-            // Update existing book locally
-            books[index].quantity += book.quantity
-            books[index].availableQuantity += book.quantity
-            books[index].lastModified = Date()
+    // Then modify your addBook method to include imageURL
+    func addBook(_ book: Book, withImage image: UIImage? = nil) {
+        // Create a task to handle async operations
+        Task {
+            var updatedBook = book
             
-            // Update in Supabase
-            Task {
+            // If an image is provided, upload it and get URL
+            if let image = image {
+                do {
+                    // Upload image and get URL
+                    let imageURL = try await uploadBookImage(image, for: book.isbn)
+                    updatedBook.imageURL = imageURL
+                    
+                    // Also save locally
+                    saveBookImage(image, for: book.isbn)
+                } catch {
+                    print("Error uploading image: \(error)")
+                }
+            }
+            
+            // Now add the book with the imageURL (if available)
+            if let index = books.firstIndex(where: { $0.isbn == updatedBook.isbn }) {
+                // Update existing book locally
+                books[index].quantity += updatedBook.quantity
+                books[index].availableQuantity += updatedBook.quantity
+                books[index].lastModified = Date()
+                
+                // Update imageURL if we have a new one
+                if updatedBook.imageURL != nil {
+                    books[index].imageURL = updatedBook.imageURL
+                }
+                
+                // Update in Supabase
                 do {
                     try await SupabaseManager.shared.client
                         .from("Books")
                         .update(books[index])
-                        .eq("isbn", value: book.isbn)
+                        .eq("isbn", value: updatedBook.isbn)
                         .execute()
                     saveBooks()
                 } catch {
                     print("Error updating book in Supabase: \(error)")
                 }
-            }
-        } else {
-            // Add new book
-            books.append(book)
-            
-            // Insert in Supabase
-            Task {
+            } else {
+                // Add new book
+                books.append(updatedBook)
+                
+                // Insert in Supabase
                 do {
                     try await SupabaseManager.shared.client
                         .from("Books")
-                        .insert(book)
+                        .insert(updatedBook)
                         .execute()
                     saveBooks()
                 } catch {
@@ -57,7 +142,6 @@ class InventoryManager: ObservableObject {
             }
         }
     }
-    
     
     func removeBook(isbn: String) {
         books.removeAll { $0.isbn == isbn }
@@ -234,7 +318,6 @@ class InventoryManager: ObservableObject {
     }
     
     // MARK: - CSV Import
-    
     func importCSV(from url: URL) throws {
         let csvString = try String(contentsOf: url, encoding: .utf8)
         let rows = csvString.components(separatedBy: "\n")
