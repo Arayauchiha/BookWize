@@ -679,7 +679,7 @@ struct DashboardView: View {
                             NavigationLink(destination: BookManagementView()
                                 .environmentObject(booksManager)) {
                                 HStack {
-                                    Text("Your Reads")
+                                    Text("Book Log")
                                         .font(.title2)
                                         .fontWeight(.bold)
                                     Spacer()
@@ -1080,7 +1080,7 @@ struct BookManagementView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
-        .navigationTitle("Your Reads")
+        .navigationTitle("Book Log")
         .navigationBarTitleDisplayMode(.inline)
     }
     
