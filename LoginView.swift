@@ -242,6 +242,7 @@ struct LoginView: View {
             PasswordResetRequestView(
                 email: $resetEmail,
                 passwordResetOTP: $passwordResetOTP,
+                userRole: userRole,
                 onRequestReset: handleForgotPassword,
                 onVerifyOTP: {
                     // When OTP is verified, close this sheet and show password reset sheet
