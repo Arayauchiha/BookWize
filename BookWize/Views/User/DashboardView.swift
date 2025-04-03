@@ -605,174 +605,171 @@ struct DashboardView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    if isLoading {
-                        ProgressView("Loading your dashboard...")
-                            .padding()
-                    } else if let error = errorMessage {
-                        VStack {
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 50))
-                                .foregroundColor(.orange)
-                                .padding()
-                            
-                            Text("Error loading dashboard")
-                                .font(.headline)
-                            
-                            Text(error)
-                                .font(.subheadline)
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.secondary)
-                                .padding()
-                            
-                            Button(action: {
-                                isLoading = true
-                                Task {
-                                    await fetchUserData()
-                                }
-                            }) {
-                                Text("Try Again")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .cornerRadius(10)
-                            }
-                        }
+        ScrollView {
+            VStack(spacing: 20) {
+                if isLoading {
+                    ProgressView("Loading your dashboard...")
                         .padding()
-                    } else {
-                        // Monthly Reading Goal Section (moved up)
-                        VStack(alignment: .leading, spacing: 8) {
-                            NavigationLink(destination: ReadingProgressDetailView(
-                                monthlyGoal: user?.monthlyGoal ?? 0,
-                                issuedBooks: issuedBooks,
-                                updatePagesRead: updatePagesRead,
-                                updateGoal: updateMonthlyGoal
-                            )) {
-                                HStack {
-                                    Text("Reading Progress")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Reading Progress Card
-                            ReadingProgressCard(
-                                monthlyGoal: user?.monthlyGoal ?? 0,
-                                completedBooks: completedBooksCount,
-                                issuedBooks: issuedBooks.count,
-                                onTap: {}
-                            )
-                            .padding(.horizontal)
-                        }
+                } else if let error = errorMessage {
+                    VStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.orange)
+                            .padding()
                         
-                        // Your Reads Section (moved down)
-                        VStack(alignment: .leading, spacing: 8) {
-                            NavigationLink(destination: BookManagementView()
-                                .environmentObject(booksManager)) {
-                                HStack {
-                                    Text("Book Log")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .contentShape(Rectangle())
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .padding(.horizontal)
-                            
-                            if let urgentBook = mostUrgentBook {
-                                TabView(selection: $currentIndex) {
-                                    BorrowedBookRow(book: urgentBook)
-                                        .tag(0)
-                                        .padding(.horizontal)
-                                }
-                                .tabViewStyle(.page(indexDisplayMode: .never))
-                                .frame(height: 200)
-                            } else {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "book.closed")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.gray)
-                                    Text("Tap to view your books")
-                                        .font(.headline)
-                                        .foregroundColor(.gray)
-                                }
-                                .frame(height: 200)
-                                .frame(maxWidth: .infinity)
-                                .background(Color(.systemBackground))
-                                .cornerRadius(15)
-                                .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                                .padding(.horizontal)
-                            }
-                        }
+                        Text("Error loading dashboard")
+                            .font(.headline)
                         
-                        // Overdue Fines Section
-                        VStack(alignment: .leading, spacing: 8) {
-                            NavigationLink(destination: OverdueFinesView()) {
-                                HStack {
-                                    Text("Overdue Books")
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(.gray)
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal)
+                        Text(error)
+                            .font(.subheadline)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.secondary)
+                            .padding()
+                        
+                        Button(action: {
+                            isLoading = true
+                            Task {
+                                await fetchUserData()
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Display the card without NavigationLink - make it non-clickable
-                            OverdueFinesCard(
-                                totalAmount: finesManager.totalFineAmount,
-                                fineCount: finesManager.fineCount
-                            )
-                            .padding(.horizontal)
-                            .padding(.top, 4)
+                        }) {
+                            Text("Try Again")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(Color.blue)
+                                .cornerRadius(10)
                         }
                     }
+                    .padding()
+                } else {
+                    // Monthly Reading Goal Section
+                    VStack(alignment: .leading, spacing: 8) {
+                        NavigationLink(destination: ReadingProgressDetailView(
+                            monthlyGoal: user?.monthlyGoal ?? 0,
+                            issuedBooks: issuedBooks,
+                            updatePagesRead: updatePagesRead,
+                            updateGoal: updateMonthlyGoal
+                        )) {
+                            HStack {
+                                Text("Reading Progress")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Reading Progress Card
+                        ReadingProgressCard(
+                            monthlyGoal: user?.monthlyGoal ?? 0,
+                            completedBooks: completedBooksCount,
+                            issuedBooks: issuedBooks.count,
+                            onTap: {}
+                        )
+                        .padding(.horizontal)
+                    }
+                    
+                    // Your Reads Section (moved down)
+                    VStack(alignment: .leading, spacing: 8) {
+                        NavigationLink(destination: BookManagementView()
+                            .environmentObject(booksManager)) {
+                            HStack {
+                                Text("Book Log")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .contentShape(Rectangle())
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal)
+                        
+                        if let urgentBook = mostUrgentBook {
+                            TabView(selection: $currentIndex) {
+                                BorrowedBookRow(book: urgentBook)
+                                    .tag(0)
+                                    .padding(.horizontal)
+                            }
+                            .tabViewStyle(.page(indexDisplayMode: .never))
+                            .frame(height: 200)
+                        } else {
+                            VStack(spacing: 12) {
+                                Image(systemName: "book.closed")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.gray)
+                                Text("Tap to view your books")
+                                    .font(.headline)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(height: 200)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(15)
+                            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+                            .padding(.horizontal)
+                        }
+                    }
+                    
+                    // Overdue Fines Section
+                    VStack(alignment: .leading, spacing: 8) {
+                        NavigationLink(destination: OverdueFinesView()) {
+                            HStack {
+                                Text("Overdue Books")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // Display the card without NavigationLink - make it non-clickable
+                        OverdueFinesCard(
+                            totalAmount: finesManager.totalFineAmount,
+                            fineCount: finesManager.fineCount
+                        )
+                        .padding(.horizontal)
+                        .padding(.top, 4)
+                    }
                 }
-                .padding(.vertical)
             }
-            .navigationTitle("Dashboard")
-            .onAppear {
-                // Load the fine policy when the view appears
-                FinePolicyManager.shared.loadFinePolicy()
-                
-                Task {
-                    await fetchUserData()
-                    await booksManager.fetchBorrowedBooks()
-                    await finesManager.fetchOverdueFines()
-                }
+            .padding(.vertical)
+        }
+        .onAppear {
+            // Load the fine policy when the view appears
+            FinePolicyManager.shared.loadFinePolicy()
+            
+            Task {
+                await fetchUserData()
+                await booksManager.fetchBorrowedBooks()
+                await finesManager.fetchOverdueFines()
             }
+        }
 
-            .sheet(isPresented: $showReadingTracker) {
-                ReadingProgressDetailView(
-                    monthlyGoal: user?.monthlyGoal ?? 0,
-                    issuedBooks: issuedBooks,
-                    updatePagesRead: updatePagesRead,
-                    updateGoal: updateMonthlyGoal
-                )
+        .sheet(isPresented: $showReadingTracker) {
+            ReadingProgressDetailView(
+                monthlyGoal: user?.monthlyGoal ?? 0,
+                issuedBooks: issuedBooks,
+                updatePagesRead: updatePagesRead,
+                updateGoal: updateMonthlyGoal
+            )
 
-            }
-            .sheet(isPresented: $showingGoalSheet) {
-                MonthlyGoalSheet(
-                    currentGoal: user?.monthlyGoal ?? 0,
-                    updateGoal: updateMonthlyGoal
-                )
-            }
+        }
+        .sheet(isPresented: $showingGoalSheet) {
+            MonthlyGoalSheet(
+                currentGoal: user?.monthlyGoal ?? 0,
+                updateGoal: updateMonthlyGoal
+            )
         }
     }
     
@@ -1876,8 +1873,6 @@ struct OverdueFinesView: View {
             .padding(.vertical)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Overdue Books")
-        .navigationBarTitleDisplayMode(.inline)
         .navigationBarItems(trailing: 
             Button(action: {
                 showingHistory = true
