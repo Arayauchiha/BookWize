@@ -401,6 +401,10 @@ struct InventoryView: View {
                     Section(header: Text("Book Details")) {
                         TextField("ISBN", text: $isbn)
                             .keyboardType(.numberPad)
+                            .onChange(of: isbn) { newValue in
+                                // Only allow numeric input
+                                isbn = newValue.filter { $0.isNumber }
+                            }
                         TextField("Title", text: $title)
                         TextField("Author", text: $author)
                         TextField("Publisher", text: $publisher)
