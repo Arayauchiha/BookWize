@@ -13,6 +13,9 @@ struct ReservedBookView: View {
     @State private var issuedReservationId: UUID?
     @State private var showSuccessAlert = false
     
+    // MARK: - Cleanup timer
+    @State private var cleanupTimer: Timer?
+    
     private let supabase = SupabaseConfig.client
     
     var filteredReservations: [ReservationRecord] {
@@ -31,11 +34,18 @@ struct ReservedBookView: View {
             .refreshable {
                 isLoading = true
                 await fetchReservations()
+                await checkExpiredReservations()
             }
             .onAppear {
                 Task {
                     await fetchReservations()
+                    await checkExpiredReservations()
+                    startCleanupTimer()
                 }
+            }
+            .onDisappear {
+                cleanupTimer?.invalidate()
+                cleanupTimer = nil
             }
             .onChange(of: searchText) { _ in
                 Task {
@@ -86,19 +96,63 @@ struct ReservedBookView: View {
             }
     }
     
+    // MARK: - Timer Functions
+    
+    private func startCleanupTimer() {
+        cleanupTimer?.invalidate()
+        // Check for expired reservations every 5 minutes
+        cleanupTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { _ in
+            Task {
+                await checkExpiredReservations()
+            }
+        }
+    }
+    
     // MARK: - Extracted View Components
+    
+//    private var mainContent: some View {
+//        ZStack {
+//            if isLoading {
+//                LoadingView()
+//            } else if reservations.isEmpty {
+//                EmptyStateView(
+//                    icon: "clock.badge.exclamationmark",
+//                    title: "No Reservations Found",
+//                    message: "Reservations expire automatically after 24 hours if not processed. Check back later or refresh the page."
+//                )
+//            } else {
+//                reservationsList
+//            }
+//        }
+//    }
     
     private var mainContent: some View {
         ZStack {
             if isLoading {
                 LoadingView()
             } else if reservations.isEmpty {
-                EmptyView()
+                EmptyStateView(
+                    icon: "clock.badge.exclamationmark",
+                    title: "No Reservations Found",
+                    message: "Reservations expire automatically after 24 hours if not processed. Check back later or refresh the page."
+                )
+            } else if filteredReservations.isEmpty {
+                EmptyStateView(
+                    icon: "magnifyingglass",
+                    title: "No Results Found",
+                    message: "Try searching with a different keyword."
+                )
             } else {
                 reservationsList
             }
         }
     }
+
+//    private var filteredReservations: [ReservationRecord] {
+//        reservations.filter { reservation in
+//            searchText.isEmpty || reservation.book?.title?.localizedCaseInsensitiveContains(searchText) == true
+//        }
+//    }
     
     private var reservationsList: some View {
         ScrollView {
@@ -120,6 +174,8 @@ struct ReservedBookView: View {
             }
         }
     }
+    
+    // MARK: - Data Fetching and Processing
     
     func fetchReservations() async {
         do {
@@ -148,62 +204,68 @@ struct ReservedBookView: View {
         }
     }
     
-    //MARK: - issue reserved books:
-    func issueReservedBook(reservation: ReservationRecord) async {
-        guard let book = reservation.book, let member = reservation.member else {
-            errorMessage = "Missing book or member information"
+    // Check for and process expired reservations
+    func checkExpiredReservations() async {
+        print("Checking for expired reservations...")
+        
+        var expiredReservations: [ReservationRecord] = []
+        let now = Date()
+        
+        // Identify expired reservations (older than 24 hours)
+        for reservation in reservations {
+            let expirationDate = Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
+            if now > expirationDate {
+                expiredReservations.append(reservation)
+            }
+        }
+        
+        if expiredReservations.isEmpty {
+            print("No expired reservations found.")
             return
         }
         
-        isLoading = true
+        print("Found \(expiredReservations.count) expired reservations. Processing...")
+        
+        // Process each expired reservation
+        for reservation in expiredReservations {
+            await processExpiredReservation(reservation)
+        }
+        
+        // Refresh the reservations list
+        await fetchReservations()
+    }
+    
+    // Process a single expired reservation
+    private func processExpiredReservation(_ reservation: ReservationRecord) async {
+        guard let book = reservation.book, let isbn = book.isbn else {
+            print("Missing book information for reservation \(reservation.id)")
+            return
+        }
         
         do {
-            // Create the issueBooks object
-            let issueDate = Date()
-            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
+            // Start a transaction
+            try await SupabaseManager.shared.client.rpc("begin_transaction")
             
-            let newIssue = issueBooks(
-                id: UUID(),
-                isbn: book.isbn ?? "",
-                memberEmail: member.email,
-                issueDate: issueDate,
-                returnDate: returnDate
-            )
-            
-            // Use the correct implementation found in your first file
-            // First, get the current available quantity
+            // First, get the current book quantities
             let response = try await SupabaseManager.shared.client
                 .from("Books")
-                .select("availableQuantity")
-                .eq("isbn", value: newIssue.isbn)
+                .select("availableQuantity, quantity")
+                .eq("isbn", value: isbn)
                 .single()
                 .execute()
             
             guard let data = response.data as? [[String: Any]],
                   let firstBook = data.first,
-                  let currentQuantity = firstBook["availableQuantity"] as? Int else {
+                  let availableQuantity = firstBook["availableQuantity"] as? Int,
+                  let quantity = firstBook["quantity"] as? Int else {
                 throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get book quantity"])
             }
             
-            // Check if there are books available
-            guard currentQuantity > 0 else {
-                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No books available"])
-            }
-            
-            // Start a transaction to ensure both operations succeed or fail together
-            try await SupabaseManager.shared.client.rpc("begin_transaction")
-            
-            // Insert the issued book record
-            try await SupabaseManager.shared.client
-                .from("issuebooks")
-                .insert(newIssue)
-                .execute()
-            
-            // Update the available quantity
+            // Update book quantities (increment availableQuantity by 1)
             try await SupabaseManager.shared.client
                 .from("Books")
-                .update(["availableQuantity": currentQuantity - 1])
-                .eq("isbn", value: newIssue.isbn)
+                .update(["availableQuantity": availableQuantity + 1])
+                .eq("isbn", value: isbn)
                 .execute()
             
             // Delete the reservation
@@ -216,6 +278,279 @@ struct ReservedBookView: View {
             // Commit the transaction
             try await SupabaseManager.shared.client.rpc("commit_transaction")
             
+            print("Successfully processed expired reservation \(reservation.id) for book: \(book.title)")
+            
+        } catch {
+            // Rollback the transaction if it was started
+            try? await SupabaseManager.shared.client.rpc("rollback_transaction")
+            print("Error processing expired reservation \(reservation.id): \(error.localizedDescription)")
+        }
+    }
+    
+    //MARK: - issue reserved books:
+//    func issueReservedBook(reservation: ReservationRecord) async {
+//        guard let book = reservation.book, let member = reservation.member else {
+//            errorMessage = "Missing book or member information"
+//            return
+//        }
+//        
+//        isLoading = true
+//        
+//        do {
+//            // First, check if the book exists and has available quantity
+//            struct BookQuantity: Codable {
+//                let availableQuantity: Int
+//            }
+//            
+//            let response: BookQuantity = try await supabase
+//                .from("Books")
+//                .select("availableQuantity")
+//                .eq("id", value: book.id.uuidString)
+//                .single()
+//                .execute()
+//                .value
+//            
+//            // Print the data for debugging
+//            print("Book query response: \(response)")
+//            
+//            let currentQuantity = response.availableQuantity
+//            
+//            // Check if there are books available
+//            guard currentQuantity > 0 else {
+//                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No books available"])
+//            }
+//            
+//            // Create the issueBooks object
+//            let issueDate = Date()
+//            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
+//            
+//            let newIssue = issueBooks(
+//                id: UUID(),
+//                isbn: book.isbn ?? "",
+//                memberEmail: member.email,
+//                issueDate: issueDate,
+//                returnDate: returnDate
+//            )
+//            
+//            // Start a transaction using the same client
+//            try await supabase.rpc("begin_transaction")
+//            
+//            // Insert the issued book record
+//            try await supabase
+//                .from("issuebooks")
+//                .insert(newIssue)
+//                .execute()
+//            
+//            // Update the available quantity
+//            try await supabase
+//                .from("Books")
+//                .update(["availableQuantity": currentQuantity - 1])
+//                .eq("id", value: book.id.uuidString)
+//                .execute()
+//            
+//            // Delete the reservation
+//            try await supabase
+//                .from("BookReservation")
+//                .delete()
+//                .eq("id", value: reservation.id.uuidString)
+//                .execute()
+//            
+//            // Commit the transaction
+//            try await supabase.rpc("commit_transaction")
+//            
+//            await MainActor.run {
+//                isLoading = false
+//                issuedReservationId = reservation.id
+//                showSuccessAlert = true
+//                
+//                // Remove the issued book from the local array
+//                reservations.removeAll(where: { $0.id == reservation.id })
+//            }
+//        } catch {
+//            // Rollback the transaction if it was started
+//            try? await supabase.rpc("rollback_transaction")
+//            
+//            await MainActor.run {
+//                print("Error issuing book: \(error)")
+//                errorMessage = "Failed to issue book: \(error.localizedDescription)"
+//                isLoading = false
+//            }
+//        }
+//    }
+//    
+//    func issueReservedBook(reservation: ReservationRecord) async {
+//        guard let book = reservation.book, let member = reservation.member else {
+//            errorMessage = "Missing book or member information"
+//            return
+//        }
+//        
+//        isLoading = true
+//        
+//        do {
+//            // Create the issueBooks object
+//            let issueDate = Date()
+//            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
+//            
+//            let newIssue = issueBooks(
+//                id: UUID(),
+//                isbn: book.isbn ?? "",
+//                memberEmail: member.email,
+//                issueDate: issueDate,
+//                returnDate: returnDate,
+//                actualReturnedDate: nil
+//            )
+//            
+//            // Start a transaction using the same client
+//            try await supabase.rpc("begin_transaction")
+//            
+//            // Insert the issued book record
+//            try await supabase
+//                .from("issuebooks")
+//                .insert(newIssue)
+//                .execute()
+//            
+//            // Query current quantity (we still need this to keep track)
+//            struct BookQuantity: Codable {
+//                let availableQuantity: Int
+//            }
+//            
+//            let response: BookQuantity = try await supabase
+//                .from("Books")
+//                .select("availableQuantity")
+//                .eq("id", value: book.id.uuidString)
+//                .single()
+//                .execute()
+//                .value
+//            
+//            let currentQuantity = response.availableQuantity
+//            
+//            // Update the available quantity only if it's greater than 0
+//            // This prevents negative quantities but allows issuing reserved books
+//            if currentQuantity > 0 {
+//                try await supabase
+//                    .from("Books")
+//                    .update(["availableQuantity": currentQuantity - 1])
+//                    .eq("id", value: book.id.uuidString)
+//                    .execute()
+//            }
+//            
+//            // Delete the reservation
+//            try await supabase
+//                .from("BookReservation")
+//                .delete()
+//                .eq("id", value: reservation.id.uuidString)
+//                .execute()
+//            
+//            // Commit the transaction
+//            try await supabase.rpc("commit_transaction")
+//            
+//            await MainActor.run {
+//                isLoading = false
+//                issuedReservationId = reservation.id
+//                showSuccessAlert = true
+//                
+//                // Remove the issued book from the local array
+//                reservations.removeAll(where: { $0.id == reservation.id })
+//            }
+//        } catch {
+//            // Rollback the transaction if it was started
+//            try? await supabase.rpc("rollback_transaction")
+//            
+//            await MainActor.run {
+//                print("Error issuing book: \(error)")
+//                errorMessage = "Failed to issue book: \(error.localizedDescription)"
+//                isLoading = false
+//            }
+//        }
+//    }
+//    
+    
+    func issueReservedBook(reservation: ReservationRecord) async {
+        guard let book = reservation.book, let member = reservation.member else {
+            errorMessage = "Missing book or member information"
+            return
+        }
+        
+        isLoading = true
+        
+        do {
+            // Check how many books the member has already issued
+            // Using filter() to check for null values
+            let countResponse = try await supabase
+                .from("issuebooks")
+                .select("id", count: .exact)
+                .eq("member_email", value: member.email)
+                .filter("actual_returned_date", operator: "is", value: "null") // Correct syntax for null check
+                .execute()
+            
+            let currentlyIssuedCount = countResponse.count ?? 0
+            
+            // Check if the member has reached the limit
+            if currentlyIssuedCount >= 5 {
+                await MainActor.run {
+                    errorMessage = "Member has reached the maximum limit of 5 issued books"
+                    isLoading = false
+                }
+                return
+            }
+            
+            // Create the issueBooks object
+            let issueDate = Date()
+            let returnDate = Calendar.current.date(byAdding: .day, value: 10, to: issueDate)
+            
+            let newIssue = issueBooks(
+                id: UUID(),
+                isbn: book.isbn ?? "",
+                memberEmail: member.email,
+                issueDate: issueDate,
+                returnDate: returnDate,
+                actualReturnedDate: nil
+            )
+            
+            // Start a transaction using the same client
+            try await supabase.rpc("begin_transaction")
+            
+            // Insert the issued book record
+            try await supabase
+                .from("issuebooks")
+                .insert(newIssue)
+                .execute()
+            
+            // Query current quantity (we still need this to keep track)
+            struct BookQuantity: Codable {
+                let availableQuantity: Int
+            }
+            
+            let response: BookQuantity = try await supabase
+                .from("Books")
+                .select("availableQuantity")
+                .eq("id", value: book.id.uuidString)
+                .single()
+                .execute()
+                .value
+            
+            let currentQuantity = response.availableQuantity
+            
+            // Update the available quantity only if it's greater than 0
+            // This prevents negative quantities but allows issuing reserved books
+            if currentQuantity > 0 {
+                try await supabase
+                    .from("Books")
+                    .update(["availableQuantity": currentQuantity - 1])
+                    .eq("id", value: book.id.uuidString)
+                    .execute()
+            }
+            
+            // Delete the reservation
+            try await supabase
+                .from("BookReservation")
+                .delete()
+                .eq("id", value: reservation.id.uuidString)
+                .execute()
+            
+            // Commit the transaction
+            try await supabase.rpc("commit_transaction")
+            
             await MainActor.run {
                 isLoading = false
                 issuedReservationId = reservation.id
@@ -226,7 +561,7 @@ struct ReservedBookView: View {
             }
         } catch {
             // Rollback the transaction if it was started
-            try? await SupabaseManager.shared.client.rpc("rollback_transaction")
+            try? await supabase.rpc("rollback_transaction")
             
             await MainActor.run {
                 print("Error issuing book: \(error)")
@@ -235,10 +570,36 @@ struct ReservedBookView: View {
             }
         }
     }
-    
     struct ReservationCard: View {
         let reservation: ReservationRecord
         let issueAction: () -> Void
+        @State private var timeRemaining: TimeInterval = 0
+        @State private var timer: Timer?
+        
+        var formattedTimeRemaining: String {
+            if timeRemaining <= 0 {
+                return "Expired"
+            }
+            
+            let hours = Int(timeRemaining) / 3600
+            let minutes = Int(timeRemaining) % 3600 / 60
+            
+            if hours > 0 {
+                return "\(hours)h \(minutes)m remaining"
+            } else {
+                return "\(minutes)m remaining"
+            }
+        }
+        
+        var timeRemainingColor: Color {
+            if timeRemaining <= 0 {
+                return .red
+            } else if timeRemaining < 3600 { // Less than 1 hour
+                return .orange
+            } else {
+                return .blue
+            }
+        }
         
         var body: some View {
             VStack(spacing: 0) {
@@ -283,13 +644,25 @@ struct ReservedBookView: View {
                                 .foregroundColor(.secondary)
                         }
                         
-                        // Reservation Date
-                        HStack {
-                            Image(systemName: "calendar")
-                                .foregroundColor(.gray)
-                            Text(reservation.created_at.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        // Reservation Date and Time Remaining
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(.gray)
+                                Text(reservation.created_at.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            // Countdown Timer
+                            HStack {
+                                Image(systemName: "timer")
+                                    .foregroundColor(timeRemainingColor)
+                                Text(formattedTimeRemaining)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(timeRemainingColor)
+                            }
                         }
                     }
                     .padding(.vertical, 8)
@@ -307,11 +680,36 @@ struct ReservedBookView: View {
                         .cornerRadius(8)
                 }
                 .padding(.top, 12)
+                .disabled(timeRemaining <= 0)
+                .opacity(timeRemaining <= 0 ? 0.5 : 1)
             }
             .padding(16)
             .background(Color(UIColor.systemBackground))
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+            .onAppear {
+                calculateTimeRemaining()
+                startTimer()
+            }
+            .onDisappear {
+                timer?.invalidate()
+                timer = nil
+            }
+        }
+        
+        private func calculateTimeRemaining() {
+            let expirationDate = Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
+            timeRemaining = expirationDate.timeIntervalSince(Date())
+            if timeRemaining < 0 {
+                timeRemaining = 0
+            }
+        }
+        
+        private func startTimer() {
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                calculateTimeRemaining()
+            }
         }
     }
     
@@ -319,6 +717,37 @@ struct ReservedBookView: View {
         let reservation: ReservationRecord
         let issueAction: () -> Void
         @Environment(\.dismiss) private var dismiss
+        @State private var timeRemaining: TimeInterval = 0
+        @State private var timer: Timer?
+        
+        private var expirationDate: Date {
+            Calendar.current.date(byAdding: .hour, value: 24, to: reservation.created_at) ?? Date()
+        }
+        
+        var formattedTimeRemaining: String {
+            if timeRemaining <= 0 {
+                return "Expired"
+            }
+            
+            let hours = Int(timeRemaining) / 3600
+            let minutes = Int(timeRemaining) % 3600 / 60
+            
+            if hours > 0 {
+                return "\(hours) hours \(minutes) minutes remaining"
+            } else {
+                return "\(minutes) minutes remaining"
+            }
+        }
+        
+        var timeRemainingColor: Color {
+            if timeRemaining <= 0 {
+                return .red
+            } else if timeRemaining < 3600 { // Less than 1 hour
+                return .orange
+            } else {
+                return .blue
+            }
+        }
         
         var body: some View {
             NavigationView {
@@ -358,11 +787,63 @@ struct ReservedBookView: View {
                                 title: "Reserved On",
                                 value: reservation.created_at.formatted(date: .long, time: .shortened)
                             )
+                            
+                            DetailItem(
+                                title: "Expires On",
+                                value: expirationDate.formatted(date: .long, time: .shortened),
+                                valueColor: timeRemaining > 0 ? .primary : .red
+                            )
+                            
+                            DetailItem(
+                                title: "Time Left",
+                                value: formattedTimeRemaining,
+                                valueColor: timeRemainingColor
+                            )
+                            
                             DetailItem(
                                 title: "Status",
-                                value: "Reserved",
-                                valueColor: .blue
+                                value: timeRemaining > 0 ? "Reserved" : "Expired",
+                                valueColor: timeRemaining > 0 ? .blue : .red
                             )
+                        }
+                        
+                        // Expiration Notice
+                        if timeRemaining > 0 {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundColor(.orange)
+                                    Text("Reservation Expiration Policy")
+                                        .font(.headline)
+                                        .foregroundColor(.orange)
+                                }
+                                
+                                Text("This reservation will automatically expire in \(formattedTimeRemaining) if not processed. Once expired, the book will become available for others to reserve.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding()
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(12)
+                        } else {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Image(systemName: "xmark.circle")
+                                        .foregroundColor(.red)
+                                    Text("Reservation Expired")
+                                        .font(.headline)
+                                        .foregroundColor(.red)
+                                }
+                                
+                                Text("This reservation has expired and will be automatically removed. The book is now available for others to reserve.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding()
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(12)
                         }
                         
                         // Action Button
@@ -372,10 +853,11 @@ struct ReservedBookView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.blue)
+                                .background(timeRemaining > 0 ? Color.blue : Color.gray)
                                 .cornerRadius(12)
                         }
                         .padding(.top)
+                        .disabled(timeRemaining <= 0)
                     }
                     .padding()
                 }
@@ -386,6 +868,28 @@ struct ReservedBookView: View {
                         Button("Done") { dismiss() }
                     }
                 }
+                .onAppear {
+                    calculateTimeRemaining()
+                    startTimer()
+                }
+                .onDisappear {
+                    timer?.invalidate()
+                    timer = nil
+                }
+            }
+        }
+        
+        private func calculateTimeRemaining() {
+            timeRemaining = expirationDate.timeIntervalSince(Date())
+            if timeRemaining < 0 {
+                timeRemaining = 0
+            }
+        }
+        
+        private func startTimer() {
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+                calculateTimeRemaining()
             }
         }
     }
@@ -446,6 +950,32 @@ struct ReservedBookView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(UIColor.systemBackground))
+        }
+    }
+    
+    struct EmptyStateView: View {
+        var icon: String
+        var title: String
+        var message: String
+
+        var body: some View {
+            VStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue.opacity(0.7))
+                
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

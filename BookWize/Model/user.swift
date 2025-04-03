@@ -9,8 +9,9 @@ struct User: Codable, Identifiable {
     var selectedLibrary: String
     var selectedGenres: [String]
     var fine: Double
+    var monthlyGoal: Int?
     
-    init(id: UUID = UUID(), email: String, name: String, gender: Gender, password: String, selectedLibrary: String, selectedGenres: [String] = [], fine: Double = 0) {
+    init(id: UUID = UUID(), email: String, name: String, gender: Gender, password: String, selectedLibrary: String, selectedGenres: [String] = [], fine: Double = 0, monthlyGoal: Int? = nil) {
         self.id = id
         self.email = email
         self.name = name
@@ -19,6 +20,7 @@ struct User: Codable, Identifiable {
         self.selectedLibrary = selectedLibrary
         self.selectedGenres = selectedGenres
         self.fine = fine
+        self.monthlyGoal = monthlyGoal
     }
 }
 

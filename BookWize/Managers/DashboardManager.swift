@@ -1,6 +1,7 @@
 import Foundation
 
 class DashboardManager: ObservableObject {
+    @Published private(set) var overdueMembersCount: Int = 0
     @Published private(set) var totalBooksCount: Int = 0
     @Published private(set) var issuedBooksCount: Int = 0
     @Published private(set) var totalMembersCount: Int = 0
@@ -16,12 +17,37 @@ class DashboardManager: ObservableObject {
     }
     
     func fetchDashboardData() async {
+        await fetchOverdueMembersCount()
         await fetchTotalBooksCount()
         await fetchIssuedBooksCount()
         await fetchTotalMembersCount()
-        await fetchRevenueAndFines()
+        await fetchTotalRevenue()
+        await fetchOverdueFines()
         await fetchActiveLibrariansCount()
         await loadBooksFromSupabase()
+    }
+    
+    private func fetchOverdueMembersCount() async {
+        do {
+            struct OverdueMember: Codable {
+                let fine: Double?
+            }
+
+            let overdueMembers: [OverdueMember] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("fine")
+                .gt("fine", value: 0) // Fetch members who have a fine greater than 0
+                .execute()
+                .value
+            
+            await MainActor.run {
+                self.overdueMembersCount = overdueMembers.count
+            }
+            
+            print("Fetched overdue members count: \(overdueMembers.count)")
+        } catch {
+            print("Error fetching overdue members count: \(error)")
+        }
     }
     
     private func fetchTotalBooksCount() async {
@@ -84,62 +110,116 @@ class DashboardManager: ObservableObject {
         }
     }
     
-    private func fetchRevenueAndFines() async {
-        do {
-            let client = SupabaseManager.shared.client
-            
-            // Define the required structs
-            struct MembershipSetting: Codable {
-                let Membership: Double?
-                let PerDayFine: Double?
-                let FineSet_id: UUID?
+//    private func fetchRevenueAndFines() async {
+//        do {
+//            let client = SupabaseManager.shared.client
+//
+//            // Define the required structs
+//            struct MembershipSetting: Codable {
+//                let Membership: Double?
+//            }
+//
+//            struct MemberFine: Codable {
+//                let fine: Double?
+//            }
+//
+//            // Fetch membership fee
+//            let membershipFeeResponse: [MembershipSetting] = try await client
+//                .from("FineAndMembershipSet")
+//                .select("Membership")
+//                .execute()
+//                .value
+//            
+//            let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
+//
+//            // Fetch total members count
+//            let membersCount: Int = try await client
+//                .from("Members")
+//                .select("*", head: true)
+//                .execute()
+//                .count ?? 0
+//            
+//            let membershipRevenue = Double(membersCount) * membershipFee
+//
+//            // Fetch total overdue fines from "Members" table
+//            let finesResponse: [MemberFine] = try await client
+//                .from("Members")
+//                .select("fine")
+//                .execute()
+//                .value
+//            
+//            let totalFines = finesResponse.reduce(0.0) { sum, member in
+//                sum + (member.fine ?? 0)
+//            }
+//
+//            // Calculate total revenue
+//            let totalAmount = membershipRevenue + totalFines
+//
+//            await MainActor.run {
+//                self.totalRevenue = totalAmount
+//                self.overdueFines = totalFines
+//                print("Updated Revenue: \(self.totalRevenue)")
+//                print("Updated Overdue Fines: \(self.overdueFines)")
+//            }
+//        } catch {
+//            print("Error fetching revenue and fines: \(error)")
+//        }
+//    }
+
+    private func fetchTotalRevenue() async {
+            do {
+                let client = SupabaseManager.shared.client
+                struct MembershipSetting: Codable { let Membership: Double? }
+                
+                let membershipFeeResponse: [MembershipSetting] = try await client
+                    .from("FineAndMembershipSet")
+                    .select("Membership")
+                    .execute()
+                    .value
+                
+                let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
+                print("Membership Fee Response: \(membershipFeeResponse)")
+                
+                let membersCount: Int = try await client
+                    .from("Members")
+                    .select("*", count: .exact)
+                    .execute()
+                    .count ?? 0
+
+                print("Total Members Count: \(membersCount)")
+                
+                let membershipRevenue = Double(membersCount) * membershipFee
+                
+                await MainActor.run { self.totalRevenue = membershipRevenue }
+                print("Updated Total Revenue: \(self.totalRevenue)")
+            } catch {
+                print("Error fetching total revenue: \(error)")
             }
-            
-            struct Fine: Codable {
-                let fineAmount: Double?
-                let id: UUID?
-            }
-            
-            // Fetch membership fee and members count
-            let membershipFeeResponse: [MembershipSetting] = try await client
-                .from("FineAndMembershipSet")
-                .select("*")
-                .execute()
-                .value
-            
-            let membershipFee = membershipFeeResponse.first?.Membership ?? 0.0
-            
-            let membersCount: Int = try await client
-                .from("Members")
-                .select("*", head: true)
-                .execute()
-                .count ?? 0
-            
-            let membershipRevenue = Double(membersCount) * membershipFee
-            
-            // Fetch fines
-            let finesResponse: [Fine] = try await client
-                .from("issuebooks")
-                .select("fineAmount, id")
-                .execute()
-                .value
-            
-            let totalFines = finesResponse.reduce(0.0) { sum, fine in
-                sum + (fine.fineAmount ?? 0)
-            }
-            
-            // Calculate total revenue
-            let totalAmount = membershipRevenue + totalFines
-            
-            await MainActor.run {
-                self.totalRevenue = totalAmount
-                self.overdueFines = totalFines
-            }
-        } catch {
-            print("Error fetching revenue and fines: \(error)")
         }
-    }
+        
     
+    private func fetchOverdueFines() async {
+            do {
+                let client = SupabaseManager.shared.client
+                struct MemberFine: Codable { let fine: Double? }
+                
+                let finesResponse: [MemberFine] = try await client
+                    .from("Members")
+                    .select("fine")
+                    .execute()
+                    .value
+                
+                let totalFines = finesResponse.reduce(0.0) { sum, member in
+                    sum + (member.fine ?? 0)
+                }
+                
+                await MainActor.run { self.overdueFines = totalFines }
+                print("Updated Overdue Fines: \(self.overdueFines)")
+            } catch {
+                print("Error fetching overdue fines: \(error)")
+            }
+        }
+
     private func fetchActiveLibrariansCount() async {
         do {
             struct LibrarianUser: Codable {

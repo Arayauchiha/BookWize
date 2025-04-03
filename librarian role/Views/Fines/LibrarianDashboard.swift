@@ -29,9 +29,9 @@ struct LibrarianDashboard: View {
                     // Second Row
                     HStack(spacing: 16) {
                         DashboardCard(
-                            title: "Fine Overdue",
-                            value: String(format: "$%.2f", dashboardManager.overdueFines),
-                            icon: "dollarsign.circle.fill",
+                            title: "Members with Overdue Fines",
+                            value: "\(dashboardManager.overdueMembersCount)",
+                            icon: "exclamationmark.triangle.fill",
                             color: .red
                         )
                         
@@ -51,6 +51,7 @@ struct LibrarianDashboard: View {
                             .fontWeight(.bold)
                             .padding(.top)
                             .padding(.horizontal)
+                            .dynamicTypeSize(.small ... .accessibility3)
                         
                         HStack(spacing: 16) {
                             if let mostPopularGenre = getPopularGenres().first {
@@ -71,21 +72,46 @@ struct LibrarianDashboard: View {
                     }
                     
                     // Overdue Books Section
-//                    Group {
-//                        Text("Overdue Books")
-//                            .font(.title2)
-//                            .fontWeight(.bold)
-//                            .padding(.top)
-//                            .padding(.horizontal)
-//                        
-//                        NavigationLink(destination: OverdueBooksListView()) {
-//                            OverdueSummaryCard(
-//                                //overdueCount: fineManager.overdueBooks.count,
-//                                totalFine: calculateTotalFine()
-//                            )
-//                            .padding(.horizontal)
-//                        }
-//                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Overdues")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .dynamicTypeSize(.small ... .accessibility3)
+                            
+                            Spacer()
+                            
+                            NavigationLink(destination: OverdueBooksListView()) {
+                                Text("See All")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                                    .dynamicTypeSize(.small ... .accessibility2)
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("\(dashboardManager.overdueFines > 0 ? "₹\(String(format: "%.2f", dashboardManager.overdueFines))" : "₹0.00")")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.red)
+                                    .dynamicTypeSize(.small ... .accessibility3)
+                                
+                                Text("Total Overdue Fines")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .dynamicTypeSize(.small ... .accessibility2)
+                            }
+                           
+                        }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal)
+                    }
+                    .padding(.top)
                 }
                 .padding(.vertical)
             }
@@ -109,6 +135,29 @@ struct LibrarianDashboard: View {
     }
 }
 
+struct SearchBar: View {
+    @Binding var text: String
+    var placeholder: String
+
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(AppTheme.secondaryTextColor)
+            
+            TextField(placeholder, text: $text)
+                .dynamicTypeSize(.small ... .accessibility2)
+        }
+        .padding(8)
+        .background(Color(.systemBackground))
+        .cornerRadius(8)
+    }
+}
+
+#Preview {
+    LibrarianDashboard()
+        .environment(\.colorScheme, .light)
+}
+
 struct OverdueSummaryCard: View {
     let overdueCount: Int
     let totalFine: Double
@@ -121,11 +170,13 @@ struct OverdueSummaryCard: View {
                         .foregroundColor(.red)
                     Text("Overdue Books")
                         .font(.headline)
+                        .dynamicTypeSize(.small ... .accessibility2)
                 }
                 
                 Text("\(overdueCount) books • $\(String(format: "%.2f", totalFine)) in fines")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
             }
             
             Spacer()
@@ -157,38 +208,16 @@ struct SummaryItem: View {
             Text(value)
                 .font(.headline)
                 .foregroundColor(AppTheme.textColor)
+                .dynamicTypeSize(.small ... .accessibility3)
             
             Text(title)
                 .font(.caption)
                 .foregroundColor(AppTheme.secondaryTextColor)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-struct SearchBar: View {
-    @Binding var text: String
-    var placeholder: String
-
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(AppTheme.secondaryTextColor)
-            
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .autocapitalization(.none)
-            
-            if !text.isEmpty {
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppTheme.secondaryTextColor)
-                }
-            }
-        }
-        .padding(12)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
     }
 }
 
@@ -206,11 +235,13 @@ struct EmptyStateView: View {
             Text(title)
                 .font(.headline)
                 .foregroundColor(AppTheme.textColor)
+                .dynamicTypeSize(.small ... .accessibility3)
             
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(AppTheme.secondaryTextColor)
                 .multilineTextAlignment(.center)
+                .dynamicTypeSize(.small ... .accessibility2)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -234,11 +265,14 @@ struct DashboardCard: View {
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
+                    .dynamicTypeSize(.small ... .accessibility3)
             }
             
             Text(title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -247,7 +281,6 @@ struct DashboardCard: View {
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
-
 
 struct SimpleMiniBarGraph: View {
     let data: [(String, Int)]
@@ -301,6 +334,8 @@ struct GenreStatsCard: View {
                             .font(.title2)
                             .bold()
                             .foregroundColor(.primary)
+                            .dynamicTypeSize(.small ... .accessibility3)
+                            .lineLimit(1)
                     }
                 }
                 
@@ -315,6 +350,8 @@ struct GenreStatsCard: View {
                 Text(title)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
+                    .lineLimit(2)
             }
             .padding()
             .frame(maxWidth: .infinity)
@@ -341,11 +378,15 @@ struct PopularGenreCard: View {
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
+                    .dynamicTypeSize(.small ... .accessibility3)
+                    .lineLimit(1)
             }
             
             Text(title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
         }
         .padding()
         .frame(maxWidth: .infinity)

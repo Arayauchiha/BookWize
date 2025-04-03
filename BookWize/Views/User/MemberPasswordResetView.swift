@@ -5,6 +5,7 @@ struct MemberPasswordResetView: View {
     @Binding var newPassword: String
     @Binding var confirmPassword: String
     @Binding var isNewPasswordVisible: Bool
+    @State private var currentPassword = ""
     @FocusState private var focusedField: Field?
     
     let email: String
@@ -26,8 +27,10 @@ struct MemberPasswordResetView: View {
     // Add state for showing error alert
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showSuccess = false
     
     private enum Field {
+        case currentPassword
         case newPassword
         case confirmPassword
     }
@@ -40,6 +43,54 @@ struct MemberPasswordResetView: View {
     // Add update password function
     private func updatePassword() async {
         print("Attempting to update password for email: \(email)")
+        
+        // First verify current password
+        do {
+            let data: [FetchData] = try await SupabaseManager.shared.client
+                .from("Members")
+                .select("*")
+                .eq("email", value: email)
+                .eq("password", value: currentPassword)
+                .execute()
+                .value
+            
+            if data.isEmpty {
+                DispatchQueue.main.async {
+                    errorMessage = "Current password is incorrect"
+                    showError = true
+                }
+                return
+            }
+        } catch {
+            print("Error verifying current password:", error)
+            DispatchQueue.main.async {
+                errorMessage = "Failed to verify current password: \(error.localizedDescription)"
+                showError = true
+            }
+            return
+        }
+        
+        // Validate passwords match
+        guard newPassword == confirmPassword else {
+            errorMessage = "New passwords do not match"
+            showError = true
+            return
+        }
+        
+        // Validate new password is different
+        guard newPassword != currentPassword else {
+            errorMessage = "New password must be different from current password"
+            showError = true
+            return
+        }
+        
+        // Validate password requirements
+        guard passwordValidation.isValid else {
+            errorMessage = "New password does not meet requirements"
+            showError = true
+            return
+        }
+        
         do {
             let userData = FetchData(email: email, password: newPassword)
             print("Sending update request to Members table with data:", userData)
@@ -54,7 +105,7 @@ struct MemberPasswordResetView: View {
             
             DispatchQueue.main.async {
                 print("Password successfully updated for member:", email)
-                onSave()
+                showSuccess = true
             }
         } catch {
             print("Error updating password:", error)
@@ -75,6 +126,22 @@ struct MemberPasswordResetView: View {
                     .multilineTextAlignment(.center)
                 
                 VStack(alignment: .leading, spacing: 16) {
+                    // Current password field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Current Password")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.customText.opacity(0.6))
+                        
+                        SecureField("Enter current password", text: $currentPassword)
+                            .textContentType(.password)
+                            .textInputAutocapitalization(.never)
+                            .focused($focusedField, equals: .currentPassword)
+                            .padding()
+                            .background(Color.customInputBackground)
+                            .cornerRadius(8)
+                    }
+                    .padding(.bottom, 8)
+                    
                     // New password field
                     VStack(alignment: .leading, spacing: 8) {
                         Text("New Password")
@@ -213,8 +280,8 @@ struct MemberPasswordResetView: View {
                             .fill(Color.customButton)
                     )
                     .padding(.top, 16)
-                    .disabled(newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword)
-                    .opacity(newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword ? 0.7 : 1)
+                    .disabled(currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword)
+                    .opacity(currentPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty || !passwordValidation.isValid || newPassword != confirmPassword ? 0.7 : 1)
                 }
                 .padding(.horizontal, 24)
                 
@@ -236,8 +303,15 @@ struct MemberPasswordResetView: View {
             } message: {
                 Text(errorMessage)
             }
+            .alert("Success", isPresented: $showSuccess) {
+                Button("OK") {
+                    onSave()
+                }
+            } message: {
+                Text("Your password has been updated successfully")
+            }
             .onAppear { 
-                focusedField = .newPassword
+                focusedField = .currentPassword
                 print("MemberPasswordResetView appeared for email:", email)
             }
         }

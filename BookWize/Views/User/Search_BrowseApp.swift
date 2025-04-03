@@ -114,7 +114,7 @@ struct AccountSettingsView: View {
 }
 
 struct Search_BrowseApp: View {
-    @State private var selectedTab = 1
+    @State private var selectedTab = 0
     @AppStorage("isMemberLoggedIn") private var isMemberLoggedIn = false
     let userPreferredGenres: [String]
     @State private var user: User?
@@ -161,7 +161,7 @@ struct Search_BrowseApp: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Dashboard Tab
-            UserDashboardView()
+            DashboardView()
                 .tabItem {
                     Label("Dashboard", systemImage: "rectangle.3.group")
                 }
