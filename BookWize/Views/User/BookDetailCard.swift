@@ -188,10 +188,13 @@ private struct ActionButtonsView: View {
     @State private var errorMessage = ""
     @State private var isBookReserved: Bool
     @State private var reservationId: UUID?
+    @State private var showReserveSuccessAlert = false
+    @State private var showCancelConfirmation = false
     @Binding var currentAvailability: Int
     @Binding var parentIsBookReserved: Bool
+    @Binding var parentShowReserveSuccessAlert: Bool
     
-    init(book: Book, supabase: SupabaseClient, isReserving: Binding<Bool>, addedToWishlist: Binding<Bool>, currentAvailability: Binding<Int>, parentIsBookReserved: Binding<Bool>) {
+    init(book: Book, supabase: SupabaseClient, isReserving: Binding<Bool>, addedToWishlist: Binding<Bool>, currentAvailability: Binding<Int>, parentIsBookReserved: Binding<Bool>, parentShowReserveSuccessAlert: Binding<Bool>) {
         self.book = book
         self.supabase = supabase
         self._isReserving = isReserving
@@ -200,6 +203,7 @@ private struct ActionButtonsView: View {
         self._isBookReserved = State(initialValue: parentIsBookReserved.wrappedValue)
         self._reservationId = State(initialValue: BookReservationManager.shared.getReservationId(bookId: book.id))
         self._parentIsBookReserved = parentIsBookReserved
+        self._parentShowReserveSuccessAlert = parentShowReserveSuccessAlert
     }
     
     private func checkReservationStatus() {
@@ -331,6 +335,7 @@ private struct ActionButtonsView: View {
             return
         }
         
+        print("Starting reservation process for book: \(book.title)")
         isReserving = true
         
         do {
@@ -386,6 +391,8 @@ private struct ActionButtonsView: View {
             }
             
             print("Book reserved successfully! New availability: \(currentAvailability)")
+            
+            // Update UI state and show success alert
             await MainActor.run {
                 isBookReserved = true
                 parentIsBookReserved = true
@@ -402,6 +409,10 @@ private struct ActionButtonsView: View {
                 
                 // Notify that book status has changed
                 NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
+                
+                // Show success alert - this is not working reliably
+                print("Attempting to show reserve success alert from within reserveBook")
+                parentShowReserveSuccessAlert = true
             }
             
         } catch {
@@ -507,6 +518,12 @@ private struct ActionButtonsView: View {
                 Button(action: {
                     Task {
                         await reserveBook()
+                        
+                        // Force show the success alert on the main thread
+                        await MainActor.run {
+                            print("Showing reserve success alert")
+                            parentShowReserveSuccessAlert = true
+                        }
                     }
                 }) {
                     if isReserving {
@@ -524,9 +541,7 @@ private struct ActionButtonsView: View {
                 .disabled(isReserving)
             } else if parentIsBookReserved {
                 Button(action: {
-                    Task {
-                        await removeReservation()
-                    }
+                    showCancelConfirmation = true
                 }) {
                     if isReserving {
                         ProgressView()
@@ -587,6 +602,16 @@ private struct ActionButtonsView: View {
             }
         } message: {
             Text("Are you sure you want to remove '\(book.title)' from your wishlist?")
+        }
+        .alert("Cancel Reservation", isPresented: $showCancelConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Confirm", role: .destructive) {
+                Task {
+                    await removeReservation()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to cancel your reservation for '\(book.title)'?")
         }
         .onAppear {
             print("ActionButtonsView appeared for book: \(book.title) with ID: \(book.id)")
@@ -1019,6 +1044,8 @@ struct BookDetailCard: View {
     @State private var currentAvailability: Int
     @State private var forceUpdateKey = UUID()
     @State private var isBookReserved: Bool
+    @State private var showReserveSuccessAlert = false
+    @State private var showCancelConfirmation = false
     
     init(book: Book, supabase: SupabaseClient, isPresented: Binding<Bool>) {
         self.book = book
@@ -1067,7 +1094,8 @@ struct BookDetailCard: View {
                             isReserving: $isReserving,
                             addedToWishlist: $addedToWishlist,
                             currentAvailability: $currentAvailability,
-                            parentIsBookReserved: $isBookReserved
+                            parentIsBookReserved: $isBookReserved,
+                            parentShowReserveSuccessAlert: $showReserveSuccessAlert
                         )
                         .id(forceUpdateKey)
                         
@@ -1303,6 +1331,16 @@ struct BookDetailCard: View {
             if let reservationId = BookReservationManager.shared.getReservationId(bookId: book.id) {
                 print("Persisting reservation state for book: \(book.title) with ID: \(book.id)")
             }
+        }
+        .alert("Reservation Successful", isPresented: $showReserveSuccessAlert) {
+            Button("OK", role: .cancel) {
+                print("Success alert OK button tapped")
+            }
+        } message: {
+            Text("Book has been successfully reserved!")
+        }
+        .onChange(of: showReserveSuccessAlert) { oldValue, newValue in
+            print("BookDetailCard: Reserve success alert changed from \(oldValue) to \(newValue)")
         }
     }
 }
