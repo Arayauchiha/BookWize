@@ -11,12 +11,14 @@ class FineCalculator {
         let memberEmail: String
         let returnDate: String?
         let actualReturnedDate: String?
+        let duesFine: Double?
         
         enum CodingKeys: String, CodingKey {
             case id
             case memberEmail = "member_email"
             case returnDate = "return_date"
             case actualReturnedDate = "actual_returned_date"
+            case duesFine = "duesFine"
         }
     }
     
@@ -50,7 +52,7 @@ class FineCalculator {
             // 2. Get all issue books (both returned and unreturned)
             let issueBooks: [IssueBook] = try await SupabaseManager.shared.client
                 .from("issuebooks")
-                .select("id, member_email, return_date, actual_returned_date")
+                .select("id, member_email, return_date, actual_returned_date, duesFine")
                 .execute()
                 .value
             
@@ -147,10 +149,14 @@ class FineCalculator {
                 print("Days difference: \(days)")
                 
                 if days > 0 {
-                    let fine = Double(days) * perDayFine
+                    let calculatedFine = Double(days) * perDayFine
+                    let duesFine = book.duesFine ?? 0.0
+                    let fine = (calculatedFine - duesFine)
                     let previousFine = memberFines[book.memberEmail] ?? 0
                     memberFines[book.memberEmail] = previousFine + fine
-                    print("Calculated fine: \(fine)")
+                    print("Calculated fine: \(calculatedFine)")
+                    print("Dues fine: \(duesFine)")
+                    print("Final fine after deduction: \(fine)")
                     print("Previous fine: \(previousFine)")
                     print("Total fine for member: \(previousFine + fine)")
                 } else {

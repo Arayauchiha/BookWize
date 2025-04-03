@@ -233,6 +233,8 @@ struct ReturnBookFormView: View {
     @State private var selectedCondition = BookCondition.good
     @State private var fineAmount = ""
     @State private var duesFine: Double = 0.0
+    @State private var perDayFine: Double = 0.0
+    @State private var isDuesFineConfirmed = false
     
     let onReturn: (issueBooks) -> Void
     
@@ -248,10 +250,98 @@ struct ReturnBookFormView: View {
         if selectedCondition == .damaged {
             return basicFieldsValid && !fineAmount.isEmpty &&
                    isValidFineAmount(fineAmount) &&
-                   (Double(fineAmount) ?? 0) > 0
+                   (Double(fineAmount) ?? 0) > 0 &&
+                   isDuesFineConfirmed
         }
         
-        return basicFieldsValid
+        return basicFieldsValid && isDuesFineConfirmed
+    }
+    
+    private func calculateDuesFine() async {
+        do {
+            // 1. Get per day fine from FineAndMembershipSet
+            let fineSettings: [FineSettings] = try await SupabaseManager.shared.client
+                .from("FineAndMembershipSet")
+                .select("PerDayFine")
+                .execute()
+                .value
+            
+            guard let perDayFine = fineSettings.first?.perDayFine else {
+                print("No fine settings found")
+                return
+            }
+            
+            self.perDayFine = perDayFine
+            
+            // 2. Get the issue book details
+            let issueBook: [IssueBook] = try await SupabaseManager.shared.client
+                .from("issuebooks")
+                .select("id, member_email, return_date")
+                .eq("isbn", value: isbn)
+                .eq("member_email", value: smartCardID)
+                .execute()
+                .value
+            
+            guard let book = issueBook.first else {
+                print("No issue book found")
+                return
+            }
+            
+            guard let returnDateString = book.returnDate else {
+                print("No return date found")
+                return
+            }
+            
+            // 3. Parse the return date
+            let isoFormatter = ISO8601DateFormatter()
+            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            let dateFormatter1 = DateFormatter()
+            dateFormatter1.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+            
+            let dateFormatter2 = DateFormatter()
+            dateFormatter2.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
+            
+            let dateFormatter3 = DateFormatter()
+            dateFormatter3.dateFormat = "yyyy-MM-dd"
+            
+            var returnDate: Date?
+            if let date = isoFormatter.date(from: returnDateString) {
+                returnDate = date
+            } else if let date = dateFormatter1.date(from: returnDateString) {
+                returnDate = date
+            } else if let date = dateFormatter2.date(from: returnDateString) {
+                returnDate = date
+            } else if let date = dateFormatter3.date(from: returnDateString) {
+                returnDate = date
+            }
+            
+            guard let returnDate = returnDate else {
+                print("Failed to parse return date")
+                return
+            }
+            
+            // 4. Calculate fine for this specific book
+            let currentDate = Date()
+            let calendar = Calendar.current
+            let components = calendar.dateComponents([.day], from: returnDate, to: currentDate)
+            let days = components.day ?? 0
+            
+            if days > 0 {
+                let fine = Double(days) * perDayFine
+                await MainActor.run {
+                    self.duesFine = fine
+                }
+                print("Calculated fine for this book: \(fine) for \(days) days")
+            } else {
+                await MainActor.run {
+                    self.duesFine = 0.0
+                }
+            }
+            
+        } catch {
+            print("Error calculating fine:", error)
+        }
     }
     
     var body: some View {
@@ -335,6 +425,9 @@ struct ReturnBookFormView: View {
                             .foregroundColor(.red)
                     }
                     
+                    Toggle("Mark as Paid", isOn: $isDuesFineConfirmed)
+                        .tint(.blue)
+                    
                     if selectedCondition == .damaged {
                         TextField("Enter Damage Fine Amount", text: $fineAmount)
                             .keyboardType(.decimalPad)
@@ -392,6 +485,9 @@ struct ReturnBookFormView: View {
                     isbn = scannedISBN
                     Task {
                         await fetchBookDetails(isbn: scannedISBN)
+                        if !smartCardID.isEmpty {
+                            await calculateDuesFine()
+                        }
                     }
                 }
             }
@@ -400,6 +496,9 @@ struct ReturnBookFormView: View {
                     smartCardID = scannedCode
                     Task {
                         await fetchMemberDetails(smartCardID: scannedCode)
+                        if !isbn.isEmpty {
+                            await calculateDuesFine()
+                        }
                     }
                 }
             }
@@ -421,16 +520,7 @@ struct ReturnBookFormView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
-            .task {
-                if !isbn.isEmpty && !smartCardID.isEmpty {
-                    await calculateDuesFine()
-                }
-            }
         }
-    }
-    
-    private func calculateDuesFine() async {
-        duesFine = 0.0
     }
     
     private func returnBook() {
@@ -439,6 +529,7 @@ struct ReturnBookFormView: View {
         
         Task {
             do {
+                // 1. Get the book details
                 let bookQuery = SupabaseManager.shared.client
                     .from("Books")
                     .select()
@@ -447,6 +538,31 @@ struct ReturnBookFormView: View {
                 
                 let currentBook: Book = try await bookQuery.execute().value
                 
+                // 2. Get current member's fine
+                let memberQuery = SupabaseManager.shared.client
+                    .from("Members")
+                    .select("fine")
+                    .eq("email", value: smartCardID)
+                    .single()
+                
+                let memberResponse = try await memberQuery.execute()
+                print("Member response data: \(memberResponse.data)")
+                
+                // Try to get the fine value in different ways
+                var currentFine: Double = 0.0
+                if let data = memberResponse.data as? [String: Any] {
+                    if let fine = data["fine"] as? Double {
+                        currentFine = fine
+                    } else if let fine = data["fine"] as? Int {
+                        currentFine = Double(fine)
+                    } else if let fine = data["fine"] as? String {
+                        currentFine = Double(fine) ?? 0.0
+                    }
+                }
+                
+                print("Current member fine before update: \(currentFine)")
+                
+                // 3. Update the issuebook record with return details and fines
                 let updateData = ReturnBookUpdate(
                     actual_returned_date: Date(),
                     bookCondition: selectedCondition.rawValue,
@@ -461,11 +577,15 @@ struct ReturnBookFormView: View {
                     .eq("member_email", value: smartCardID)
                     .execute()
                 
+                // 4. Update the book's available quantity
                 let bookUpdateResponse = try await SupabaseManager.shared.client
                     .from("Books")
                     .update(["availableQuantity": currentBook.availableQuantity + 1])
                     .eq("isbn", value: isbn)
                     .execute()
+                
+                // Refresh the issued books list
+                await circulationManager.fetchIssuedBooks()
                 
                 DispatchQueue.main.async {
                     circulationManager.isLoading = false
@@ -620,6 +740,26 @@ struct ReturnBookUpdate: Encodable {
     let bookCondition: String
     let fineAmount: Double?
     let duesFine: Double
+}
+
+struct FineSettings: Codable {
+    let perDayFine: Double
+    
+    enum CodingKeys: String, CodingKey {
+        case perDayFine = "PerDayFine"
+    }
+}
+
+struct IssueBook: Codable {
+    let id: UUID
+    let memberEmail: String
+    let returnDate: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case memberEmail = "member_email"
+        case returnDate = "return_date"
+    }
 }
 
 #Preview {
