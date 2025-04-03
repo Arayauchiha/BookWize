@@ -4,90 +4,136 @@ import Supabase
 
 struct InventoryView: View {
     @StateObject private var inventoryManager = InventoryManager()
+    @State private var selectedSegment = 0
     @State private var searchText = ""
+    @State private var selectedBook: Book?
     @State private var showingAddBookSheet = false
+    @State private var isFetchingRequests = false
+    @State private var bookRequests: [BookRequest] = []
     @State private var showingISBNScanner = false
     @State private var showingCSVUpload = false
     @State private var showingRequestBook = false
-    @State private var selectedBook: Book?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showError = false
-    @State private var selectedSegment = 0
-    @State private var requests: [BookRequest] = []
-    @State private var isFetchingRequests = false
     
     private let segments = ["Books", "Requests"]
     
     var filteredBooks: [Book] {
-        inventoryManager.searchBooks(query: searchText)
+        if searchText.isEmpty {
+            return inventoryManager.books
+        }
+        return inventoryManager.books.filter { book in
+            book.title.localizedCaseInsensitiveContains(searchText) ||
+            book.author.localizedCaseInsensitiveContains(searchText) ||
+            book.isbn.localizedCaseInsensitiveContains(searchText)
+        }
     }
     
     var filteredRequests: [BookRequest] {
         if searchText.isEmpty {
-            return requests
-        } else {
-            return requests.filter { request in
-                request.author.lowercased().contains(searchText.lowercased()) ||
-                request.title.lowercased().contains(searchText.lowercased()) ||
-                request.reason.lowercased().contains(searchText.lowercased())
-            }
+            return bookRequests
+        }
+        return bookRequests.filter { request in
+            request.title.localizedCaseInsensitiveContains(searchText) ||
+            request.author.localizedCaseInsensitiveContains(searchText)
         }
     }
     
     var body: some View {
-        NavigationView {
-            VStack {
-                Picker("View", selection: $selectedSegment) {
-                    ForEach(0..<segments.count, id: \.self) { index in
-                        Text(segments[index]).tag(index)
+        VStack {
+            Picker("View", selection: $selectedSegment) {
+                ForEach(0..<segments.count, id: \.self) { index in
+                    Text(segments[index]).tag(index)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding()
+            
+            if selectedSegment == 0 {
+                List {
+                    ForEach(filteredBooks) { book in
+                        EnhancedBookRowView(book: book)
+                            .onTapGesture {
+                                selectedBook = book
+                            }
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                if selectedSegment == 0 {
-                    List {
-                        ForEach(filteredBooks) { book in
-                            EnhancedBookRowView(book: book)
-                                .onTapGesture {
-                                    selectedBook = book
-                                }
+                .listStyle(.insetGrouped)
+                .overlay {
+                    if inventoryManager.books.isEmpty {
+                        VStack {
+                            ProgressView("Loading books...")
+                            Text("Please wait while we fetch the books...")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                                .padding(.top)
                         }
                     }
-                } else {
-                    List {
-                        ForEach(filteredRequests) { request in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Author: \(request.author)")
-                                    .font(.headline)
-                                Text("Title: \(request.title)")
-                                    .font(.subheadline)
-                                Text("Quantity: \(request.quantity)")
-                                    .font(.caption)
-                                Text("Reason: \(request.reason)")
-                                    .font(.caption)
-                                Text("Status: \(request.Request_status.rawValue.capitalized)")
-                                    .font(.caption)
-                                    .foregroundColor(request.Request_status .background)
-                            }
-                            .padding(.vertical, 4)
+                }
+            } else {
+                List {
+                    ForEach(filteredRequests) { request in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Author: \(request.author)")
+                                .font(.headline)
+                            Text("Title: \(request.title)")
+                                .font(.subheadline)
+                            Text("Quantity: \(request.quantity)")
+                                .font(.caption)
+                            Text("Reason: \(request.reason)")
+                                .font(.caption)
+                            Text("Status: \(request.Request_status.rawValue.capitalized)")
+                                .font(.caption)
+                                .foregroundColor(request.Request_status.background)
                         }
+                        .padding(.vertical, 4)
                     }
-                    .overlay {
-                        if isFetchingRequests {
-                            ProgressView("Loading requests...")
-                        }
-                    }
-                    .onAppear {
-                        fetchRequests()
+                }
+                .listStyle(.insetGrouped)
+                .overlay {
+                    if isFetchingRequests {
+                        ProgressView("Loading requests...")
                     }
                 }
             }
-            .listStyle(.insetGrouped)
-            .searchable(text: $searchText, prompt: "Search by title, author, or ISBN...")
-            .navigationTitle("Library Inventory")
-            .toolbar {
+        }
+        .searchable(text: $searchText, prompt: "Search \(segments[selectedSegment].lowercased())...")
+        .refreshable {
+            do {
+                if selectedSegment == 0 {
+                    try await inventoryManager.refreshBooks()
+                } else {
+                    await fetchBookRequests()
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+        }
+        .sheet(item: $selectedBook) { book in
+            NavigationView {
+                BookDetailView(book: book, inventoryManager: inventoryManager)
+            }
+        }
+        .sheet(isPresented: $showingAddBookSheet) {
+            NavigationView {
+                AddBookView(inventoryManager: inventoryManager)
+            }
+        }
+        .sheet(isPresented: $showingISBNScanner) {
+            ISBNScannerView { scannedISBN in
+                handleScannedISBN(scannedISBN)
+            }
+        }
+        .sheet(isPresented: $showingCSVUpload) {
+            CSVUploadView(viewModel: inventoryManager)
+        }
+        .sheet(isPresented: $showingRequestBook) {
+            RequestBookView()
+        }
+        .toolbar {
+            if selectedSegment == 0 {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button(action: { showingAddBookSheet = true }) {
@@ -101,6 +147,7 @@ struct InventoryView: View {
                         Button(action: { showingCSVUpload = true }) {
                             Label("Import CSV", systemImage: "square.and.arrow.down.fill")
                         }
+                        
                         Button(action: { showingRequestBook = true }) {
                             Label("Request Book", systemImage: "square.and.arrow.down.fill")
                         }
@@ -111,80 +158,65 @@ struct InventoryView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingAddBookSheet) {
-                AddBookView(inventoryManager: inventoryManager)
+        }
+        .alert("Error", isPresented: $showError) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred")
+        }
+        .overlay {
+            if isLoading {
+                ProgressView("Fetching book details...")
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                    .shadow(radius: 10)
             }
-            .sheet(isPresented: $showingISBNScanner) {
-                ISBNScannerView { scannedISBN in
-                    handleScannedISBN(scannedISBN)
-                }
+        }
+        .task {
+            do {
+                try await inventoryManager.refreshBooks()
+                await fetchBookRequests()
+            } catch {
+                errorMessage = error.localizedDescription
+                showError = true
             }
-            .sheet(isPresented: $showingCSVUpload) {
-                CSVUploadView(viewModel: inventoryManager)
+        }
+    }
+    
+    private func fetchBookRequests() async {
+        isFetchingRequests = true
+        defer { isFetchingRequests = false }
+        
+        do {
+            let requests: [BookRequest] = try await SupabaseManager.shared.client
+                .from("BookRequest")
+                .select()
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            
+            await MainActor.run {
+                self.bookRequests = requests
             }
-            .sheet(isPresented: $showingRequestBook) {
-                RequestBookView()
-            }
-            .sheet(item: $selectedBook) { book in
-                BookDetailView(book: book, inventoryManager: inventoryManager)
-            }
-            .alert("Error", isPresented: $showError) {
-                Button("OK") { }
-            } message: {
-                Text(errorMessage ?? "An unknown error occurred")
-            }
-            .overlay {
-                if isLoading {
-                    ProgressView("Fetching book details...")
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(8)
-                        .shadow(radius: 10)
-                }
+        } catch {
+            print("Error fetching book requests: \(error)")
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                showError = true
             }
         }
     }
     
     private func handleScannedISBN(_ isbn: String) {
-        isLoading = true
         Task {
             do {
                 let book = try await BookService.shared.fetchBookDetails(isbn: isbn)
                 await MainActor.run {
                     inventoryManager.addBook(book)
-                    isLoading = false
                 }
             } catch {
-                await MainActor.run {
-                    errorMessage = "Error fetching book details: \(error.localizedDescription)"
-                    showError = true
-                    isLoading = false
-                }
-            }
-        }
-    }
-    
-    private func fetchRequests() {
-        isFetchingRequests = true
-        Task {
-            do {
-                let client = SupabaseManager.shared.client
-                let fetchedRequests: [BookRequest] = try await client
-                    .from("BookRequest")
-                    .select()
-                    .execute()
-                    .value
-                
-                await MainActor.run {
-                    self.requests = fetchedRequests
-                    isFetchingRequests = false
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Failed to fetch requests: \(error.localizedDescription)"
-                    isFetchingRequests = false
-                    showError = true
-                }
+                print("Error fetching book details: \(error)")
             }
         }
     }
@@ -252,72 +284,71 @@ struct InventoryView: View {
     
     struct BookDetailView: View {
         let book: Book
-        @ObservedObject var inventoryManager: InventoryManager
+        let inventoryManager: InventoryManager
         @Environment(\.dismiss) var dismiss
         @State private var showingEditSheet = false
         @State private var showingDeleteAlert = false
         @State private var editedBook: Book?
         
         var body: some View {
-            NavigationView {
-                List {
-                    Section(header: Text("Book Information")) {
-                        DetailRow(title: "Title", value: book.title)
-                        DetailRow(title: "Author", value: book.author)
-                        DetailRow(title: "ISBN", value: book.isbn)
-                        DetailRow(title: "Publisher", value: book.publisher)
-                        if let publishedDate = book.publishedDate {
-                            DetailRow(title: "Published Date", value: publishedDate)
-                        }
-                    }
-                    
-                    Section(header: Text("Inventory Status")) {
-                        DetailRow(title: "Total Quantity", value: "\(book.quantity)")
-                        DetailRow(title: "Available", value: "\(book.availableQuantity)")
-                        DetailRow(title: "Status", value: book.isAvailable ? "Available" : "Not Available")
-                    }
-                    
-                    if let description = book.description {
-                        Section(header: Text("Description")) {
-                            Text(description)
-                        }
-                    }
-                    
-                    Section {
-                        Button(role: .destructive) {
-                            showingDeleteAlert = true
-                        } label: {
-                            Label("Delete Book", systemImage: "trash")
-                        }
+            List {
+                Section(header: Text("Book Information")) {
+                    DetailRow(title: "Title", value: book.title)
+                    DetailRow(title: "Author", value: book.author)
+                    DetailRow(title: "ISBN", value: book.isbn)
+                    DetailRow(title: "Publisher", value: book.publisher)
+                    if let publishedDate = book.publishedDate {
+                        DetailRow(title: "Published Date", value: publishedDate)
                     }
                 }
-                .navigationTitle("Book Details")
-                .navigationBarItems(
-                    trailing: HStack {
-                        Button("Edit") {
-                            editedBook = book
-                            showingEditSheet = true
-                        }
-                        Button("Done") { dismiss() }
+                
+                Section(header: Text("Inventory Status")) {
+                    DetailRow(title: "Total Quantity", value: "\(book.quantity)")
+                    DetailRow(title: "Available", value: "\(book.availableQuantity)")
+                    DetailRow(title: "Status", value: book.isAvailable ? "Available" : "Not Available")
+                }
+                
+                if let description = book.description {
+                    Section(header: Text("Description")) {
+                        Text(description)
                     }
-                )
-                .sheet(isPresented: $showingEditSheet) {
-                    if let book = editedBook {
+                }
+                
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("Delete Book", systemImage: "trash")
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Book Details")
+            .navigationBarItems(
+                leading: Button("Cancel") { dismiss() },
+                trailing: Button("Edit") {
+                    editedBook = book
+                    showingEditSheet = true
+                }
+            )
+            .sheet(isPresented: $showingEditSheet) {
+                if let book = editedBook {
+                    NavigationView {
                         EditBookView(book: book, inventoryManager: inventoryManager) { updatedBook in
                             inventoryManager.updateBook(updatedBook)
                             dismiss()
                         }
                     }
                 }
-                .alert("Delete Book", isPresented: $showingDeleteAlert) {
-                    Button("Cancel", role: .cancel) { }
-                    Button("Delete", role: .destructive) {
-                        inventoryManager.removeBook(isbn: book.isbn)
-                        dismiss()
-                    }
-                } message: {
-                    Text("Are you sure you want to delete this book? This action cannot be undone.")
+            }
+            .alert("Delete Book", isPresented: $showingDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    inventoryManager.removeBook(isbn: book.isbn)
+                    dismiss()
                 }
+            } message: {
+                Text("Are you sure you want to delete this book? This action cannot be undone.")
             }
         }
     }
@@ -572,14 +603,13 @@ struct InventoryView: View {
     
     struct EditBookView: View {
         let book: Book
-        @ObservedObject var inventoryManager: InventoryManager
+        let inventoryManager: InventoryManager
         let onSave: (Book) -> Void
         @Environment(\.dismiss) var dismiss
         
         @State private var title: String
         @State private var author: String
         @State private var publisher: String
-        @State private var quantity: Int
         @State private var publishedDate: String
         @State private var description: String
         @State private var pageCount: String
@@ -594,7 +624,6 @@ struct InventoryView: View {
             _title = State(initialValue: book.title)
             _author = State(initialValue: book.author)
             _publisher = State(initialValue: book.publisher)
-            _quantity = State(initialValue: book.quantity)
             _publishedDate = State(initialValue: book.publishedDate ?? "")
             _description = State(initialValue: book.description ?? "")
             _pageCount = State(initialValue: book.pageCount.map(String.init) ?? "")
@@ -603,47 +632,45 @@ struct InventoryView: View {
         }
         
         var body: some View {
-            NavigationView {
-                Form {
-                    Section(header: Text("Book Details")) {
-                        TextField("Title", text: $title)
-                        TextField("Author", text: $author)
-                        TextField("Publisher", text: $publisher)
-                        TextField("ISBN", text: .constant(book.isbn))
-                            .disabled(true)
-                        Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
-                    }
-                    
-                    Section(header: Text("Additional Information")) {
-                        TextField("Published Date", text: $publishedDate)
-                        TextField("Description", text: $description, axis: .vertical)
-                            .lineLimit(3...6)
-                        TextField("Page Count", text: $pageCount)
-                            .keyboardType(.numberPad)
-                        TextField("Genre", text: $genre)
-                    }
+            Form {
+                Section(header: Text("Book Details")) {
+                    TextField("Title", text: $title)
+                    TextField("Author", text: $author)
+                    TextField("Publisher", text: $publisher)
+                    TextField("ISBN", text: .constant(book.isbn))
+                        .disabled(true)
                 }
-                .navigationTitle("Edit Book")
-                .navigationBarItems(
-                    leading: Button("Cancel") { dismiss() },
-                    trailing: Button("Save") {
-                        let updatedBook = Book(
-                            isbn: book.isbn,
-                            title: title,
-                            author: author,
-                            publisher: publisher,
-                            quantity: quantity,
-                            publishedDate: publishedDate.isEmpty ? nil : publishedDate,
-                            description: description.isEmpty ? nil : description,
-                            pageCount: Int(pageCount),
-                            categories: genre.isEmpty ? nil : [genre],
-                            imageURL: imageURL.isEmpty ? nil : imageURL
-                        )
-                        onSave(updatedBook)
-                    }
-                    .disabled(title.isEmpty || author.isEmpty || publisher.isEmpty)
-                )
+                
+                Section(header: Text("Additional Information")) {
+                    TextField("Published Date", text: $publishedDate)
+                    TextField("Description", text: $description, axis: .vertical)
+                        .lineLimit(3...6)
+                    TextField("Page Count", text: $pageCount)
+                        .keyboardType(.numberPad)
+                    TextField("Genre", text: $genre)
+                }
             }
+            .navigationTitle("Edit Book")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(
+                leading: Button("Cancel") { dismiss() },
+                trailing: Button("Save") {
+                    let updatedBook = Book(
+                        isbn: book.isbn,
+                        title: title,
+                        author: author,
+                        publisher: publisher,
+                        quantity: book.quantity,
+                        publishedDate: publishedDate.isEmpty ? nil : publishedDate,
+                        description: description.isEmpty ? nil : description,
+                        pageCount: Int(pageCount),
+                        categories: genre.isEmpty ? nil : [genre],
+                        imageURL: imageURL.isEmpty ? nil : imageURL
+                    )
+                    onSave(updatedBook)
+                }
+                .disabled(title.isEmpty || author.isEmpty || publisher.isEmpty)
+            )
         }
     }
 }
@@ -675,4 +702,8 @@ struct DetailRow: View {
             Spacer()
         }
     }
+}
+
+#Preview {
+    InventoryView()
 }

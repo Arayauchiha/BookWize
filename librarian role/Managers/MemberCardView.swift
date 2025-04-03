@@ -78,9 +78,8 @@ struct MemberCardView: View {
             }
         }
         .padding(16)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: Color(.systemGray4), radius: 5, x: 0, y: 2)
+        .background(Color.customCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .onTapGesture {
             showingEditSheet = true
         }

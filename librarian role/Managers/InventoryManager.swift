@@ -11,7 +11,11 @@ class InventoryManager: ObservableObject {
         loadBooks()
         loadImages()
         Task {
-            await loadBooksFromSupabase()
+            do {
+                try await refreshBooks()
+            } catch {
+                print("Error refreshing books during initialization: \(error)")
+            }
         }
     }
     
@@ -166,20 +170,22 @@ class InventoryManager: ObservableObject {
     }
     
     func updateBook(_ book: Book) {
-        if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
-            books[index] = book
-            books[index].lastModified = Date()
-            
-            // Update in Supabase
+        if let index = books.firstIndex(where: { $0.id == book.id }) {
             Task {
-                try! await SupabaseManager.shared.client
-                    .from("Books")
-                    .update(book)
-                    .eq("isbn", value: book.isbn)
-                    .execute()
+                do {
+                    let _ = try await SupabaseManager.shared.client
+                        .from("Books")
+                        .update(book)
+                        .eq("id", value: book.id)
+                        .execute()
+                    
+                    await MainActor.run {
+                        self.books[index] = book
+                    }
+                } catch {
+                    print("Error updating book: \(error)")
+                }
             }
-            
-            saveBooks()
         }
     }
     
@@ -414,22 +420,29 @@ class InventoryManager: ObservableObject {
     
     // MARK: - Supabase Integration
     
-    private func loadBooksFromSupabase() async {
+    @MainActor
+    public func refreshBooks() async throws {
         do {
-            let books: [Book] = try await SupabaseManager.shared.client
+            print("Fetching books from Supabase...")
+            let fetchedBooks: [Book] = try await SupabaseManager.shared.client
                 .from("Books")
-                .select("*")
+                .select()
+                .order("title")
                 .execute()
                 .value
             
-            await MainActor.run {
-                self.books = books
-                self.saveBooks()
-            }
+            print("Successfully fetched \(fetchedBooks.count) books")
+            self.books = fetchedBooks
         } catch {
-            print("Error loading books from Supabase: \(error)")
+            print("Error loading books: \(error)")
+            throw error
         }
     }
+}
+
+#Preview {
+    Text("InventoryManager")
+        .environmentObject(InventoryManager())
 }
 
 
