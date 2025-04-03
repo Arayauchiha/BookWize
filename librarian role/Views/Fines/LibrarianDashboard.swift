@@ -43,13 +43,15 @@ struct LibrarianDashboard: View {
                     )
                 }
                 .padding(.horizontal)
+            }
                     // Analytics Section
             HStack(spacing: 16) {
                 if let mostPopularGenre = getPopularGenres().first {
                     PopularGenreCard(
                         title: "Popular Genres",
                         genre: mostPopularGenre.0,
-                        color: .orange
+                        color: .orange,
+                        count: 0
                     )
                     Group {
                         Text("Analytics")
@@ -154,10 +156,10 @@ struct LibrarianDashboard: View {
                 // Debug print
                 print("Debug - Popular Genres after refresh: \(dashboardManager.getPopularGenres())")
             }
-            .onAppear {
-                // Debug print on appear
-                print("Debug - Popular Genres on appear: \(dashboardManager.getPopularGenres())")
-            }
+//            .onAppear {
+//                // Debug print on appear
+//                print("Debug - Popular Genres on appear: \(dashboardManager.getPopularGenres())")
+//            }
         }
     }
     
