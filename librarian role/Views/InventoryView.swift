@@ -338,6 +338,48 @@ struct InventoryView: View {
         }
     }
     
+//    struct AddBookView: View {
+//        @Environment(\.dismiss) var dismiss
+//        @ObservedObject var inventoryManager: InventoryManager
+//        
+//        @State private var isbn = ""
+//        @State private var title = ""
+//        @State private var author = ""
+//        @State private var publisher = ""
+//        @State private var quantity = 1
+//        
+//        var body: some View {
+//            NavigationView {
+//                Form {
+//                    Section(header: Text("Book Details")) {
+//                        TextField("ISBN", text: $isbn)
+//                            .keyboardType(.numberPad)
+//                        TextField("Title", text: $title)
+//                        TextField("Author", text: $author)
+//                        TextField("Publisher", text: $publisher)
+//                        Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
+//                    }
+//                }
+//                .navigationTitle("Add New Book")
+//                .navigationBarItems(
+//                    leading: Button("Cancel") { dismiss() },
+//                    trailing: Button("Save") {
+//                        let newBook = Book(
+//                            isbn: isbn,
+//                            title: title,
+//                            author: author,
+//                            publisher: publisher,
+//                            quantity: quantity
+//                        )
+//                        inventoryManager.addBook(newBook)
+//                        dismiss()
+//                    }
+//                    .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
+//                )
+//            }
+//        }
+//    }
+    
     struct AddBookView: View {
         @Environment(\.dismiss) var dismiss
         @ObservedObject var inventoryManager: InventoryManager
@@ -347,6 +389,11 @@ struct InventoryView: View {
         @State private var author = ""
         @State private var publisher = ""
         @State private var quantity = 1
+        @State private var bookImage: UIImage?
+        @State private var showImagePicker = false
+        @State private var showCamera = false
+        @State private var selectedSource: UIImagePickerController.SourceType = .photoLibrary
+        @State private var isUploading = false // Add loading state
         
         var body: some View {
             NavigationView {
@@ -359,26 +406,116 @@ struct InventoryView: View {
                         TextField("Publisher", text: $publisher)
                         Stepper("Quantity: \(quantity)", value: $quantity, in: 1...100)
                     }
+                    
+                    Section(header: Text("Book Cover")) {
+                        if let image = bookImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 200)
+                                .cornerRadius(10)
+                        } else {
+                            Text("No image selected")
+                                .foregroundColor(.gray)
+                        }
+                        
+                        HStack {
+                            Button("Choose from Gallery") {
+                                selectedSource = .photoLibrary
+                                showImagePicker = true
+                            }
+                            .buttonStyle(.bordered)
+                            
+                            Button("Take Photo") {
+                                selectedSource = .camera
+                                showCamera = true
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
                 }
                 .navigationTitle("Add New Book")
                 .navigationBarItems(
                     leading: Button("Cancel") { dismiss() },
-                    trailing: Button("Save") {
-                        let newBook = Book(
-                            isbn: isbn,
-                            title: title,
-                            author: author,
-                            publisher: publisher,
-                            quantity: quantity
-                        )
-                        inventoryManager.addBook(newBook)
-                        dismiss()
-                    }
-                    .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
+                    trailing:
+                        Group {
+                            if isUploading {
+                                ProgressView()
+                            } else {
+                                Button("Save") {
+                                    saveBook()
+                                }
+                                .disabled(isbn.isEmpty || title.isEmpty || author.isEmpty || publisher.isEmpty)
+                            }
+                        }
                 )
+                .sheet(isPresented: $showImagePicker) {
+                    ImagePicker(image: $bookImage, sourceType: selectedSource)
+                }
+                .fullScreenCover(isPresented: $showCamera) {
+                    ImagePicker(image: $bookImage, sourceType: .camera)
+                }
+            }
+        }
+        
+        private func saveBook() {
+                isUploading = true
+                
+                let newBook = Book(
+                    isbn: isbn,
+                    title: title,
+                    author: author,
+                    publisher: publisher,
+                    quantity: quantity
+                )
+                
+                // Call the modified addBook method with the image
+                inventoryManager.addBook(newBook, withImage: bookImage)
+                
+                // We'll dismiss the view right away, the upload will continue in the background
+                isUploading = false
+                dismiss()
+            }
+        }
+
+    // MARK: - Image Picker
+    struct ImagePicker: UIViewControllerRepresentable {
+        @Binding var image: UIImage?
+        var sourceType: UIImagePickerController.SourceType
+        
+        func makeCoordinator() -> Coordinator {
+            return Coordinator(self)
+        }
+        
+        func makeUIViewController(context: Context) -> UIImagePickerController {
+            let picker = UIImagePickerController()
+            picker.sourceType = sourceType
+            picker.delegate = context.coordinator
+            return picker
+        }
+        
+        func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+        
+        class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+            let parent: ImagePicker
+            
+            init(_ parent: ImagePicker) {
+                self.parent = parent
+            }
+            
+            func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+                if let selectedImage = info[.originalImage] as? UIImage {
+                    parent.image = selectedImage
+                }
+                picker.dismiss(animated: true)
+            }
+            
+            func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+                picker.dismiss(animated: true)
             }
         }
     }
+    
     
     struct EditBookView: View {
         let book: Book

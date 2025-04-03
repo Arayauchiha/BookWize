@@ -110,6 +110,22 @@ struct ReservedBookView: View {
     
     // MARK: - Extracted View Components
     
+//    private var mainContent: some View {
+//        ZStack {
+//            if isLoading {
+//                LoadingView()
+//            } else if reservations.isEmpty {
+//                EmptyStateView(
+//                    icon: "clock.badge.exclamationmark",
+//                    title: "No Reservations Found",
+//                    message: "Reservations expire automatically after 24 hours if not processed. Check back later or refresh the page."
+//                )
+//            } else {
+//                reservationsList
+//            }
+//        }
+//    }
+    
     private var mainContent: some View {
         ZStack {
             if isLoading {
@@ -120,11 +136,23 @@ struct ReservedBookView: View {
                     title: "No Reservations Found",
                     message: "Reservations expire automatically after 24 hours if not processed. Check back later or refresh the page."
                 )
+            } else if filteredReservations.isEmpty {
+                EmptyStateView(
+                    icon: "magnifyingglass",
+                    title: "No Results Found",
+                    message: "Try searching with a different keyword."
+                )
             } else {
                 reservationsList
             }
         }
     }
+
+//    private var filteredReservations: [ReservationRecord] {
+//        reservations.filter { reservation in
+//            searchText.isEmpty || reservation.book?.title?.localizedCaseInsensitiveContains(searchText) == true
+//        }
+//    }
     
     private var reservationsList: some View {
         ScrollView {
@@ -945,13 +973,6 @@ struct ReservedBookView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
-                
-                Text("Expired reservations are automatically removed and the book quantities are updated.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-                    .padding(.top, 8)
             }
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
