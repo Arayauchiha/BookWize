@@ -180,6 +180,7 @@ struct MemberLoginView: View {
             PasswordResetRequestView(
                 email: $resetEmail,
                 passwordResetOTP: $passwordResetOTP,
+                userRole: .member,
                 onRequestReset: handleForgotPassword,
                 onVerifyOTP: {
                     // When OTP is verified, close this sheet and show password reset sheet
@@ -428,6 +429,7 @@ struct PasswordResetRequestView: View {
     @State private var emailError: String?
     @FocusState private var isEmailFocused: Bool
     @FocusState private var isOTPFocused: Bool
+    let userRole: UserRole // Add role parameter
     
     // Reference to the email service
     private let emailService = EmailService.shared
@@ -437,6 +439,15 @@ struct PasswordResetRequestView: View {
     
     private var isEmailValid: Bool {
         ValidationUtils.isValidEmail(email)
+    }
+    
+    // Initialize with role
+    init(email: Binding<String>, passwordResetOTP: Binding<String>, userRole: UserRole, onRequestReset: @escaping () -> Void, onVerifyOTP: @escaping () -> Void) {
+        self._email = email
+        self._passwordResetOTP = passwordResetOTP
+        self.userRole = userRole
+        self.onRequestReset = onRequestReset
+        self.onVerifyOTP = onVerifyOTP
     }
     
     var body: some View {
@@ -458,24 +469,32 @@ struct PasswordResetRequestView: View {
                         .multilineTextAlignment(.center)
                         .padding(.bottom, 10)
                     
-                    TextField("Email address", text: $email)
-                        .textFieldStyle(CustomTextFieldStyle())
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                        .focused($isEmailFocused)
-                        .onChange(of: email) { newValue in
-                            if !newValue.isEmpty && !isEmailValid {
-                                emailError = "Please enter a valid email address"
-                            } else {
-                                emailError = nil
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Email address", text: $email)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(emailError != nil ? Color.red : Color.gray.opacity(0.3), lineWidth: 1)
+                            )
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                            .focused($isEmailFocused)
+                            .onChange(of: email) { newValue in
+                                if !newValue.isEmpty && !isEmailValid {
+                                    emailError = "Please enter a valid email address"
+                                } else {
+                                    emailError = nil
+                                }
                             }
+                        
+                        if let error = emailError {
+                            Text(error)
+                                .foregroundStyle(Color.red)
+                                .font(.caption)
                         }
-                    
-                    if let error = emailError {
-                        Text(error)
-                            .foregroundStyle(Color.red)
-                            .font(.caption)
                     }
                 } else {
                     Text("Enter the verification code sent to \(email)")
@@ -484,18 +503,38 @@ struct PasswordResetRequestView: View {
                         .multilineTextAlignment(.center)
                         .padding(.bottom, 10)
                     
-                    TextField("Verification code", text: $passwordResetOTP)
-                        .textFieldStyle(CustomTextFieldStyle())
-                        .keyboardType(.numberPad)
-                        .focused($isOTPFocused)
-                        .onChange(of: passwordResetOTP) { newValue in
-                            // Limit to 6 digits
-                            if newValue.count > 6 {
-                                passwordResetOTP = String(newValue.prefix(6))
+                    // OTP Input Boxes
+                    HStack(spacing: 12) {
+                        ForEach(0..<6) { index in
+                            let digit = index < passwordResetOTP.count ? String(Array(passwordResetOTP)[index]) : ""
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                    .background(Color.white)
+                                    .frame(width: 45, height: 45)
+                                
+                                Text(digit)
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.customText)
                             }
-                            // Allow only digits
-                            passwordResetOTP = newValue.filter { $0.isNumber }
                         }
+                    }
+                    .overlay(
+                        TextField("", text: $passwordResetOTP)
+                            .keyboardType(.numberPad)
+                            .textContentType(.oneTimeCode)
+                            .focused($isOTPFocused)
+                            .opacity(0.001) // Make it nearly invisible but still functional
+                            .onChange(of: passwordResetOTP) { newValue in
+                                // Limit to 6 digits
+                                if newValue.count > 6 {
+                                    passwordResetOTP = String(newValue.prefix(6))
+                                }
+                                // Allow only digits
+                                passwordResetOTP = newValue.filter { $0.isNumber }
+                            }
+                    )
                 }
                 
                 if !errorMessage.isEmpty {
@@ -529,15 +568,62 @@ struct PasswordResetRequestView: View {
                             return
                         }
                         
-                        isLoading = true
-                        onRequestReset()
-                        
-                        // After sending email
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                            isLoading = false
-                            otpSent = true
-                            isOTPFocused = true
-                            startTimer()
+                        // Check email existence based on role
+                        Task {
+                            isLoading = true
+                            do {
+                                let client = SupabaseManager.shared.client
+                                
+                                switch userRole {
+                                case .librarian:
+                                    // Check Users table for librarians
+                                    let response: [FetchData] = try await client
+                                        .from("Users")
+                                        .select("*")
+                                        .eq("email", value: email)
+                                        .eq("roleFetched", value: "librarian")
+                                        .execute()
+                                        .value
+                                    
+                                    DispatchQueue.main.async {
+                                        isLoading = false
+                                        if response.isEmpty {
+                                            errorMessage = "No librarian account found with this email"
+                                        } else {
+                                            handleSuccessfulEmailCheck()
+                                        }
+                                    }
+                                    
+                                case .member:
+                                    // Check Members table for members
+                                    let response: [MemberResponse] = try await client
+                                        .from("Members")
+                                        .select("*")
+                                        .eq("email", value: email)
+                                        .execute()
+                                        .value
+                                    
+                                    DispatchQueue.main.async {
+                                        isLoading = false
+                                        if response.isEmpty {
+                                            errorMessage = "No member account found with this email"
+                                        } else {
+                                            handleSuccessfulEmailCheck()
+                                        }
+                                    }
+                                    
+                                default:
+                                    DispatchQueue.main.async {
+                                        isLoading = false
+                                        errorMessage = "Invalid user role"
+                                    }
+                                }
+                            } catch {
+                                DispatchQueue.main.async {
+                                    isLoading = false
+                                    errorMessage = "Error checking email: \(error.localizedDescription)"
+                                }
+                            }
                         }
                     }
                 }) {
@@ -611,6 +697,18 @@ struct PasswordResetRequestView: View {
                 timer?.invalidate()
                 timer = nil
             }
+        }
+    }
+    
+    private func handleSuccessfulEmailCheck() {
+        errorMessage = ""
+        onRequestReset()
+        
+        // After sending email
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            otpSent = true
+            isOTPFocused = true
+            startTimer()
         }
     }
 }

@@ -12,6 +12,8 @@ struct OTPVerificationView: View {
     @State private var timeRemaining = 60
     @State private var timer: Timer?
     @State private var canResend = false
+    @State private var otpFields: [String] = Array(repeating: "", count: 6)
+    @FocusState private var focusedField: Int?
     
     // Reference to the email service
     private let emailService = EmailService.shared
@@ -31,22 +33,16 @@ struct OTPVerificationView: View {
                         .foregroundStyle(Color.customText.opacity(0.6))
                         .padding(.horizontal, 20)
 
-                    TextField("Enter 6-digit code", text: $otp)
-                        .keyboardType(.numberPad)
-                        .textContentType(.oneTimeCode)
-                        .focused($isOTPFieldFocused)
-                        .onChange(of: otp) { _, newValue in
-                            // Limit to 6 digits
-                            if newValue.count > 6 {
-                                otp = String(newValue.prefix(6))
-                            }
-                            // Remove non-numeric characters
-                            otp = newValue.filter { $0.isNumber }
-                            // Clear error when user types
-                            errorMessage = ""
+                    HStack(spacing: 8) {
+                        ForEach(0..<6) { index in
+                            OTPTextField(text: $otpFields[index], isFocused: focusedField == index)
+                                .focused($focusedField, equals: index)
+                                .onChange(of: otpFields[index]) { _, newValue in
+                                    handleOTPChange(at: index, newValue: newValue)
+                                }
                         }
-                        .textFieldStyle(CustomTextFieldStyle())
-                        .padding(.horizontal, 20)
+                    }
+                    .padding(.horizontal, 20)
                     
                     if !errorMessage.isEmpty {
                         Text(errorMessage)
@@ -114,7 +110,7 @@ struct OTPVerificationView: View {
                 }
             }
             .onAppear { 
-                isOTPFieldFocused = true
+                focusedField = 0
                 startTimer()
             }
             .onDisappear {
@@ -122,6 +118,25 @@ struct OTPVerificationView: View {
                 timer = nil
             }
         }
+    }
+    
+    private func handleOTPChange(at index: Int, newValue: String) {
+        // Remove non-numeric characters
+        let filteredValue = newValue.filter { $0.isNumber }
+        
+        // Update the field with filtered value
+        otpFields[index] = filteredValue
+        
+        // If we have a value and it's not the last field, move to the next field
+        if !filteredValue.isEmpty && index < 5 {
+            focusedField = index + 1
+        }
+        
+        // Combine all fields into the otp binding
+        otp = otpFields.joined()
+        
+        // Clear error when user types
+        errorMessage = ""
     }
     
     private func startTimer() {
@@ -143,6 +158,7 @@ struct OTPVerificationView: View {
         
         // Clear the current OTP input
         otp = ""
+        otpFields = Array(repeating: "", count: 6)
         
         Task {
             // Send a new OTP
@@ -154,11 +170,30 @@ struct OTPVerificationView: View {
                     errorMessage = "Failed to resend verification code"
                 } else {
                     errorMessage = ""
-                    isOTPFieldFocused = true
+                    focusedField = 0
                     startTimer() // Restart the timer after successful resend
                 }
             }
         }
+    }
+}
+
+struct OTPTextField: View {
+    @Binding var text: String
+    let isFocused: Bool
+    
+    var body: some View {
+        TextField("", text: $text)
+            .keyboardType(.numberPad)
+            .textContentType(.oneTimeCode)
+            .multilineTextAlignment(.center)
+            .frame(width: 45, height: 45)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isFocused ? Color.customButton : Color.gray.opacity(0.3), lineWidth: 2)
+            )
+            .font(.title2)
+            .fontWeight(.semibold)
     }
 }
 
