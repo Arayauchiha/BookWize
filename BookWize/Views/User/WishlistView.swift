@@ -20,59 +20,46 @@ struct WishlistView: View {
     @State private var showBookDetail = false
     let supabase = SupabaseConfig.client
     var body: some View {
-        NavigationView {
-            ZStack {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                } else if viewModel.wishlistBooks.isEmpty {
-                    emptyWishlistView
-                } else {
-                    wishlistContentView
-                }
+        ZStack {
+            if viewModel.isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+            } else if viewModel.wishlistBooks.isEmpty {
+                emptyWishlistView
+            } else {
+                wishlistContentView
             }
-            .navigationTitle("My Wishlist")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        viewModel.refreshWishlist()
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .disabled(viewModel.isLoading)
-                }
+        }
+        .navigationTitle("My Wishlist")
+        .onAppear {
+            // Load wishlist data every time the view appears
+            viewModel.loadWishlist()
+            // Listen for notifications about changes to wishlist or reservations
+            NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
+        }
+        .sheet(item: $selectedBook) { book in
+            NavigationView {
+                BookDetailCard(book: book, supabase: supabase, isPresented: $showBookDetail)
+                    .navigationBarHidden(true)
             }
-            .onAppear {
-                // Load wishlist data every time the view appears
-                viewModel.loadWishlist()
-                // Listen for notifications about changes to wishlist or reservations
-                NotificationCenter.default.post(name: Notification.Name("RefreshBookStatus"), object: nil)
+            .interactiveDismissDisabled(false)
+        }
+        .alert("Remove from Wishlist", isPresented: $viewModel.showingRemoveAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) {
+                viewModel.confirmRemoval()
             }
-            .sheet(item: $selectedBook) { book in
-                NavigationView {
-                    BookDetailCard(book: book, supabase: supabase, isPresented: $showBookDetail)
-                        .navigationBarHidden(true)
-                }
-                .interactiveDismissDisabled(false)
+        } message: {
+            if let book = viewModel.bookToRemove {
+                Text("Are you sure you want to remove '\(book.title)' from your wishlist?")
+            } else {
+                Text("Are you sure you want to remove this book from your wishlist?")
             }
-            .alert("Remove from Wishlist", isPresented: $viewModel.showingRemoveAlert) {
-                Button("Cancel", role: .cancel) {}
-                Button("Remove", role: .destructive) {
-                    viewModel.confirmRemoval()
-                }
-            } message: {
-                if let book = viewModel.bookToRemove {
-                    Text("Are you sure you want to remove '\(book.title)' from your wishlist?")
-                } else {
-                    Text("Are you sure you want to remove this book from your wishlist?")
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name.reservationStatusChanged)) { _ in
-                // When reservation status changes, force refresh
-                print("WishlistView received reservation change notification, refreshing UI")
-                viewModel.refreshWishlist()
-            }
-
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name.reservationStatusChanged)) { _ in
+            // When reservation status changes, force refresh
+            print("WishlistView received reservation change notification, refreshing UI")
+            viewModel.refreshWishlist()
         }
     }
     

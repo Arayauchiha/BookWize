@@ -1,8 +1,30 @@
 import SwiftUI
 struct NavigationUtil {
     static func popToRootView() {
-        findNavigationController(viewController: UIApplication.shared.windows.filter { $0.isKeyWindow }.first?.rootViewController)?
-            .popToRootViewController(animated: true)
+        // Get all windows and filter for key window
+        let windows = UIApplication.shared.windows.filter { $0.isKeyWindow }
+        
+        // For sheets and other modal presentations, we need to check all view controllers
+        for window in windows {
+            if let rootController = window.rootViewController {
+                // Try to find navigation controller
+                if let navController = findNavigationController(viewController: rootController) {
+                    // Found a navigation controller, pop to its root
+                    navController.popToRootViewController(animated: true)
+                    return
+                }
+                
+                // Check if there are any presented view controllers
+                var currentController = rootController
+                while let presentedController = currentController.presentedViewController {
+                    if let navController = findNavigationController(viewController: presentedController) {
+                        navController.popToRootViewController(animated: true)
+                        return
+                    }
+                    currentController = presentedController
+                }
+            }
+        }
     }
     
     static func findNavigationController(viewController: UIViewController?) -> UINavigationController? {
@@ -10,12 +32,20 @@ struct NavigationUtil {
             return nil
         }
         
+        // If it's already a navigation controller, return it
         if let navigationController = viewController as? UINavigationController {
             return navigationController
         }
         
+        // Check children recursively
         for childViewController in viewController.children {
-            return findNavigationController(viewController: childViewController)
+            if let navigationController = childViewController as? UINavigationController {
+                return navigationController
+            }
+            
+            if let foundController = findNavigationController(viewController: childViewController) {
+                return foundController
+            }
         }
         
         return nil
