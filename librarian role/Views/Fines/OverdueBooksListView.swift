@@ -32,7 +32,7 @@ struct OverdueBooksListView: View {
                         .font(.headline)
                 }
                 
-                Text("₹\(String(format: "%.2f", dashboardManager.overdueFines))")
+                Text("$\(String(format: "%.2f", dashboardManager.overdueFines))")
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundColor(.red)
@@ -117,7 +117,7 @@ struct OverdueBookRow: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            Text("Fine: ₹\(String(format: "%.2f", fine))")
+            Text("Fine: $\(String(format: "%.2f", fine))")
                 .font(.headline)
                 .foregroundColor(.red)
         }

@@ -422,7 +422,7 @@ struct ReturnBookFormView: View {
                     HStack {
                         Text("Dues Fine")
                         Spacer()
-                        Text("₹\(String(format: "%.2f", duesFine))")
+                        Text("$\(String(format: "%.2f", duesFine))")
                             .foregroundColor(.red)
                     }
                     
@@ -455,7 +455,7 @@ struct ReturnBookFormView: View {
                     HStack {
                         Text("Total Fine")
                         Spacer()
-                        Text("₹\(String(format: "%.2f", duesFine + (Double(fineAmount) ?? 0)))")
+                        Text("$\(String(format: "%.2f", duesFine + (Double(fineAmount) ?? 0)))")
                             .foregroundColor(.red)
                             .fontWeight(.bold)
                     }

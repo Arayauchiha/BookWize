@@ -67,7 +67,7 @@ struct MemberCardView: View {
                 HStack {
                     Image(systemName: "dollarsign.circle.fill")
                         .foregroundStyle(member.fine > 0 ? .red : .green)
-                    Text("Fine: ₹\(String(format: "%.2f", member.fine))")
+                    Text("Fine: $\(String(format: "%.2f", member.fine))")
                         .font(.subheadline)
                         .foregroundStyle(member.fine > 0 ? .red : .green)
                 }
@@ -157,7 +157,7 @@ struct EditMemberSheet: View {
                     InfoRow(icon: genderIcon, text: member.gender.rawValue)
                     InfoRow(icon: "books.vertical.fill", text: member.selectedLibrary)
                     InfoRow(icon: "dollarsign.circle.fill",
-                           text: "₹\(String(format: "%.2f", member.fine))",
+                           text: "$\(String(format: "%.2f", member.fine))",
                            color: member.fine > 0 ? .red : .green)
                 } header: {
                     Text("Member Information")
