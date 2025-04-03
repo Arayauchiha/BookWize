@@ -1,41 +1,6 @@
 import SwiftUI
 import Supabase
 
-struct DashboardCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(color)
-                Spacer()
-                Text(value)
-                    .font(.title2)
-                    .bold()
-                    .foregroundColor(.primary)
-                    .dynamicTypeSize(.small ... .accessibility3)
-            }
-            
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .dynamicTypeSize(.small ... .accessibility2)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-    }
-}
-
 struct StatCard: View {
     let title: String
     let value: String
@@ -76,141 +41,6 @@ struct StatCard: View {
         .frame(maxWidth: .infinity, minHeight: 110, alignment: .leading)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
-    }
-}
-
-struct SummaryItem: View {
-    var title: String
-    var value: String
-    var icon: String
-    var color: Color
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.headline)
-                .foregroundColor(AppTheme.textColor)
-                .dynamicTypeSize(.small ... .accessibility3)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(AppTheme.secondaryTextColor)
-                .dynamicTypeSize(.small ... .accessibility2)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-struct GenreStatsCard: View {
-    let title: String
-    let genres: [(String, Int)]
-    let color: Color
-    
-    var body: some View {
-        NavigationLink(destination: GenreAnalyticsView(genres: genres, color: color)) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.title2)
-                        .foregroundColor(color)
-                    Spacer()
-                    if let genre = genres.first {
-                        Text(genre.0)
-                            .font(.title2)
-                            .bold()
-                            .foregroundColor(.primary)
-                            .dynamicTypeSize(.small ... .accessibility3)
-                            .lineLimit(1)
-                    }
-                }
-                
-                // Simplified graph
-                SimpleMiniBarGraph(data: genres, color: color)
-                
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .dynamicTypeSize(.small ... .accessibility2)
-                    .lineLimit(2)
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color(.systemBackground))
-            .cornerRadius(12)
-            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        }
-    }
-}
-
-struct OverdueSummaryCard: View {
-    let overdueCount: Int
-    let totalFine: Double
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
-                    Text("Overdue Books")
-                        .font(.headline)
-                        .dynamicTypeSize(.small ... .accessibility2)
-                }
-                
-                Text("\(overdueCount) books • $\(String(format: "%.2f", totalFine)) in fines")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .dynamicTypeSize(.small ... .accessibility2)
-            }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(.secondary)
-                .font(.system(size: 14, weight: .semibold))
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-    }
-}
-
-// Analytics Grid View Component
-struct AnalyticsGridView: View {
-    let totalRevenue: String
-    let overdueFines: String
-    let activeLibrarians: String
-    let activeMembers: String
-    let totalBooks: String
-    let issuedBooks: String
-    
-    var body: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 16),
-            GridItem(.flexible(), spacing: 16)
-        ], spacing: 16) {
-            StatCard(title: "Total Revenue", value: totalRevenue,
-                    icon: "dollarsign.circle.fill", color: .green)
-            StatCard(title: "Overdue Fines", value: overdueFines,
-                    icon: "clock.badge.exclamationmark.fill", color: .red)
-            StatCard(title: "Active Librarians", value: activeLibrarians,
-                    icon: "person.2.fill", color: .blue)
-            StatCard(title: "Members", value: activeMembers,
-                    icon: "person.3.fill", color: .green)
-            StatCard(title: "Available Books", value: totalBooks,
-                    icon: "books.vertical.fill", color: .blue)
-            StatCard(title: "Issued Books", value: issuedBooks,
-                    icon: "book.closed.fill", color: .purple)
-        }
-        .padding(.horizontal)
     }
 }
 
@@ -303,6 +133,37 @@ struct RequestRow: View {
         case .approved: return .green
         case .rejected: return .red
         }
+    }
+}
+
+// Analytics Grid View Component
+struct AnalyticsGridView: View {
+    let totalRevenue: String
+    let overdueFines: String
+    let activeLibrarians: String
+    let activeMembers: String
+    let totalBooks: String
+    let issuedBooks: String
+    
+    var body: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
+        ], spacing: 16) {
+            StatCard(title: "Total Revenue", value: totalRevenue,
+                    icon: "dollarsign.circle.fill", color: .green)
+            StatCard(title: "Overdue Fines", value: overdueFines,
+                    icon: "clock.badge.exclamationmark.fill", color: .red)
+            StatCard(title: "Active Librarians", value: activeLibrarians,
+                    icon: "person.2.fill", color: .blue)
+            StatCard(title: "Members", value: activeMembers,
+                    icon: "person.3.fill", color: .green)
+            StatCard(title: "Available Books", value: totalBooks,
+                    icon: "books.vertical.fill", color: .blue)
+            StatCard(title: "Issued Books", value: issuedBooks,
+                    icon: "book.closed.fill", color: .purple)
+        }
+        .padding(.horizontal)
     }
 }
 

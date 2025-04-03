@@ -51,6 +51,7 @@ struct LibrarianDashboard: View {
                             .fontWeight(.bold)
                             .padding(.top)
                             .padding(.horizontal)
+                            .dynamicTypeSize(.small ... .accessibility3)
                         
                         HStack(spacing: 16) {
                             if let mostPopularGenre = getPopularGenres().first {
@@ -76,6 +77,7 @@ struct LibrarianDashboard: View {
                             Text("Overdues")
                                 .font(.title2)
                                 .fontWeight(.bold)
+                                .dynamicTypeSize(.small ... .accessibility3)
                             
                             Spacer()
                             
@@ -83,6 +85,7 @@ struct LibrarianDashboard: View {
                                 Text("See All")
                                     .font(.subheadline)
                                     .foregroundColor(.blue)
+                                    .dynamicTypeSize(.small ... .accessibility2)
                             }
                         }
                         .padding(.horizontal)
@@ -93,10 +96,12 @@ struct LibrarianDashboard: View {
                                     .font(.title3)
                                     .fontWeight(.bold)
                                     .foregroundColor(.red)
+                                    .dynamicTypeSize(.small ... .accessibility3)
                                 
                                 Text("Total Overdue Fines")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
+                                    .dynamicTypeSize(.small ... .accessibility2)
                             }
                            
                         }
@@ -130,6 +135,28 @@ struct LibrarianDashboard: View {
     }
 }
 
+struct SearchBar: View {
+    @Binding var text: String
+    var placeholder: String
+
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(AppTheme.secondaryTextColor)
+            
+            TextField(placeholder, text: $text)
+                .dynamicTypeSize(.small ... .accessibility2)
+        }
+        .padding(8)
+        .background(Color(.systemBackground))
+        .cornerRadius(8)
+    }
+}
+
+#Preview {
+    LibrarianDashboard()
+        .environment(\.colorScheme, .light)
+}
 
 struct OverdueSummaryCard: View {
     let overdueCount: Int
@@ -143,11 +170,13 @@ struct OverdueSummaryCard: View {
                         .foregroundColor(.red)
                     Text("Overdue Books")
                         .font(.headline)
+                        .dynamicTypeSize(.small ... .accessibility2)
                 }
                 
                 Text("\(overdueCount) books • $\(String(format: "%.2f", totalFine)) in fines")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
             }
             
             Spacer()
@@ -179,38 +208,16 @@ struct SummaryItem: View {
             Text(value)
                 .font(.headline)
                 .foregroundColor(AppTheme.textColor)
+                .dynamicTypeSize(.small ... .accessibility3)
             
             Text(title)
                 .font(.caption)
                 .foregroundColor(AppTheme.secondaryTextColor)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-    }
-}
-
-struct SearchBar: View {
-    @Binding var text: String
-    var placeholder: String
-
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(AppTheme.secondaryTextColor)
-            
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-                .autocapitalization(.none)
-            
-            if !text.isEmpty {
-                Button(action: { text = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(AppTheme.secondaryTextColor)
-                }
-            }
-        }
-        .padding(12)
-        .background(Color(.systemGray6))
-        .cornerRadius(10)
     }
 }
 
@@ -228,11 +235,13 @@ struct EmptyStateView: View {
             Text(title)
                 .font(.headline)
                 .foregroundColor(AppTheme.textColor)
+                .dynamicTypeSize(.small ... .accessibility3)
             
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(AppTheme.secondaryTextColor)
                 .multilineTextAlignment(.center)
+                .dynamicTypeSize(.small ... .accessibility2)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -256,11 +265,14 @@ struct DashboardCard: View {
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
+                    .dynamicTypeSize(.small ... .accessibility3)
             }
             
             Text(title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
         }
         .padding()
         .frame(maxWidth: .infinity)
@@ -269,7 +281,6 @@ struct DashboardCard: View {
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
-
 
 struct SimpleMiniBarGraph: View {
     let data: [(String, Int)]
@@ -323,6 +334,8 @@ struct GenreStatsCard: View {
                             .font(.title2)
                             .bold()
                             .foregroundColor(.primary)
+                            .dynamicTypeSize(.small ... .accessibility3)
+                            .lineLimit(1)
                     }
                 }
                 
@@ -337,6 +350,8 @@ struct GenreStatsCard: View {
                 Text(title)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                    .dynamicTypeSize(.small ... .accessibility2)
+                    .lineLimit(2)
             }
             .padding()
             .frame(maxWidth: .infinity)
@@ -363,11 +378,15 @@ struct PopularGenreCard: View {
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
+                    .dynamicTypeSize(.small ... .accessibility3)
+                    .lineLimit(1)
             }
             
             Text(title)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
+                .dynamicTypeSize(.small ... .accessibility2)
+                .lineLimit(2)
         }
         .padding()
         .frame(maxWidth: .infinity)
