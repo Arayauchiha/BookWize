@@ -158,7 +158,7 @@ struct EnhancedLoanCard: View {
                 Spacer()
                 
                 VStack(alignment: .trailing) {
-                    Text("Return Date")
+                    Text("Due Date")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if let returnDate = issuedBooks.returnDate {

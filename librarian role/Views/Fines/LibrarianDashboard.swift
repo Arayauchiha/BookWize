@@ -341,7 +341,7 @@ struct GenreStatsCard: View {
                             .font(.title2)
                             .bold()
                             .foregroundColor(.primary)
-                            .lineLimit(2)
+                            .lineLimit(1)
                     }
                 }
                 .frame(height: 30)
@@ -350,15 +350,16 @@ struct GenreStatsCard: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
+                }
+                .padding()
+                .frame(height: 100)
+                .frame(maxWidth: .infinity)
+                .background(Color.customCardBackground)
+                .cornerRadius(12)
             }
-            .padding()
-            .frame(height: 100)
-            .frame(maxWidth: .infinity)
-            .background(Color.customCardBackground)
-            .cornerRadius(12)
         }
     }
-}
+
 
 struct PopularGenreCard: View {
     let title: String
@@ -378,14 +379,9 @@ struct PopularGenreCard: View {
                     .font(.title2)
                     .bold()
                     .foregroundColor(.primary)
-                    .lineLimit(2)
+                    .lineLimit(1)
             }
             .frame(height: 30)
-            
-            Text("\(count) members prefer this genre")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.vertical, 2)
             
             Text(title)
                 .font(.subheadline)
