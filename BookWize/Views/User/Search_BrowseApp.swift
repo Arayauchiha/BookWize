@@ -124,7 +124,7 @@ struct Search_BrowseApp: View {
     @State private var newPassword = ""
     @State private var confirmPassword = ""
     @State private var isNewPasswordVisible = false
-    @State private var showLogoutAlert = false
+    @State private var showLogoutConfirmation = false
     
     init(userPreferredGenres: [String] = []) {
         self.userPreferredGenres = userPreferredGenres
@@ -157,6 +157,19 @@ struct Search_BrowseApp: View {
         } catch {
             print("❌ Error fetching member: \(error)")
         }
+    }
+    
+    private func handleLogout() {
+        // Clear stored user data
+        UserDefaults.standard.removeObject(forKey: "currentMemberId")
+        UserDefaults.standard.removeObject(forKey: "currentMemberEmail")
+        
+        // Update UI
+        isMemberLoggedIn = false
+        NavigationUtil.popToRootView()
+        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+        let window = windowScene?.windows.first
+        window?.rootViewController = UIHostingController(rootView: ContentView())
     }
     
     var body: some View {
@@ -232,7 +245,29 @@ struct Search_BrowseApp: View {
                         }
                         
                         Button(role: .destructive) {
-                            showLogoutAlert = true
+                            // Show confirmation alert
+                            let alertController = UIAlertController(
+                                title: "Logout",
+                                message: "Are you sure you want to logout?",
+                                preferredStyle: .alert
+                            )
+                            
+                            alertController.addAction(UIAlertAction(
+                                title: "Cancel",
+                                style: .cancel
+                            ))
+                            
+                            alertController.addAction(UIAlertAction(
+                                title: "Logout",
+                                style: .destructive,
+                                handler: { _ in handleLogout() }
+                            ))
+                            
+                            // Present the alert
+                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                               let rootViewController = windowScene.windows.first?.rootViewController {
+                                rootViewController.present(alertController, animated: true)
+                            }
                         } label: {
                             Label("Logout", systemImage: "rectangle.portrait.and.arrow.right")
                         }
@@ -248,23 +283,6 @@ struct Search_BrowseApp: View {
                     }
                 }
                 .navigationTitle("Account")
-                .alert("Logout", isPresented: $showLogoutAlert) {
-                    Button("Cancel", role: .cancel) { }
-                    Button("Logout", role: .destructive) {
-                        // Clear stored user data
-                        UserDefaults.standard.removeObject(forKey: "currentMemberId")
-                        UserDefaults.standard.removeObject(forKey: "currentMemberEmail")
-                        
-                        // Update UI
-                        isMemberLoggedIn = false
-                        NavigationUtil.popToRootView()
-                        let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-                        let window = windowScene?.windows.first
-                        window?.rootViewController = UIHostingController(rootView: ContentView())
-                    }
-                } message: {
-                    Text("Are you sure you want to logout?")
-                }
                 .sheet(isPresented: $isPasswordResetPresented) {
                     if let user = user {
                         MemberPasswordResetView(
