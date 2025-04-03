@@ -421,15 +421,6 @@ struct ProfileView: View {
                         Text("Are you sure you want to logout?")
                     }
                 }
-                
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
             .navigationTitle("Profile")
             .navigationBarItems(trailing: Button("Done") { dismiss() })
