@@ -398,7 +398,7 @@ struct InventoryView: View {
                     Section(header: Text("Book Details")) {
                         TextField("ISBN", text: $isbn)
                             .keyboardType(.numberPad)
-                            .onChange(of: isbn) { newValue in
+                            .onChange(of: isbn) { _, newValue in
                                 // Only allow numeric input
                                 let filteredValue = newValue.filter { $0.isNumber }
                                 if filteredValue != newValue {

@@ -85,12 +85,9 @@ class EmailService {
         )
 
         do {
-            try await smtp.send(mail)
+            smtp.send(mail)
             print("Email sent successfully to \(recipient)")
             return true
-        } catch {
-            print("Failed to send email: \(error.localizedDescription)")
-            return false
         }
     }
     
@@ -106,12 +103,9 @@ class EmailService {
         )
         
         do {
-            try await smtp.send(mail)
+            smtp.send(mail)
             print("HTML email sent successfully to \(recipient)")
             return true
-        } catch {
-            print("Failed to send HTML email: \(error.localizedDescription)")
-            return false
         }
     }
 }

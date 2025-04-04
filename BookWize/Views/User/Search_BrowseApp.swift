@@ -328,7 +328,7 @@ struct Search_BrowseApp: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .onChange(of: showingProfileSheet) { newValue in
+        .onChange(of: showingProfileSheet) { _, newValue in
             if newValue && user == nil {
                 Task {
                     await fetchMember()

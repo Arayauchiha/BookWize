@@ -79,7 +79,7 @@ struct LoginView: View {
                         .textInputAutocapitalization(.never)
                         .disableAutocorrection(true)
                         .customTextField()
-                        .onChange(of: email) { newValue in
+                        .onChange(of: email) { _, newValue in
                             if !newValue.isEmpty && !isEmailValid {
                                 emailError = "Please enter a valid email address"
                             } else {

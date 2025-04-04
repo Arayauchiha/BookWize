@@ -13,7 +13,7 @@ import Foundation
                     .single()
                     .execute()
                 
-                guard let data = response.data as? [[String: Any]],
+                guard let data = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]],
                       let firstBook = data.first,
                       let currentQuantity = firstBook["available_quantity"] as? Int else {
                     throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get book quantity"])
@@ -25,7 +25,7 @@ import Foundation
                 }
                 
                 // Start a transaction to ensure both operations succeed or fail together
-                try await SupabaseManager.shared.client.rpc("begin_transaction")
+                _ = try SupabaseManager.shared.client.rpc("begin_transaction")
                 
                 // Insert the issued book record
                 try await SupabaseManager.shared.client
@@ -41,7 +41,7 @@ import Foundation
                     .execute()
                 
                 // Commit the transaction
-                try await SupabaseManager.shared.client.rpc("commit_transaction")
+                _ = try SupabaseManager.shared.client.rpc("commit_transaction")
                 
                 DispatchQueue.main.async {
                     completion(true)
@@ -49,7 +49,7 @@ import Foundation
             } catch {
                 print("Error issuing book:", error)
                 // Rollback the transaction if it was started
-                try? await SupabaseManager.shared.client.rpc("rollback_transaction")
+               _ = try SupabaseManager.shared.client.rpc("rollback_transaction")
                 
                 DispatchQueue.main.async {
                     completion(false)
@@ -57,29 +57,6 @@ import Foundation
             }
         }
     }
-//
-//    /// Fetch all issued books
-////    func fetchIssuedBooks(completion: @escaping ([issueBooks]) -> Void) {
-////        Task {
-////            do {
-////                let issuedBooks: [issueBooks] = try await SupabaseManager.shared.client
-////                    .from("issueBooks")
-////                    .select()
-////                    .execute()
-////                    .value
-////                
-////                DispatchQueue.main.async {
-////                    completion(issuedBooks)
-////                }
-////            } catch {
-////                print("Error fetching issued books:", error)
-////                DispatchQueue.main.async {
-////                    completion([])
-////                }
-////            }
-////        }
-////    }
-//}
 
 class IssuedBookManager: ObservableObject {
     static let shared = IssuedBookManager()
@@ -113,11 +90,11 @@ class IssuedBookManager: ObservableObject {
             var jsonData: Data?
             
             // Check if data is an array of dictionaries
-            if let dataArray = response.data as? [[String: Any]] {
+            if let dataArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
                 jsonData = try? JSONSerialization.data(withJSONObject: dataArray)
             }
             // Check if data is already a Data object
-            else if let data = response.data as? Data {
+            else if let data = try? JSONSerialization.jsonObject(with: response.data) as? Data {
                 jsonData = data
             }
             

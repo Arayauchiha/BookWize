@@ -55,7 +55,7 @@ struct OpenLibraryBook: Codable {
         } else {
             key.components(separatedBy: "/").last ?? ""
         }
-        let imageURL = "https://covers.openlibrary.org/b/id/\(coverId)-L.jpg"
+        _ = "https://covers.openlibrary.org/b/id/\(coverId)-L.jpg"
         
         let authorName = if let firstAuthor = authorName?.first {
             firstAuthor

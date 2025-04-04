@@ -188,7 +188,7 @@ struct FineAndMembershipManagement: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 100)
-                                .onChange(of: editedFine) { newValue in
+                                .onChange(of: editedFine) { _, newValue in
                                     if let _ = Double(newValue) {
                                         HapticManager.lightImpact()
                                     }
@@ -202,7 +202,7 @@ struct FineAndMembershipManagement: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 100)
-                                .onChange(of: editedMembership) { newValue in
+                                .onChange(of: editedMembership) { _, newValue in
                                     if let _ = Double(newValue) {
                                         HapticManager.lightImpact()
                                     }

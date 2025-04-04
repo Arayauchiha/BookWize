@@ -19,46 +19,6 @@ class InventoryManager: ObservableObject {
         }
     }
     
-    // MARK: - Book Management
-//    func addBook(_ book: Book) {
-//        if let index = books.firstIndex(where: { $0.isbn == book.isbn }) {
-//            // Update existing book locally
-//            books[index].quantity += book.quantity
-//            books[index].availableQuantity += book.quantity
-//            books[index].lastModified = Date()
-//            
-//            // Update in Supabase
-//            Task {
-//                do {
-//                    try await SupabaseManager.shared.client
-//                        .from("Books")
-//                        .update(books[index])
-//                        .eq("isbn", value: book.isbn)
-//                        .execute()
-//                    saveBooks()
-//                } catch {
-//                    print("Error updating book in Supabase: \(error)")
-//                }
-//            }
-//        } else {
-//            // Add new book
-//            books.append(book)
-//            
-//            // Insert in Supabase
-//            Task {
-//                do {
-//                    try await SupabaseManager.shared.client
-//                        .from("Books")
-//                        .insert(book)
-//                        .execute()
-//                    saveBooks()
-//                } catch {
-//                    print("Error inserting book in Supabase: \(error)")
-//                }
-//            }
-//        }
-//    }
-    
     // Add this method to your InventoryManager class
     func uploadBookImage(_ image: UIImage, for isbn: String) async throws -> String {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
@@ -69,11 +29,11 @@ class InventoryManager: ObservableObject {
         let fileName = "\(isbn)_\(Int(Date().timeIntervalSince1970)).jpg"
         
         // Upload to Supabase Storage
-        let uploadResult = try await SupabaseManager.shared.client.storage
+        _ = try await SupabaseManager.shared.client.storage
             .from("book-covers") // Replace with your actual bucket name
             .upload(
-                path: fileName,
-                file: imageData,
+                fileName,
+                data: imageData,
                 options: .init(contentType: "image/jpeg")
             )
         
@@ -364,7 +324,7 @@ class InventoryManager: ObservableObject {
                 pageCount: pageCount > 0 ? pageCount : nil,
                 categories: genre.isEmpty ? nil : [genre],
                 imageURL: imageURL.isEmpty ? nil : imageURL
-//                quantity: quantity // Avoid storing empty URLs
+               // quantity: quantity // Avoid storing empty URLs
             )
             
             addBook(book)

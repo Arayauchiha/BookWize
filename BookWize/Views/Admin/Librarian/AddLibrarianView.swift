@@ -57,7 +57,7 @@ struct AddLibrarianView: View {
                         
                         TextField("Full Name", text: $name)
                             .textFieldStyle(CustomTextFieldStyle())
-                            .onChange(of: name) { newValue in
+                            .onChange(of: name) { _, newValue in
                                 if newValue.isEmpty {
                                     nameError = "Name is required"
                                     HapticManager.error()
@@ -84,7 +84,7 @@ struct AddLibrarianView: View {
                         TextField("Age", text: $age)
                             .textFieldStyle(CustomTextFieldStyle())
                             .keyboardType(.numberPad)
-                            .onChange(of: age) { newValue in
+                            .onChange(of: age) { _, newValue in
                                 if newValue.isEmpty {
                                     ageError = "Age is required"
                                     HapticManager.error()
@@ -142,7 +142,7 @@ struct AddLibrarianView: View {
                         TextField("Phone", text: $phone)
                             .textFieldStyle(CustomTextFieldStyle())
                             .keyboardType(.numberPad)
-                            .onChange(of: phone) { newValue in
+                            .onChange(of: phone) { _, newValue in
                                 if newValue.isEmpty {
                                     phoneError = "Phone number is required"
                                     HapticManager.error()
@@ -283,7 +283,7 @@ struct AddLibrarianView: View {
             alertType = .error("Phone number should be of 10 digit")
             return
         }
-        guard let phoneInt = Int(phone) else {
+        guard Int(phone) != nil else {
             HapticManager.error()
             alertType = .error("Invalid phone number")
             return

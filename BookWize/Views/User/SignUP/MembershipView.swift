@@ -89,7 +89,7 @@ struct MembershipView: View {
         
         Task {
             do {
-                let response = try await SupabaseManager.shared.client.database
+                let response = try await SupabaseManager.shared.client
                     .from("FineAndMembershipSet")
                     .select("Membership")
                     .single()
@@ -139,7 +139,7 @@ struct MembershipView: View {
         )
         
         do {
-            let response = try await client.database
+            _ = try await client
                 .from("Members")
                 .insert(user)
                 .execute()
@@ -575,7 +575,7 @@ struct GenreSelectionView: View {
                 let client = SupabaseManager.shared.client
                 
                 // Fetch all books to extract genres from categories
-                let response = try await client.database
+                let response = try await client
                     .from("Books")
                     .select("categories")
                     .execute()
@@ -621,7 +621,7 @@ struct GenreSelectionView: View {
         
         do {
             // Update the selectedGenres column for the user
-            let response = try await client.database
+            _ = try await client
                 .from("Members")
                 .update(["selectedGenres": Array(selectedGenres)])
                 .eq("email", value: userEmail)
@@ -630,7 +630,7 @@ struct GenreSelectionView: View {
             print("Successfully saved selected genres to Supabase")
             
             // Fetch the complete user data to ensure we have the user ID
-            let userResponse: [User] = try await client.database
+            let userResponse: [User] = try await client
                 .from("Members")
                 .select("*")
                 .eq("email", value: userEmail)

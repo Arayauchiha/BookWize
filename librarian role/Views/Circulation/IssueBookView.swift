@@ -233,7 +233,7 @@ struct IssueBookFormView: View {
                 }) {
                     TextField("Scan ISBN", text: $isbn)
                         .keyboardType(.numberPad)
-                        .onChange(of: isbn) { newValue in
+                        .onChange(of: isbn) { _, newValue in
                             if !newValue.isEmpty {
                                 Task {
                                     await fetchBookDetails(isbn: newValue)
@@ -412,7 +412,7 @@ struct IssueBookFormView: View {
                     .single()
                 
                 let response = try await query.execute()
-                if let data = response.data as? [String: Any],
+                if let data = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
                    let email = data["email"] as? String,
                    let name = data["name"] as? String {
                     await MainActor.run {
@@ -529,13 +529,13 @@ struct IssueBookFormView: View {
                 )
 
                 // Insert new issue record
-                let issueResponse = try await SupabaseManager.shared.client
+                _ = try await SupabaseManager.shared.client
                     .from("issuebooks")
                     .insert(newIssue)
                     .execute()
 
                 // Decrease available quantity of the book
-                let updateResponse = try await SupabaseManager.shared.client
+                _ = try await SupabaseManager.shared.client
                     .from("Books")
                     .update(["availableQuantity": currentBook.availableQuantity - 1])
                     .eq("isbn", value: isbn)

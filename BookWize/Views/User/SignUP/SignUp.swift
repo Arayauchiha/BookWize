@@ -77,7 +77,7 @@ struct SignupView: View {
                             TextField("Enter your email", text: $email)
                                 .autocapitalization(.none)
                                 .keyboardType(.emailAddress)
-                                .onChange(of: email) { newValue in
+                                .onChange(of: email) { _, newValue in
                                     emailError = ValidationUtils.getEmailError(newValue)
                                 }
                         }
@@ -85,7 +85,7 @@ struct SignupView: View {
                         // Name
                         inputField(title: "Full Name", error: nameError) {
                             TextField("Enter your full name", text: $name)
-                                .onChange(of: name) { newValue in
+                                .onChange(of: name) { _, newValue in
                                     let nameRegex = "^[A-Za-z\\s]+$"
                                     let namePredicate = NSPredicate(format: "SELF MATCHES %@", nameRegex)
                                     nameError = namePredicate.evaluate(with: newValue) ? nil : "Only letters and spaces allowed"
@@ -123,7 +123,7 @@ struct SignupView: View {
                                 if isPasswordVisible {
                                     TextField("Enter password", text: $password)
                                         .textFieldStyle(CustomTextFieldStyle())
-                                        .onChange(of: password) { newValue in
+                                        .onChange(of: password) { _, newValue in
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                             
                                             if !confirmPassword.isEmpty {
@@ -133,7 +133,7 @@ struct SignupView: View {
                                 } else {
                                     SecureField("Enter password", text: $password)
                                         .textFieldStyle(CustomTextFieldStyle())
-                                        .onChange(of: password) { newValue in
+                                        .onChange(of: password) { _, newValue in
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                             
                                             if !confirmPassword.isEmpty {

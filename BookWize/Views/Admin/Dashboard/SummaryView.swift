@@ -108,7 +108,7 @@ struct AllRequestsView: View {
             .padding(.top, 16)
             .padding(.bottom, 20)
             .tint(Color.customButton)
-            .onChange(of: selectedSegment) { _ in
+            .onChange(of: selectedSegment) { _, newValue in
                 HapticManager.lightImpact()
             }
             

@@ -79,7 +79,7 @@ class BookSearchViewModel: ObservableObject {
             print("Fetching books from Supabase...")
             
             // Add a cache-busting query parameter
-            let timestamp = Int(Date().timeIntervalSince1970)
+            _ = Int(Date().timeIntervalSince1970)
             let readableBooks: [Book]? = try await SupabaseManager.shared.client
                 .from("Books")
                 .select("*")
@@ -238,7 +238,7 @@ class BookSearchViewModel: ObservableObject {
             print("Refreshing books data from Supabase...")
             
             // Add cache-busting timestamp to force fresh data
-            let timestamp = Int(Date().timeIntervalSince1970)
+            _ = Int(Date().timeIntervalSince1970)
             let readableBooks: [Book]? = try await SupabaseManager.shared.client
                 .from("Books")
                 .select("*")
