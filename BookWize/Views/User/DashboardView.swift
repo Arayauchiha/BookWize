@@ -238,10 +238,11 @@ class BorrowedBooksManager: ObservableObject {
                 }
             }
             
+            let captureBooks = books
             await MainActor.run {
-                self.borrowedBooks = books
+                self.borrowedBooks = captureBooks
                 self.isLoading = false
-                print("Updated borrowed books: \(books.count)")
+                print("Updated borrowed books: \(captureBooks.count)")
             }
             
         } catch {
@@ -327,10 +328,11 @@ class ReturnedBooksManager: ObservableObject {
                 }
             }
             
+            let capturedBooks = books
             await MainActor.run {
-                self.returnedBooks = books
+                self.returnedBooks = capturedBooks
                 self.isLoading = false
-                print("Updated returned books: \(books.count)")
+                print("Updated returned books: \(capturedBooks.count)")
             }
             
         } catch {
@@ -451,10 +453,11 @@ class OverdueFinesManager: ObservableObject {
                 }
             }
             
+            let capturedFines = fines
             await MainActor.run {
-                self.overdueFines = fines
+                self.overdueFines = capturedFines
                 self.isLoading = false
-                print("Updated overdue fines: \(fines.count)")
+                print("Updated overdue fines: \(capturedFines.count)")
             }
             
         } catch {

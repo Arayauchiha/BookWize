@@ -75,7 +75,7 @@ struct RequestBookView: View {
                 Text("Book request submitted successfully!")
             }
         }
-        .onChange(of: quantityString) { newValue in
+        .onChange(of: quantityString) { _, newValue in
             if let number = Int(newValue) {
                 showQuantityError = number <= 0
             }

@@ -359,7 +359,7 @@ struct ReturnBookFormView: View {
                 }) {
                     TextField("Scan or Enter ISBN", text: $isbn)
                         .keyboardType(.numberPad)
-                        .onChange(of: isbn) { newValue in
+                        .onChange(of: isbn) { _, newValue in
                             if !newValue.isEmpty {
                                 Task {
                                     await fetchBookDetails(isbn: newValue)
@@ -368,7 +368,7 @@ struct ReturnBookFormView: View {
                         }
                     
                     TextField("Enter Book Name", text: $bookName)
-                        .onChange(of: bookName) { newValue in
+                        .onChange(of: bookName) { _, newValue in
                             if !newValue.isEmpty {
                                 Task {
                                     await fetchBookByName(name: newValue)
@@ -389,7 +389,7 @@ struct ReturnBookFormView: View {
                 }) {
                     TextField("Scan or Enter Member ID", text: $smartCardID)
                         .keyboardType(.default)
-                        .onChange(of: smartCardID) { newValue in
+                        .onChange(of: smartCardID) { _, newValue in
                             if !newValue.isEmpty {
                                 Task {
                                     await fetchMemberDetails(smartCardID: newValue)
@@ -398,7 +398,7 @@ struct ReturnBookFormView: View {
                         }
                     
                     TextField("Enter Member Name", text: $memberName)
-                        .onChange(of: memberName) { newValue in
+                        .onChange(of: memberName) { _, newValue in
                             if !newValue.isEmpty {
                                 Task {
                                     await fetchMemberByName(name: newValue)
@@ -431,7 +431,7 @@ struct ReturnBookFormView: View {
                     if selectedCondition == .damaged {
                         TextField("Enter Damage Fine Amount", text: $fineAmount)
                             .keyboardType(.decimalPad)
-                            .onChange(of: fineAmount) { newValue in
+                            .onChange(of: fineAmount) { _, newValue in
                                 if !isValidFineAmount(newValue) {
                                     fineAmount = String(newValue.filter { "0123456789.".contains($0) })
                                 }
@@ -502,7 +502,7 @@ struct ReturnBookFormView: View {
                     }
                 }
             }
-            .onChange(of: selectedCondition) { newCondition in
+            .onChange(of: selectedCondition) { _, newCondition in
                 if newCondition == .good {
                     fineAmount = ""
                 }
@@ -550,7 +550,7 @@ struct ReturnBookFormView: View {
                 
                 // Try to get the fine value in different ways
                 var currentFine: Double = 0.0
-                if let data = memberResponse.data as? [String: Any] {
+                if let data = try? JSONSerialization.jsonObject(with: memberResponse.data) as? [String: Any] {
                     if let fine = data["fine"] as? Double {
                         currentFine = fine
                     } else if let fine = data["fine"] as? Int {
@@ -570,7 +570,7 @@ struct ReturnBookFormView: View {
                     duesFine: duesFine
                 )
                 
-                let updateResponse = try await SupabaseManager.shared.client
+                _ = try await SupabaseManager.shared.client
                     .from("issuebooks")
                     .update(updateData)
                     .eq("isbn", value: isbn)
@@ -578,7 +578,7 @@ struct ReturnBookFormView: View {
                     .execute()
                 
                 // 4. Update the book's available quantity
-                let bookUpdateResponse = try await SupabaseManager.shared.client
+                _ = try await SupabaseManager.shared.client
                     .from("Books")
                     .update(["availableQuantity": currentBook.availableQuantity + 1])
                     .eq("isbn", value: isbn)
@@ -610,7 +610,7 @@ struct ReturnBookFormView: View {
             let query = SupabaseManager.shared.client
                 .from("Books")
                 .select()
-                .ilike("title", value: "%\(name)%")
+                .ilike("title", pattern: "%\(name)%")
                 .single()
             
             let book: Book = try await query.execute().value
@@ -636,11 +636,11 @@ struct ReturnBookFormView: View {
             let query = SupabaseManager.shared.client
                 .from("Members")
                 .select()
-                .ilike("name", value: "%\(name)%")
+                .ilike("name", pattern: "%\(name)%")
                 .single()
             
             let response = try await query.execute()
-            if let data = response.data as? [String: Any],
+            if let data = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
                let email = data["email"] as? String,
                let name = data["name"] as? String {
                 await MainActor.run {
@@ -705,7 +705,7 @@ struct ReturnBookFormView: View {
                     .single()
                 
                 let response = try await query.execute()
-                if let data = response.data as? [String: Any],
+                if let data = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
                    let email = data["email"] as? String,
                    let name = data["name"] as? String {
                     await MainActor.run {

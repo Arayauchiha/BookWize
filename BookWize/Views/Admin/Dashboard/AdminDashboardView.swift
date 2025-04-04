@@ -204,8 +204,8 @@ struct AdminDashboardView: View {
                     HapticManager.mediumImpact()
                     currentTask?.cancel()
                     currentTask = Task {
-                        async let requests = fetchBookRequests()
-                        async let analytics = dashboardManager.fetchDashboardData()
+                        async let requests: () = fetchBookRequests()
+                        async let analytics: () = dashboardManager.fetchDashboardData()
                         try? await (requests, analytics)
                     }
                 }
@@ -264,7 +264,7 @@ struct AdminDashboardView: View {
             }
             .presentationDragIndicator(.visible)
         }
-        .onChange(of: selectedTab) { _ in
+        .onChange(of: selectedTab) { _, newValue in
             HapticManager.selection()
         }
         .onAppear {

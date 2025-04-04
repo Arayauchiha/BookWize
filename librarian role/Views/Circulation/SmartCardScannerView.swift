@@ -43,7 +43,7 @@ struct SmartCardScannerView: View {
             .onAppear {
                 scannerModel.checkPermissions()
             }
-            .onChange(of: scannerModel.scannedCode) { newValue in
+            .onChange(of: scannerModel.scannedCode) { _, newValue in
                 if let code = newValue {
                     onScan(code)
                     presentationMode.wrappedValue.dismiss()

@@ -53,7 +53,7 @@ struct FinanceView: View {
                         .pickerStyle(SegmentedPickerStyle())
                         .padding()
                         .transition(.opacity)
-                        .onChange(of: selectedCategory) { _ in
+                        .onChange(of: selectedCategory) { _, newValue in
                             HapticManager.selection()
                         }
                     }
@@ -130,7 +130,7 @@ struct FinanceView: View {
         .navigationTitle("Finance")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Search expenses")
-        .onChange(of: searchText) { _ in
+        .onChange(of: searchText) { _, newValue in
             HapticManager.lightImpact()
         }
         .toolbar {
@@ -614,9 +614,6 @@ struct ExpenseHistoryView: View {
             // Only remove completed expenses from the local array
             expenses.removeAll { $0.status == "Completed" }
             HapticManager.success()
-        } catch {
-            errorMessage = "Failed to clear history: \(error.localizedDescription)"
-            HapticManager.error()
         }
         isLoading = false
     }

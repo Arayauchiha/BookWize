@@ -155,7 +155,7 @@ struct MemberPasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
-                                        .onChange(of: newPassword) { newValue in
+                                        .onChange(of: newPassword) { _, newValue in
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                         }
                                 } else {
@@ -163,7 +163,7 @@ struct MemberPasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
-                                        .onChange(of: newPassword) { newValue in
+                                        .onChange(of: newPassword) { _, newValue in
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                         }
                                 }

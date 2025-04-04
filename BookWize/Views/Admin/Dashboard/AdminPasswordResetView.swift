@@ -163,7 +163,7 @@ struct AdminPasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
-                                        .onChange(of: newPassword) { newValue in
+                                        .onChange(of: newPassword) { _, newValue in
                                             let oldValidation = passwordValidation
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                             // Provide haptic feedback when password requirements are met
@@ -176,7 +176,7 @@ struct AdminPasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
-                                        .onChange(of: newPassword) { newValue in
+                                        .onChange(of: newPassword) { _, newValue in
                                             let oldValidation = passwordValidation
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                             // Provide haptic feedback when password requirements are met
@@ -261,7 +261,7 @@ struct AdminPasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .confirmPassword)
-                                        .onChange(of: confirmPassword) { newValue in
+                                        .onChange(of: confirmPassword) { _, newValue in
                                             if !newValue.isEmpty && newValue == newPassword {
                                                 HapticManager.success()
                                             }
@@ -271,7 +271,7 @@ struct AdminPasswordResetView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .confirmPassword)
-                                        .onChange(of: confirmPassword) { newValue in
+                                        .onChange(of: confirmPassword) { _, newValue in
                                             if !newValue.isEmpty && newValue == newPassword {
                                                 HapticManager.success()
                                             }

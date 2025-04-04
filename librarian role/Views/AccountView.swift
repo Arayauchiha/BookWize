@@ -200,7 +200,7 @@ struct ChangePasswordView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
-                                        .onChange(of: newPassword) { newValue in
+                                        .onChange(of: newPassword) { _, newValue in
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                         }
                                 } else {
@@ -208,7 +208,7 @@ struct ChangePasswordView: View {
                                         .textContentType(.newPassword)
                                         .textInputAutocapitalization(.never)
                                         .focused($focusedField, equals: .newPassword)
-                                        .onChange(of: newPassword) { newValue in
+                                        .onChange(of: newPassword) { _, newValue in
                                             passwordValidation = ValidationUtils.validatePassword(newValue)
                                         }
                                 }
@@ -424,7 +424,7 @@ struct ChangePasswordView: View {
                 
                 // Update password in Supabase
                 let userData = ["email": userEmail, "password": newPassword]
-                let response = try await SupabaseManager.shared.client
+                _ = try await SupabaseManager.shared.client
                     .from("Users")
                     .update(userData)
                     .eq("email", value: userEmail)

@@ -68,7 +68,7 @@ struct MemberLoginView: View {
                         .onSubmit {
                             focusedField = .password
                         }
-                        .onChange(of: email) { newValue in
+                        .onChange(of: email) { _, newValue in
                             if !newValue.isEmpty && !isEmailValid {
                                 emailError = "Please enter a valid email address"
                             } else {
@@ -482,7 +482,7 @@ struct PasswordResetRequestView: View {
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
                             .focused($isEmailFocused)
-                            .onChange(of: email) { newValue in
+                            .onChange(of: email) { _, newValue in
                                 if !newValue.isEmpty && !isEmailValid {
                                     emailError = "Please enter a valid email address"
                                 } else {
@@ -526,7 +526,7 @@ struct PasswordResetRequestView: View {
                             .textContentType(.oneTimeCode)
                             .focused($isOTPFocused)
                             .opacity(0.001) // Make it nearly invisible but still functional
-                            .onChange(of: passwordResetOTP) { newValue in
+                            .onChange(of: passwordResetOTP) { _, newValue in
                                 // Limit to 6 digits
                                 if newValue.count > 6 {
                                     passwordResetOTP = String(newValue.prefix(6))

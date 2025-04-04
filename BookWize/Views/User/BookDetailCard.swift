@@ -166,7 +166,7 @@ class BookReservationViewModel: ObservableObject {
         )
         
         // Don't try to capture the response as BookReservation
-        try await supabase.database
+        try await supabase
             .from("BookReservation")
             .insert(reservation)
             .execute()
@@ -248,7 +248,7 @@ private struct ActionButtonsView: View {
                     print("Checking database for reservation: book_id=\(bookIdToUse.uuidString), member_id=\(userId)")
                     
                     // Check if this book is already reserved by the current user
-                    let response = try await supabase.database
+                    let response = try await supabase
                         .from("BookReservation")
                         .select("id")
                         .eq("book_id", value: bookIdToUse.uuidString)
@@ -370,7 +370,7 @@ private struct ActionButtonsView: View {
             }
             
             // Insert the reservation
-            try await supabase.database
+            try await supabase
                 .from("BookReservation")
                 .insert(reservation)
                 .execute()
@@ -378,7 +378,7 @@ private struct ActionButtonsView: View {
             // Update book's available quantity - only do this here, nowhere else
             if currentAvailability > 0 {
                 // Update the database with the current availability value
-                try await supabase.database
+                try await supabase
                     .from("Books")
                     .update(["availableQuantity": currentAvailability - 1])
                     .eq("id", value: bookIdToUse)
@@ -462,7 +462,7 @@ private struct ActionButtonsView: View {
             }
             
             // Delete the reservation
-            try await supabase.database
+            try await supabase
                 .from("BookReservation")
                 .delete()
                 .eq("id", value: reservationId)
@@ -470,7 +470,7 @@ private struct ActionButtonsView: View {
             
             // Increase book's available quantity - only do this here, nowhere else
             // Use the current availability rather than the book's property
-            try await supabase.database
+            try await supabase
                 .from("Books")
                 .update(["availableQuantity": currentAvailability + 1])
                 .eq("id", value: bookIdToUse)
@@ -1217,7 +1217,7 @@ struct BookDetailCard: View {
                     do {
                         let userId = UserDefaults.standard.string(forKey: "currentMemberId") ?? ""
                         if !userId.isEmpty {
-                            let response = try await supabase.database
+                            let response = try await supabase
                                 .from("BookReservation")
                                 .select("id")
                                 .eq("book_id", value: bookIdToUse.uuidString)
@@ -1260,7 +1260,7 @@ struct BookDetailCard: View {
             Task {
                 do {
                     print("Fetching latest availability for book: \(book.title) with ID: \(book.id)")
-                    let response = try await supabase.database
+                    let response = try await supabase
                         .from("Books")
                         .select("availableQuantity")
                         .eq("id", value: book.id)
@@ -1328,7 +1328,7 @@ struct BookDetailCard: View {
         .onDisappear {
             // This ensures the reservation status persists when the view disappears
             // ONLY log the status, don't make any database updates here
-            if let reservationId = BookReservationManager.shared.getReservationId(bookId: book.id) {
+            if BookReservationManager.shared.getReservationId(bookId: book.id) != nil {
                 print("Persisting reservation state for book: \(book.title) with ID: \(book.id)")
             }
         }

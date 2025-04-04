@@ -412,23 +412,21 @@ class WishlistViewModel: ObservableObject {
                         }
                     }
                 }
-                catch {
-                    print("Error decoding book \(bookId): \(error)")
-                }
             } catch {
                 print("Error fetching book \(bookId): \(error)")
             }
         }
         
+        let capBooks = books
         await MainActor.run {
-            self.wishlistBooks = books
+            self.wishlistBooks = capBooks
             self.isLoading = false
             
-            if books.isEmpty {
+            if capBooks.isEmpty {
                 print("No books found in wishlist")
             } else {
-                print("Found \(books.count) books in wishlist")
-                for book in books {
+                print("Found \(capBooks.count) books in wishlist")
+                for book in capBooks {
                     print("  - \(book.title) by \(book.author)")
                 }
             }

@@ -63,7 +63,7 @@ struct AdminLoginView: View {
                         .onSubmit {
                             focusedField = .password
                         }
-                        .onChange(of: email) { newValue in
+                        .onChange(of: email) { _, newValue in
                             if !newValue.isEmpty && !isEmailValid {
                                 emailError = "Please enter a valid email address"
                             } else {
