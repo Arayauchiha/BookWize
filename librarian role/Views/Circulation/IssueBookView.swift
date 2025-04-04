@@ -93,6 +93,7 @@ struct EnhancedLoanCard: View {
     let issuedBooks: issueBooks
     @State private var bookCoverURL: URL?
     @State private var isLoadingCover = true
+    @State private var book: Book?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -176,15 +177,32 @@ struct EnhancedLoanCard: View {
         .background(Color.customCardBackground)
         .cornerRadius(12)
         .task {
-            await fetchBookCover()
+            await fetchBookDetails()
         }
     }
     
-    // Function to fetch book cover
-    private func fetchBookCover() async {
-        // Construct OpenLibrary API URL for book cover
-        let coverURL = "https://covers.openlibrary.org/b/isbn/\(issuedBooks.isbn)-M.jpg"
-        bookCoverURL = URL(string: coverURL)
+    // Function to fetch book details and cover
+    private func fetchBookDetails() async {
+        do {
+            // Fetch book details from Books table
+            let bookResponse: [Book] = try await SupabaseManager.shared.client
+                .from("Books")
+                .select("*")
+                .eq("isbn", value: issuedBooks.isbn)
+                .execute()
+                .value
+            
+            if let fetchedBook = bookResponse.first {
+                await MainActor.run {
+                    self.book = fetchedBook
+                    if let imageURL = fetchedBook.imageURL {
+                        self.bookCoverURL = URL(string: imageURL)
+                    }
+                }
+            }
+        } catch {
+            print("Error fetching book details: \(error)")
+        }
     }
 }
 
