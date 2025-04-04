@@ -4,6 +4,13 @@ struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .padding(12)
+            .background(Color(.systemBackground))
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 }
 
