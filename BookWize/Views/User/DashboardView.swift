@@ -178,6 +178,7 @@ class BorrowedBooksManager: ObservableObject {
         await fetchBorrowedBooks()
     }
     
+    @MainActor
     func fetchBorrowedBooks() async {
         isLoading = true
         errorMessage = nil
@@ -387,7 +388,7 @@ class OverdueFinesManager: ObservableObject {
         FinePolicyManager.shared.loadFinePolicy()
         await fetchOverdueFines()
     }
-    
+    @MainActor
     func fetchOverdueFines() async {
         isLoading = true
         errorMessage = nil
