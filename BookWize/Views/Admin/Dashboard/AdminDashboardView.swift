@@ -235,7 +235,7 @@ struct AdminDashboardView: View {
                     .navigationBarTitleDisplayMode(.large)
             }
             .tabItem {
-                Label("Librarians", systemImage: "person.2.fill")
+                Label("Management", systemImage: "person.2.fill")
             }
             .tag(1)
             
