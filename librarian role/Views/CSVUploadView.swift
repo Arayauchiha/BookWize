@@ -141,41 +141,6 @@ struct CSVUploadView: View {
                                 .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
                         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                        
-                        // Legend
-                        //                        HStack(spacing: 16) {
-                        //                            Label {
-                        //                                Text("Required Field")
-                        //                                    .font(.caption)
-                        //                            } icon: {
-                        //                                Text("*")
-                        //                                    .font(.caption)
-                        //                                    .foregroundColor(.white)
-                        //                                    .frame(width: 16, height: 16)
-                        //                                    .background(Color.blue)
-                        //                                    .cornerRadius(4)
-                        //                            }
-                        //
-                        //                            Label {
-                        //                                Text("Optional Field")
-                        //                                    .font(.caption)
-                        //                            } icon: {
-                        //                                Rectangle()
-                        //                                    .fill(Color.clear)
-                        //                                    .frame(width: 16, height: 16)
-                        //                                    .overlay(
-                        //                                        RoundedRectangle(cornerRadius: 4)
-                        //                                            .stroke(Color.gray, lineWidth: 1)
-                        //                                    )
-                        //                            }
-                        //                        }
-                        //                        .foregroundColor(.secondary)
-                        //                    }
-                        //                    .padding()
-                        //                    .background(Color.gray.opacity(0.05))
-                        //                    .cornerRadius(12)
-                        
-                        // Upload Button
                         Button(action: {
                             showFilePicker = true
                         }) {

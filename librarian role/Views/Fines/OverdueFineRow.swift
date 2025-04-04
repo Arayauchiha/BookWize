@@ -9,9 +9,6 @@ struct OverdueFineRow: View {
                 Text(record.bookId.uuidString)
                     .font(.headline)
                 Spacer()
-//                Text("$\(calculateFine(), specifier: "%.2f")")
-//                    .font(.headline)
-//                    .foregroundColor(.red)
             }
             
             HStack {
@@ -32,8 +29,4 @@ struct OverdueFineRow: View {
     private var daysOverdue: Int {
         Calendar.current.dateComponents([.day], from: record.dueDate, to: Date()).day ?? 0
     }
-//    
-//    private func calculateFine() -> Double {
-//        Double(daysOverdue) * FineConstants.dailyOverdueFine
-//    }
 } 
