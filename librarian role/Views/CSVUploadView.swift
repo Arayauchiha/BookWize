@@ -36,7 +36,9 @@ struct CSVUploadView: View {
     @ObservedObject var viewModel: InventoryManager
     @State private var showFilePicker = false
     @State private var showError = false
+    @State private var showSuccess = false
     @State private var errorMessage = ""
+    @State private var successMessage = ""
     @State private var isLoading = false
     
     // Column definitions with metadata
@@ -213,35 +215,46 @@ struct CSVUploadView: View {
                     switch result {
                     case .success(let files):
                         guard let file = files.first else { return }
-                        Task {
-                            isLoading = true
-                            do {
-                                // Start accessing the security-scoped resource
-                                guard file.startAccessingSecurityScopedResource() else {
-                                    throw NSError(domain: "FileError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Permission denied to access the file"])
-                                }
-                                
-                                defer {
-                                    file.stopAccessingSecurityScopedResource()
-                                }
-                                
-                                try viewModel.importCSV(from: file)
-                                dismiss()
-                            } catch {
-                                errorMessage = error.localizedDescription
-                                showError = true
+                        isLoading = true
+                        
+                        do {
+                            // Start accessing the security-scoped resource
+                            guard file.startAccessingSecurityScopedResource() else {
+                                throw NSError(domain: "FileError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Permission denied to access the file"])
                             }
-                            isLoading = false
+                            
+                            defer {
+                                file.stopAccessingSecurityScopedResource()
+                            }
+                            
+                            try viewModel.importCSV(from: file)
+                            successMessage = "Books imported successfully!"
+                            showSuccess = true
+                            HapticManager.success()
+                        } catch {
+                            errorMessage = "Error importing CSV: \(error.localizedDescription)"
+                            showError = true
+                            HapticManager.error()
                         }
+                        isLoading = false
+                        
                     case .failure(let error):
-                        errorMessage = error.localizedDescription
+                        errorMessage = "Error selecting file: \(error.localizedDescription)"
                         showError = true
+                        HapticManager.error()
                     }
                 }
                 .alert("Error", isPresented: $showError) {
-                    Button("OK", role: .cancel) { }
+                    Button("OK") { }
                 } message: {
                     Text(errorMessage)
+                }
+                .alert("Success", isPresented: $showSuccess) {
+                    Button("OK") {
+                        dismiss()
+                    }
+                } message: {
+                    Text(successMessage)
                 }
             }
         }
